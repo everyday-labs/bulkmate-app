@@ -179,7 +179,7 @@ function extractItems(lines: string[]): ParsedItem[] {
   // Fallback: no Member line found — start at first SKU-like line
   if (itemStart === -1) {
     for (let i = 0; i < lines.length; i++) {
-      if (/^[A-Z]?[0-9]{5,9}(\s|$)/.test(lines[i])) {
+      if (/^[A-Z]?[0-9]{4,9}(\s|$)/.test(lines[i])) {
         itemStart = i;
         break;
       }

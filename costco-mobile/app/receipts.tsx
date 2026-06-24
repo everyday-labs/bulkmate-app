@@ -39,6 +39,30 @@ export default function ReceiptsScreen() {
     }, []),
   );
 
+  const runSearch = useCallback(async (q: string, receipts: ReceiptRow[]) => {
+    setSearching(true);
+    try {
+      const { data: itemMatches } = await supabase
+        .from('receipt_items')
+        .select('receipt_id')
+        .or(`description.ilike.%${q}%,sku.ilike.%${q}%`);
+
+      const itemMatchIds = new Set(itemMatches?.map((i: any) => i.receipt_id) ?? []);
+      const lower = q.toLowerCase();
+
+      const filtered = receipts.filter(
+        (r) =>
+          itemMatchIds.has(r.id) ||
+          r.warehouse_name?.toLowerCase().includes(lower) ||
+          r.warehouse_code?.toLowerCase().includes(lower),
+      );
+
+      setDisplayed(filtered);
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
   // Debounce search — runs 350ms after user stops typing
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -56,7 +80,7 @@ export default function ReceiptsScreen() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, allReceipts]);
+  }, [query, allReceipts, runSearch]);
 
   async function load(isRefresh: boolean) {
     if (isRefresh) setRefreshing(true);
@@ -82,38 +106,12 @@ export default function ReceiptsScreen() {
       }));
 
       setAllReceipts(rows);
-      setDisplayed(query.trim() ? displayed : rows); // keep search results if active
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to load receipts');
+      // useEffect([query, allReceipts, runSearch]) re-applies any active search automatically.
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to load receipts');
     } finally {
       setLoading(false);
       setRefreshing(false);
-    }
-  }
-
-  async function runSearch(q: string, receipts: ReceiptRow[]) {
-    setSearching(true);
-    try {
-      // Server-side: find receipt_ids whose items match the query (name or SKU)
-      const { data: itemMatches } = await supabase
-        .from('receipt_items')
-        .select('receipt_id')
-        .or(`description.ilike.%${q}%,sku.ilike.%${q}%`);
-
-      const itemMatchIds = new Set(itemMatches?.map((i: any) => i.receipt_id) ?? []);
-      const lower = q.toLowerCase();
-
-      // Filter: receipt contains a matching item, OR warehouse name/code matches
-      const filtered = receipts.filter(
-        (r) =>
-          itemMatchIds.has(r.id) ||
-          r.warehouse_name?.toLowerCase().includes(lower) ||
-          r.warehouse_code?.toLowerCase().includes(lower),
-      );
-
-      setDisplayed(filtered);
-    } finally {
-      setSearching(false);
     }
   }
 

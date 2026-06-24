@@ -9,7 +9,6 @@ import {
   Share,
   Alert,
   Modal,
-  Animated,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
@@ -26,7 +25,6 @@ type ReceiptItem = {
   description: string;
   unit_price: number;
   discount_amount: number;
-  quantity: number;
 };
 
 type ReceiptDetails = {
@@ -72,7 +70,7 @@ export default function ReceiptSuccessScreen() {
             .single(),
           supabase
             .from('receipt_items')
-            .select('id, sku, description, unit_price, discount_amount, quantity')
+            .select('id, sku, description, unit_price, discount_amount')
             .eq('receipt_id', id)
             .order('id'),
         ]);
@@ -101,8 +99,8 @@ export default function ReceiptSuccessScreen() {
       if (!alreadyPrompted) {
         promptTimerRef.current = setTimeout(() => setShowNotifPrompt(true), 1500);
       }
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to load receipt');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to load receipt');
     } finally {
       setLoading(false);
     }
@@ -178,8 +176,8 @@ export default function ReceiptSuccessScreen() {
               const { error } = await supabase.from('receipts').delete().eq('id', receipt!.id);
               if (error) throw error;
               handleDone();
-            } catch (e: any) {
-              Alert.alert('Error', e.message ?? 'Failed to delete receipt');
+            } catch (e: unknown) {
+              Alert.alert('Error', e instanceof Error ? e.message : 'Failed to delete receipt');
             }
           },
         },
