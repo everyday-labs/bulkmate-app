@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"/Users/balajichandrasekaran/Desktop/Costco app/costco-backend\")",
+      "Bash(supabase init *)",
+      "Bash(docker info *)",
+      "Bash(docker --version)",
+      "Bash(npx expo *)",
+      "Bash(npm install *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(xcode-select -p)",
+      "Bash(xcrun simctl *)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/expo/package.json'\\).version\\)\")",
+      "Bash(supabase *)",
+      "Bash(gh api *)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(rm -rf \"/Users/balajichandrasekaran/Desktop/Costco app/costco-backend/.git\")",
+      "Bash(rm -rf \"/Users/balajichandrasekaran/Desktop/Costco app/costco-mobile/.git\")",
+      "Bash(git rm *)"
+    ]
+  }
+}

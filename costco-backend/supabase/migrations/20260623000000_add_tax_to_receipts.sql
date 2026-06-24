@@ -1,0 +1,3 @@
+ALTER TABLE receipts
+  ADD COLUMN IF NOT EXISTS tax_amount NUMERIC(10, 2),
+  ADD COLUMN IF NOT EXISTS transaction_number TEXT;
