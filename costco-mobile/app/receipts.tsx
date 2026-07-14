@@ -4,14 +4,16 @@ import {
   Text,
   FlatList,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   ActivityIndicator,
   RefreshControl,
   TextInput,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { Colors } from '../constants/colors';
+import { spacing, fontSize, radius, shadow, letterSpacing } from '../constants/theme';
 
 type ReceiptRow = {
   id: string;
@@ -24,6 +26,7 @@ type ReceiptRow = {
 
 export default function ReceiptsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [allReceipts, setAllReceipts] = useState<ReceiptRow[]>([]);
   const [displayed, setDisplayed] = useState<ReceiptRow[]>([]);
   const [query, setQuery] = useState('');
@@ -128,10 +131,10 @@ export default function ReceiptsScreen() {
   return (
     <View style={styles.container}>
       {/* Nav header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
+        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={8}>
           <Text style={styles.backText}>‹ Back</Text>
-        </TouchableOpacity>
+        </Pressable>
         <Text style={styles.title}>Receipt History</Text>
         <View style={{ width: 60 }} />
       </View>
@@ -142,8 +145,8 @@ export default function ReceiptsScreen() {
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             style={styles.searchInput}
-            placeholder="Item name, SKU, or warehouse..."
-            placeholderTextColor={Colors.gray[500]}
+            placeholder="Item, SKU, or warehouse…"
+            placeholderTextColor={Colors.gray[400]}
             value={query}
             onChangeText={setQuery}
             returnKeyType="search"
@@ -151,16 +154,19 @@ export default function ReceiptsScreen() {
             autoCapitalize="none"
             clearButtonMode="while-editing"
           />
-          {searching && <ActivityIndicator size="small" color={Colors.gray[500]} />}
+          {searching && <ActivityIndicator size="small" color={Colors.gray[400]} />}
         </View>
       </View>
 
       {error ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => load(false)}>
-            <Text style={styles.retryText}>Retry</Text>
-          </TouchableOpacity>
+          <Pressable
+            style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.7 }]}
+            onPress={() => load(false)}
+          >
+            <Text style={styles.retryText}>Try again</Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList
@@ -183,13 +189,7 @@ export default function ReceiptsScreen() {
             />
           )}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListEmptyComponent={
-            isSearching ? (
-              <NoResults query={query.trim()} />
-            ) : (
-              <EmptyState />
-            )
-          }
+          ListEmptyComponent={isSearching ? <NoResults query={query.trim()} /> : <EmptyState />}
         />
       )}
     </View>
@@ -198,26 +198,29 @@ export default function ReceiptsScreen() {
 
 function ReceiptCard({ receipt, onPress }: { receipt: ReceiptRow; onPress: () => void }) {
   const date = new Date(receipt.transaction_date + 'T00:00:00').toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
+    month: 'short', day: 'numeric', year: 'numeric',
   });
-
-  const warehouseLabel = receipt.warehouse_name
-    ? receipt.warehouse_code
-      ? `${receipt.warehouse_name} #${receipt.warehouse_code}`
-      : receipt.warehouse_name
-    : 'Costco Warehouse';
+  const warehouse = receipt.warehouse_name ?? 'Costco Warehouse';
+  const code = receipt.warehouse_code ? `#${receipt.warehouse_code}` : null;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.cardIcon}>
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onPress={onPress}
+    >
+      <View style={styles.cardIconWrap}>
         <Text style={styles.cardIconText}>🧾</Text>
       </View>
       <View style={styles.cardBody}>
-        <Text style={styles.cardWarehouse} numberOfLines={1}>{warehouseLabel}</Text>
+        <View style={styles.cardTopRow}>
+          <Text style={styles.cardWarehouse} numberOfLines={1}>{warehouse}</Text>
+          {code && <Text style={styles.cardCode}>{code}</Text>}
+        </View>
         <Text style={styles.cardMeta}>
-          {date} · {receipt.item_count} {receipt.item_count === 1 ? 'item' : 'items'}
+          {date}{'  ·  '}
+          <Text style={styles.cardItemCount}>
+            {receipt.item_count} {receipt.item_count === 1 ? 'item' : 'items'}
+          </Text>
         </Text>
       </View>
       <View style={styles.cardRight}>
@@ -226,7 +229,7 @@ function ReceiptCard({ receipt, onPress }: { receipt: ReceiptRow; onPress: () =>
         )}
         <Text style={styles.chevron}>›</Text>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -236,7 +239,7 @@ function EmptyState() {
       <Text style={styles.emptyIcon}>🧾</Text>
       <Text style={styles.emptyTitle}>No receipts yet</Text>
       <Text style={styles.emptySubtitle}>
-        Scan your first Costco receipt to start tracking purchases
+        Scan your first Costco receipt to start tracking your spending.
       </Text>
     </View>
   );
@@ -248,83 +251,130 @@ function NoResults({ query }: { query: string }) {
       <Text style={styles.emptyIcon}>🔍</Text>
       <Text style={styles.emptyTitle}>No results</Text>
       <Text style={styles.emptySubtitle}>
-        No receipts found for "{query}". Try searching by a different item name, SKU, or warehouse.
+        Nothing found for "{query}".{'\n'}Try a different item name, SKU, or warehouse.
       </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  container: { flex: 1, backgroundColor: Colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['2xl'] },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingBottom: 12,
-    paddingHorizontal: 20,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.xl,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.gray[100],
+    borderBottomColor: Colors.border,
   },
   backButton: { width: 60 },
-  backText: { fontSize: 17, color: Colors.costcoRed },
-  title: { fontSize: 17, fontWeight: '700', color: Colors.gray[700] },
+  backText: { fontSize: fontSize.xl, color: Colors.costcoRed, fontWeight: '500' },
+  title: { fontSize: fontSize.xl, fontWeight: '700', color: Colors.gray[900], letterSpacing: letterSpacing.tight },
 
   // Search
   searchRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md - 2,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.gray[100],
+    borderBottomColor: Colors.border,
   },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.gray[100],
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 8,
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 1,
+    gap: spacing.sm,
   },
-  searchIcon: { fontSize: 15 },
-  searchInput: { flex: 1, fontSize: 15, color: Colors.gray[700], padding: 0 },
+  searchIcon: { fontSize: 14 },
+  searchInput: { flex: 1, fontSize: fontSize.md, color: Colors.gray[900], padding: 0 },
 
   // List
-  listContent: { paddingVertical: 8 },
+  listContent: { paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, gap: 2 },
   emptyContainer: { flex: 1 },
+
+  // Receipt card
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: radius.xl,
+    gap: spacing.md,
+    ...shadow.sm,
+    marginVertical: 3,
   },
-  cardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+  cardPressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
+  cardIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
     backgroundColor: Colors.gray[100],
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
   },
-  cardIconText: { fontSize: 20 },
+  cardIconText: { fontSize: 22 },
   cardBody: { flex: 1 },
-  cardWarehouse: { fontSize: 15, fontWeight: '600', color: Colors.gray[700], marginBottom: 3 },
-  cardMeta: { fontSize: 13, color: Colors.gray[500] },
-  cardRight: { alignItems: 'flex-end', marginLeft: 12 },
-  cardTotal: { fontSize: 15, fontWeight: '700', color: Colors.gray[700], marginBottom: 2 },
-  chevron: { fontSize: 20, color: Colors.gray[300] },
-  separator: { height: 1, backgroundColor: Colors.gray[100], marginLeft: 74 },
+  cardTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 3 },
+  cardWarehouse: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: Colors.gray[900],
+    flexShrink: 1,
+  },
+  cardCode: {
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+    color: Colors.gray[400],
+    backgroundColor: Colors.gray[100],
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  cardMeta: { fontSize: fontSize.sm, color: Colors.gray[400] },
+  cardItemCount: { color: Colors.gray[400] },
+  cardRight: { alignItems: 'flex-end', gap: spacing.xs },
+  cardTotal: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: Colors.executiveNavy,
+    letterSpacing: letterSpacing.tight,
+  },
+  chevron: { fontSize: 18, color: Colors.gray[300] },
+  separator: { height: 0 },
 
   // Empty / no results
-  emptyInner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.gray[700], marginBottom: 8 },
-  emptySubtitle: { fontSize: 14, color: Colors.gray[500], textAlign: 'center', lineHeight: 20 },
+  emptyInner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['4xl'] },
+  emptyIcon: { fontSize: 52, marginBottom: spacing.xl },
+  emptyTitle: {
+    fontSize: fontSize['3xl'],
+    fontWeight: '700',
+    color: Colors.gray[800],
+    marginBottom: spacing.sm,
+    letterSpacing: letterSpacing.tight,
+  },
+  emptySubtitle: {
+    fontSize: fontSize.md,
+    color: Colors.gray[400],
+    textAlign: 'center',
+    lineHeight: 22,
+  },
 
   // Error
-  errorText: { fontSize: 15, color: Colors.gray[700], textAlign: 'center', marginBottom: 16 },
-  retryButton: { paddingVertical: 10, paddingHorizontal: 24, borderWidth: 1, borderColor: Colors.costcoRed, borderRadius: 8 },
-  retryText: { color: Colors.costcoRed, fontWeight: '600' },
+  errorText: { fontSize: fontSize.md, color: Colors.gray[700], textAlign: 'center', marginBottom: spacing.lg },
+  retryButton: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing['2xl'],
+    backgroundColor: Colors.costcoRed,
+    borderRadius: radius.lg,
+  },
+  retryText: { color: Colors.white, fontWeight: '700', fontSize: fontSize.md },
 });

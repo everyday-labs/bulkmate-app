@@ -26,7 +26,21 @@
       "expo-router",
       "@sentry/react-native",
       "expo-apple-authentication",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "color": "#E31837",
+          "iosDisplayInForeground": true
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Costco uses your location to verify you're at a warehouse and award check-in badges.",
+          "locationWhenInUsePermission": "Costco uses your location to verify you're at a warehouse and award check-in badges."
+        }
+      ]
     ],
     "extra": {
       "router": {},

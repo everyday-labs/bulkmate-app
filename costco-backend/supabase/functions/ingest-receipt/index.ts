@@ -169,6 +169,23 @@ serve(async (req) => {
       console.warn(`PRICE SUM MISMATCH: computed ${computedTotal.toFixed(2)} vs receipt subtotal ${parsed.subtotal}. Likely OCR digit drop — stored subtotal from receipt.`);
     }
 
+    // 8. Trigger price match check in the background — fire-and-forget so it
+    //    doesn't block the response. Errors are logged but not surfaced to client.
+    const priceMatchUrl = `${supabaseUrl}/functions/v1/price-match-check`;
+    fetch(priceMatchUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({ receipt_id: receipt.id, user_id: userId }),
+    }).then(async (res) => {
+      const text = await res.text();
+      console.log('12. price-match-check result:', text);
+    }).catch((err) => {
+      console.warn('12. price-match-check fire failed (non-blocking):', err?.message);
+    });
+
     return new Response(
       JSON.stringify({
         receiptId: receipt.id,
