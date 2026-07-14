@@ -1,5 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
 import * as Sentry from '@sentry/react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../hooks/useAuth';
@@ -10,11 +12,25 @@ if (sentryDsn && sentryDsn !== 'placeholder') {
   Sentry.init({ dsn: sentryDsn, enabled: !__DEV__ });
 }
 
+// Show notifications as banners even when the app is foregrounded
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
 export default function RootLayout() {
   const { session, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const notifListenerRef = useRef<Notifications.EventSubscription | null>(null);
+  const responseListenerRef = useRef<Notifications.EventSubscription | null>(null);
 
+  // Offline queue drain on reconnect
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       if (state.isConnected) drainQueue();
@@ -22,11 +38,10 @@ export default function RootLayout() {
     return () => unsubscribe();
   }, []);
 
+  // Auth-gated routing
   useEffect(() => {
     if (loading) return;
-
     const inAuthGroup = segments[0] === '(auth)';
-
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/login');
     } else if (session && inAuthGroup) {
@@ -34,10 +49,39 @@ export default function RootLayout() {
     }
   }, [session, loading, segments, router]);
 
+  // Notification listeners — set up once after auth is resolved
+  useEffect(() => {
+    if (loading) return;
+
+    // Foreground notification received (informational — no action needed)
+    notifListenerRef.current = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        console.log('Notification received in foreground:', notification.request.identifier);
+      },
+    );
+
+    // User tapped a notification — route to the relevant screen
+    responseListenerRef.current = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const data = response.notification.request.content.data as Record<string, string> | undefined;
+        if (data?.receiptId) {
+          router.push(`/receipt-success?receiptId=${data.receiptId}`);
+        }
+      },
+    );
+
+    return () => {
+      notifListenerRef.current?.remove();
+      responseListenerRef.current?.remove();
+    };
+  }, [loading, router]);
+
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <SafeAreaProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+    </SafeAreaProvider>
   );
 }

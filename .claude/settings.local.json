@@ -18,7 +18,9 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(rm -rf \"/Users/balajichandrasekaran/Desktop/Costco app/costco-backend/.git\")",
       "Bash(rm -rf \"/Users/balajichandrasekaran/Desktop/Costco app/costco-mobile/.git\")",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "WebFetch(domain:rapidapi.com)",
+      "Bash(npx tsc *)"
     ]
   }
 }

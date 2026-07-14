@@ -4,12 +4,15 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { File, Paths } from 'expo-file-system/next';
 import NetInfo from '@react-native-community/netinfo';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { uploadReceipt } from '../lib/receiptUpload';
 import { enqueue } from '../lib/offlineQueue';
 import { Colors } from '../constants/colors';
+import { spacing, fontSize, radius } from '../constants/theme';
 
 export default function ReceiptCameraScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [capturing, setCapturing] = useState(false);
@@ -34,7 +37,6 @@ export default function ReceiptCameraScreen() {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
       if (!photo?.uri) throw new Error('No photo captured');
 
-      // Copy to persistent local storage
       const dest = new File(Paths.document, `receipt_${Date.now()}.jpg`);
       await new File(photo.uri).copy(dest);
       const destUri = dest.uri;
@@ -60,13 +62,13 @@ export default function ReceiptCameraScreen() {
     <View style={styles.container}>
       <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
 
-      {/* Top instruction bar */}
-      <View style={styles.topBar}>
+      {/* Top instruction bar — clears the notch / Dynamic Island */}
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.md }]}>
         <Text style={styles.hint}>Lay the receipt flat and capture the full receipt</Text>
       </View>
 
-      {/* Bottom controls */}
-      <View style={styles.controls}>
+      {/* Bottom controls — clears the home indicator */}
+      <View style={[styles.controls, { bottom: insets.bottom + spacing['3xl'] }]}>
         <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
           <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
@@ -91,45 +93,48 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing['2xl'],
   },
-  permissionText: { fontSize: 16, color: Colors.gray[700], textAlign: 'center', marginBottom: 24 },
+  permissionText: {
+    fontSize: fontSize.lg,
+    color: Colors.gray[700],
+    textAlign: 'center',
+    marginBottom: spacing['2xl'],
+  },
   permissionButton: {
     backgroundColor: Colors.costcoRed,
-    borderRadius: 8,
+    borderRadius: radius.md,
     paddingVertical: 14,
-    paddingHorizontal: 32,
+    paddingHorizontal: spacing['3xl'],
   },
-  permissionButtonText: { color: Colors.white, fontSize: 16, fontWeight: '600' },
+  permissionButtonText: { color: Colors.white, fontSize: fontSize.lg, fontWeight: '600' },
   topBar: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 24,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing['2xl'],
     backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
   },
   hint: {
     color: Colors.white,
-    fontSize: 15,
+    fontSize: fontSize.md,
     textAlign: 'center',
     lineHeight: 22,
   },
   controls: {
     position: 'absolute',
-    bottom: 48,
     left: 0,
     right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 32,
+    paddingHorizontal: spacing['3xl'],
   },
   cancelButton: { width: 64, alignItems: 'center' },
-  cancelText: { color: Colors.white, fontSize: 16 },
+  cancelText: { color: Colors.white, fontSize: fontSize.lg },
   captureButton: {
     width: 72,
     height: 72,
