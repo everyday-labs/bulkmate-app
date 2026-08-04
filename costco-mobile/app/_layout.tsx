@@ -4,6 +4,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import * as Sentry from '@sentry/react-native';
 import NetInfo from '@react-native-community/netinfo';
+import { PostHogErrorBoundary, PostHogProvider } from 'posthog-react-native';
+import { posthog } from '../lib/posthog';
 import { useAuth } from '../hooks/useAuth';
 import { drainQueue } from '../lib/receiptUpload';
 
@@ -29,6 +31,28 @@ export default function RootLayout() {
   const router = useRouter();
   const notifListenerRef = useRef<Notifications.EventSubscription | null>(null);
   const responseListenerRef = useRef<Notifications.EventSubscription | null>(null);
+  const identifiedUserIdRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const user = session?.user;
+    if (!user) {
+      if (identifiedUserIdRef.current !== null) {
+        posthog?.reset();
+        identifiedUserIdRef.current = null;
+      }
+      return;
+    }
+
+    if (identifiedUserIdRef.current === user.id) return;
+
+    posthog?.identify(
+      user.id,
+      user.email ? { email: user.email } : undefined,
+    );
+    identifiedUserIdRef.current = user.id;
+  }, [loading, session]);
 
   // Offline queue drain on reconnect
   useEffect(() => {
@@ -76,12 +100,20 @@ export default function RootLayout() {
     };
   }, [loading, router]);
 
-  return (
+  const content = (
     <SafeAreaProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
       </Stack>
     </SafeAreaProvider>
+  );
+
+  return posthog ? (
+    <PostHogProvider client={posthog}>
+      <PostHogErrorBoundary>{content}</PostHogErrorBoundary>
+    </PostHogProvider>
+  ) : (
+    content
   );
 }
