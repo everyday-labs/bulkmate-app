@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { uploadReceipt } from '../lib/receiptUpload';
 import { enqueue } from '../lib/offlineQueue';
+import { posthog } from '../lib/posthog';
 import { Colors } from '../constants/colors';
 import { spacing, fontSize, radius } from '../constants/theme';
 
@@ -45,9 +46,15 @@ export default function ReceiptCameraScreen() {
 
       if (isConnected) {
         const result = await uploadReceipt(destUri);
+        posthog?.capture('receipt_upload_completed', {
+          item_count: result.itemCount,
+          is_duplicate: result.duplicate,
+          has_item_count_mismatch: result.itemCountMismatch,
+        });
         router.replace(`/receipt-success?receiptId=${result.receiptId}&duplicate=${result.duplicate}`);
       } else {
         await enqueue(destUri);
+        posthog?.capture('receipt_upload_queued_offline');
         Alert.alert('Saved', 'Receipt saved. Will upload when connected.');
         router.back();
       }

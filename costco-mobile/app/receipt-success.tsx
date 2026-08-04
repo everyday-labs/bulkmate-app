@@ -15,6 +15,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { posthog } from '../lib/posthog';
 import { Colors } from '../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../constants/theme';
 import {
@@ -157,6 +158,7 @@ export default function ReceiptSuccessScreen() {
               }
               const { error } = await supabase.from('receipts').delete().eq('id', receipt!.id);
               if (error) throw error;
+              posthog?.capture('receipt_deleted');
               handleDone();
             } catch (e: unknown) {
               Alert.alert('Error', e instanceof Error ? e.message : 'Failed to delete receipt');

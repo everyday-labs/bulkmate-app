@@ -15,6 +15,7 @@ import * as Notifications from 'expo-notifications';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { requestAndSavePushToken } from '../../lib/notifications';
+import { posthog } from '../../lib/posthog';
 import { Colors } from '../../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../../constants/theme';
 
@@ -124,6 +125,7 @@ export default function ProfileScreen() {
     try {
       const result = await requestAndSavePushToken();
       setPermStatus(result === 'granted' ? 'granted' : 'denied');
+      if (result === 'granted') posthog?.capture('notifications_enabled');
     } finally {
       setEnablingNotifs(false);
     }
