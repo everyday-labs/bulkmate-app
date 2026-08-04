@@ -40,7 +40,8 @@
           "locationAlwaysAndWhenInUsePermission": "Costco uses your location to verify you're at a warehouse and award check-in badges.",
           "locationWhenInUsePermission": "Costco uses your location to verify you're at a warehouse and award check-in badges."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "router": {},
