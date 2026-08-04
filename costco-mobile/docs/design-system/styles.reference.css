@@ -1,0 +1,291 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Costco Companion — Design System
+ *
+ * Palette: Warehouse Red & Cream
+ * Warm cream background, deep navy structure, red accent for actions/alerts.
+ * Typography: Outfit headings, Figtree body, JetBrains Mono for receipt data.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+
+  /* Custom semantic tokens */
+  --color-cream: var(--cream);
+  --color-cream-dark: var(--cream-dark);
+  --color-navy: var(--navy);
+  --color-navy-light: var(--navy-light);
+  --color-red: var(--red);
+  --color-red-light: var(--red-light);
+  --color-gold: var(--gold);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+
+  /* Chart colors */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Fonts */
+  --font-sans: "Figtree", system-ui, sans-serif;
+  --font-display: "Outfit", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Animation timings */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-instant: 100ms;
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --duration-celebrate: 600ms;
+}
+
+:root {
+  --radius: 1rem;
+
+  /* Backgrounds */
+  --background: #fdfaf3;
+  --cream: #fdfaf3;
+  --cream-dark: #f0e6d6;
+
+  /* Text / structure */
+  --foreground: #1b2a4a;
+  --navy: #1b2a4a;
+  --navy-light: #3d4f75;
+
+  /* Primary action / alert */
+  --primary: #d1373a;
+  --red: #d1373a;
+  --red-light: #f4d7d7;
+  --primary-foreground: #ffffff;
+
+  /* Surfaces */
+  --card: #ffffff;
+  --card-foreground: #1b2a4a;
+  --popover: #ffffff;
+  --popover-foreground: #1b2a4a;
+  --secondary: #f5efe6;
+  --secondary-foreground: #1b2a4a;
+  --muted: #f0e6d6;
+  --muted-foreground: #6b7280;
+  --accent: #f0e6d6;
+  --accent-foreground: #1b2a4a;
+
+  /* Feedback */
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --success: #2d8a6e;
+  --warning: #d4842a;
+  --gold: #c9a84c;
+
+  /* Borders / focus */
+  --border: #e8e0d4;
+  --input: #e8e0d4;
+  --ring: #d1373a;
+
+  /* Charts */
+  --chart-1: #d1373a;
+  --chart-2: #1b2a4a;
+  --chart-3: #c9a84c;
+  --chart-4: #2d8a6e;
+  --chart-5: #d4842a;
+}
+
+.dark {
+  --background: #14121c;
+  --cream: #14121c;
+  --cream-dark: #1f1d28;
+  --foreground: #f5efe6;
+  --navy: #f5efe6;
+  --navy-light: #d8d0c5;
+
+  --primary: #ff6b6d;
+  --red: #ff6b6d;
+  --red-light: #3d2525;
+  --primary-foreground: #14121c;
+
+  --card: #1f1d28;
+  --card-foreground: #f5efe6;
+  --popover: #1f1d28;
+  --popover-foreground: #f5efe6;
+  --secondary: #2a2733;
+  --secondary-foreground: #f5efe6;
+  --muted: #2a2733;
+  --muted-foreground: #a8a0a0;
+  --accent: #2a2733;
+  --accent-foreground: #f5efe6;
+
+  --destructive: #ff8a7a;
+  --destructive-foreground: #14121c;
+  --success: #5cbdb9;
+  --warning: #e8b84a;
+  --gold: #e8c96e;
+
+  --border: rgba(245, 239, 230, 0.12);
+  --input: rgba(245, 239, 230, 0.15);
+  --ring: #ff6b6d;
+
+  --chart-1: #ff6b6d;
+  --chart-2: #a5b4fc;
+  --chart-3: #e8c96e;
+  --chart-4: #5cbdb9;
+  --chart-5: #e8b84a;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 700;
+  }
+}
+
+/* Animation utilities */
+@utility animate-fade-in {
+  animation: fade-in 0.4s var(--ease-smooth) forwards;
+}
+
+@utility animate-fade-up {
+  animation: fade-up 0.5s var(--ease-smooth) forwards;
+}
+
+@utility animate-pop {
+  animation: pop 0.4s var(--ease-spring) forwards;
+}
+
+@utility animate-shake {
+  animation: shake 0.5s var(--ease-spring) both;
+}
+
+@utility animate-pulse-soft {
+  animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@utility animate-scan {
+  animation: scan 1.5s ease-in-out infinite;
+}
+
+@utility animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pop {
+  0% { transform: scale(0.8); opacity: 0; }
+  70% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px) rotate(-2deg); }
+  40% { transform: translateX(4px) rotate(2deg); }
+  60% { transform: translateX(-3px) rotate(-1deg); }
+  80% { transform: translateX(3px) rotate(1deg); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.03); }
+}
+
+@keyframes scan {
+  0% { top: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* Stagger delays for dashboard entrance */
+@utility delay-100 { animation-delay: 100ms; }
+@utility delay-200 { animation-delay: 200ms; }
+@utility delay-300 { animation-delay: 300ms; }
+@utility delay-400 { animation-delay: 400ms; }
+@utility delay-500 { animation-delay: 500ms; }
+
+/* Interactive press scale */
+@utility press-scale {
+  transition: transform var(--duration-fast) var(--ease-smooth);
+  &:active {
+    transform: scale(0.96);
+  }
+}
+
+/* Hide scrollbar but keep scroll */
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
