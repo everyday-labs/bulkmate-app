@@ -39,10 +39,13 @@ export default function RootLayout() {
   }, []);
 
   // Auth-gated routing
+  // (demo) hosts the standalone Warehouse Red & Cream design-system screens —
+  // unauthenticated by design, since they render fake data only.
   useEffect(() => {
     if (loading) return;
     const inAuthGroup = segments[0] === '(auth)';
-    if (!session && !inAuthGroup) {
+    const inDemoGroup = segments[0] === '(demo)';
+    if (!session && !inAuthGroup && !inDemoGroup) {
       router.replace('/(auth)/login');
     } else if (session && inAuthGroup) {
       router.replace('/(tabs)');
@@ -81,6 +84,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(demo)" />
       </Stack>
     </SafeAreaProvider>
   );
