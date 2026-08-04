@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
+import { posthog } from '../../lib/posthog';
 import { Colors } from '../../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../../constants/theme';
 
@@ -39,6 +40,7 @@ export default function RegisterScreen() {
     if (error) {
       Alert.alert('Sign up failed', error.message);
     } else {
+      posthog?.capture('user_registered', { sign_up_method: 'email' });
       Alert.alert('Almost there', 'Check your email to confirm your account.');
       router.replace('/(auth)/login');
     }

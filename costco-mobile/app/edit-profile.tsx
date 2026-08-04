@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { posthog } from '../lib/posthog';
 import { Colors } from '../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../constants/theme';
 
@@ -68,6 +69,7 @@ export default function EditProfileScreen() {
         .eq('id', session.user.id);
 
       if (error) throw error;
+      posthog?.capture('profile_updated');
       router.back();
     } catch (e: any) {
       Alert.alert('Save failed', e.message ?? 'Please try again.');

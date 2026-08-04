@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
+import { posthog } from '../../lib/posthog';
 import { Colors } from '../../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../../constants/theme';
 
@@ -205,6 +206,13 @@ export default function HomeScreen() {
       }
 
       // Show in-app modal (handles both already_checked_in and fresh check-in)
+      if (!json.already_checked_in) {
+        posthog?.capture('warehouse_check_in_completed', {
+          warehouse_tier: json.warehouse.tier,
+          tier_upgraded: json.tier_upgraded,
+          badges_earned_count: json.new_badges?.length ?? 0,
+        });
+      }
       setCheckInResult(json);
     } catch {
       Alert.alert('Check-In Failed', 'Could not get your location. Please try again.');
@@ -216,10 +224,11 @@ export default function HomeScreen() {
   async function dismissAlert(alertId: string) {
     // Optimistic update — remove from UI immediately
     setAlerts((prev) => prev.filter((a) => a.id !== alertId));
-    await supabase
+    const { error } = await supabase
       .from('price_alerts')
       .update({ dismissed_at: new Date().toISOString() })
       .eq('id', alertId);
+    if (!error) posthog?.capture('price_alert_dismissed');
   }
 
   const email = session?.user.email ?? '';

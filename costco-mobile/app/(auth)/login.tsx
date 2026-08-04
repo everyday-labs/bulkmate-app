@@ -15,6 +15,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
+import { posthog } from '../../lib/posthog';
 import { Colors } from '../../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../../constants/theme';
 
@@ -32,8 +33,15 @@ export default function LoginScreen() {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) Alert.alert('Sign in failed', error.message);
+    else {
+      posthog?.identify(
+        data.user.id,
+        data.user.email ? { email: data.user.email } : undefined,
+      );
+      posthog?.capture('user_signed_in', { sign_in_method: 'email' });
+    }
     setLoading(false);
   }
 
@@ -45,11 +53,18 @@ export default function LoginScreen() {
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
       });
-      const { error } = await supabase.auth.signInWithIdToken({
+      const { data, error } = await supabase.auth.signInWithIdToken({
         provider: 'apple',
         token: credential.identityToken!,
       });
       if (error) Alert.alert('Apple sign-in failed', error.message);
+      else {
+        posthog?.identify(
+          data.user.id,
+          data.user.email ? { email: data.user.email } : undefined,
+        );
+        posthog?.capture('user_signed_in', { sign_in_method: 'apple' });
+      }
     } catch (e: any) {
       if (e.code !== 'ERR_REQUEST_CANCELED') {
         Alert.alert('Apple sign-in failed', 'Please try again.');
