@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Pressable, StyleSheet, View, type PressableProps, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -26,7 +26,7 @@ export function FadeUpView({
   children,
 }: {
   index?: number;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }) {
   const opacity = useSharedValue(0);
@@ -51,7 +51,7 @@ export function PressScale({
   style,
   children,
   ...pressableProps
-}: Omit<PressableProps, 'children'> & { style?: ViewStyle; children: React.ReactNode }) {
+}: Omit<PressableProps, 'children'> & { style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -82,7 +82,7 @@ export function StarPop({
   children,
 }: {
   trigger: number; // increment this value each time a star should pop
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }) {
   const scale = useSharedValue(1);
@@ -132,7 +132,7 @@ export function ScanPulse({
   children,
 }: {
   active: boolean;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }) {
   const scale = useSharedValue(1);
@@ -177,7 +177,7 @@ export function CheckmarkBurst({
   children,
 }: {
   visible: boolean;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }) {
   const scale = useSharedValue(0.6);
@@ -206,7 +206,7 @@ export function AlertBounceIn({
   style,
   children,
 }: {
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }) {
   const scale = useSharedValue(0.5);
@@ -266,7 +266,7 @@ export function TierUpBurst({
   children,
 }: {
   visible: boolean;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }) {
   const scale = useSharedValue(0.3);
@@ -307,7 +307,7 @@ export function TierUpBurst({
 }
 
 // ── Empty-state / illustration float loop ────────────────────────────────────
-export function FloatView({ style, children }: { style?: ViewStyle; children: React.ReactNode }) {
+export function FloatView({ style, children }: { style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
   const translateY = useSharedValue(0);
 
   useEffect(() => {
