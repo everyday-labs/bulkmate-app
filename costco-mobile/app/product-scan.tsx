@@ -4,6 +4,7 @@ import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-ca
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { posthog } from '../lib/posthog';
 import { Colors } from '../constants/colors';
 import { spacing, fontSize, radius, letterSpacing } from '../constants/theme';
 
@@ -69,6 +70,7 @@ export default function ProductScanScreen() {
       }
 
       const product = await res.json();
+      posthog?.capture('product_scan_completed', { lookup_source: 'barcode_scan' });
       // Navigate to product detail — pass the resolved Costco SKU from the API response
       router.replace(`/product/${product.sku}`);
     } catch (e: unknown) {
