@@ -129,7 +129,8 @@ serve(async (req) => {
     console.log('8. Parsed — warehouse:', parsed.warehouseCode, '| date:', parsed.transactionDate, '| tc#:', parsed.transactionNumber ?? 'n/a', '| items:', parsed.items.length, '| expected:', parsed.expectedItemCount ?? 'unknown', '| subtotal:', parsed.subtotal ?? 'not found', '| tax:', parsed.tax ?? 'not found', '| total:', parsed.grandTotal ?? 'not found');
     console.log('8b. Items detail:', JSON.stringify(parsed.items));
     if (parsed.itemCountMismatch) {
-      console.warn(`ITEM COUNT MISMATCH: parsed ${parsed.items.length} but receipt says ${parsed.expectedItemCount}. OCR text may need parser update.`);
+      const parsedUnits = parsed.items.reduce((n, i) => n + i.quantity, 0);
+      console.warn(`ITEM COUNT MISMATCH: parsed ${parsedUnits} units across ${parsed.items.length} rows, but receipt says ${parsed.expectedItemCount}. OCR text may need parser update.`);
     }
 
     if (!parsed.transactionDate) {
@@ -251,7 +252,7 @@ serve(async (req) => {
         description: item.description,
         unit_price: item.unitPrice,
         discount_amount: item.discountAmount,
-        quantity: 1,
+        quantity: item.quantity,
       });
 
       if (itemError) console.error('Receipt item insert error:', itemError.message);
@@ -283,7 +284,10 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         receiptId: receipt.id,
-        itemCount: parsed.items.length,
+        // Total units, so this is directly comparable to expectedItemCount
+        // (the receipt's "TOTAL NUMBER OF ITEMS SOLD") — repeat SKUs are one
+        // row with quantity > 1, so row count would under-report.
+        itemCount: parsed.items.reduce((n, i) => n + i.quantity, 0),
         expectedItemCount: parsed.expectedItemCount,
         itemCountMismatch: parsed.itemCountMismatch,
         subtotal: parsed.subtotal,

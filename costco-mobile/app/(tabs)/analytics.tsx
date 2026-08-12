@@ -135,12 +135,11 @@ export default function AnalyticsScreen() {
       for (const item of itemList as any[]) {
         const key = item.description ?? item.sku ?? 'Unknown';
         const existing = itemMap.get(key) ?? { total_spend: 0, quantity: 0 };
-        // unit_price is already the line's full price, not a true per-unit
-        // price — the OCR parser doesn't split multi-quantity lines (see
-        // PARSER_DECISIONS.md), so this must not also multiply by quantity,
-        // same convention as receipt-success.tsx's itemTotal.
+        // unit_price is per-unit, so spend is price × quantity — same
+        // convention as receipt-success.tsx's itemTotal. OCR-parsed rows are
+        // always quantity 1, so this only differs once a user edits one.
         itemMap.set(key, {
-          total_spend: existing.total_spend + Number(item.unit_price ?? 0),
+          total_spend: existing.total_spend + Number(item.unit_price ?? 0) * Number(item.quantity ?? 1),
           quantity: existing.quantity + Number(item.quantity ?? 1),
         });
       }

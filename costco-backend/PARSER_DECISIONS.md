@@ -169,13 +169,55 @@ The discount was silently lost. `discountAmount` stayed 0 for that item.
 
 ---
 
+### 2026-08-11 — CRV skip flag stole the item's price (first real-device receipt)
+
+**Receipt:** Almaden #470, 5 items, subtotal $48.75. First receipt scanned on a physical device.
+
+**Symptom:** `1518783 CUCNT WIN` was stored at **$0.30** instead of $12.99, so the app's item total came out ~$13 short.
+
+**Root cause — the `skipNextPrice` CRV hack.** It assumed a CRV deposit price immediately follows its `CA REDEMP V` barcode line. In this receipt's column ordering the barcode comes *before the next item*, so the flag ate the item's price and the deposit was consumed in its place:
+```
+0600000000 CA REDEMP V   <- sets skipNextPrice
+1518783 CUCNT WIN        <- item
+12.99                    <- item price, WRONGLY SKIPPED
+0.30                     <- CRV deposit, wrongly taken as the item price
+```
+The receipt's *second* CRV line only escaped this because OCR misread `REDEMP` as `REDEN`, so the flag never armed — i.e. the parser was accidentally saved by an OCR error.
+
+**Fix — replaced the two-pass zip with a single greedy pass.** Each price is assigned to the oldest SKU still awaiting one; a price arriving when nothing is pending isn't an item price (CRV deposit, stray aggregate) and is discarded. This removes `skipNextPrice`, `prices[]`, `savingsMap`, and the `cappedPrices` slice entirely. Savings lines now attach to whichever entry most recently received a price, which collapses the old inline-vs-standalone special-casing into one rule.
+
+**Why greedy is strictly better:** it handles every layout the zip did (interleaved, fully batched, partial-batch) because it makes the same positional assumption *within* a group, but it no longer depends on the count of prices matching the count of SKUs — which is exactly what CRV deposits broke.
+
+**Verified:** re-parsed this receipt's real OCR → 5/5 items, `$48.15` net + 2 × `$0.30` CRV = **$48.75**, matching the printed subtotal exactly. Plus a 10-case regression suite (interleaved, batched, partial-batch, inline-with-tax-codes, inline+savings, standalone+savings, no-Member-line fallback, sub-$1 dropped digit, CRV, multiple savings) — all pass.
+
+---
+
+### 2026-08-11 — Merge repeat SKUs into one row with a quantity (reverses the 2026-06 "no dedup" decision)
+
+**Trigger:** the same receipt above had SKU `1518783` printed on two lines (`CUCNT WIN` and `KS COCNT TR`) — that's simply how Costco prints a multi-buy, not a `2 @ 12.99` format. It surfaced as two separate $12.99 rows with no quantity anywhere.
+
+**Decision:** **SKU is the product identity; descriptions are not.** The two differing descriptions above are the *same* product read two ways by OCR — which is precisely why the earlier "don't dedup, the descriptions might be different products" reasoning doesn't hold. `mergeBySku` now collapses repeat lines into one row with `quantity > 1`.
+
+**Grouping key is SKU + unit price, not SKU alone.** Same SKU at the same price is unambiguously N units of one product. Same SKU at *different* prices stays as separate rows, because merging would force inventing a single unit price and would misstate the line total. (Verified: two `1111` rows at $10 and $8 stay separate and still total $18.)
+
+**Knock-on fixes this required:**
+- `ParsedItem` gained a `quantity` field; `ingest-receipt` now inserts `item.quantity` instead of a hardcoded `1`.
+- `itemCountMismatch` compares **total units**, not row count — otherwise every multi-buy receipt would report a false mismatch (this receipt: 4 rows, 5 units, receipt says 5).
+- The response's `itemCount` is likewise units, so it stays directly comparable to `expectedItemCount`.
+
+**Semantics to preserve:** `unitPrice` is genuinely per-unit; a line's contribution is `unitPrice × quantity − discountAmount`. Mobile (`receipt-success` totals, Analytics top-items) computes it that way.
+
+**Verified:** the real receipt → 4 rows / 5 units, `1518783 $12.99 ×2`, net $48.15 + $0.60 CRV = $48.75 ✓. Edge cases pass: same-SKU-different-price stays split, 3× same SKU merges to one ×3 row, and a discount on one unit of a merged pair carries through correctly. Full 10-case layout regression still green.
+
+---
+
 ## Future Improvements
 
 ### Total verification
 After zipping items, sum all `unitPrice` values and compare to SUBTOTAL extracted from the receipt. If the delta is a round number (e.g. off by $7.00), it likely indicates a leading digit was dropped by OCR (`.99` → should be `7.99`). Flag a `priceSumMismatch` warning and store for inspection.
 
 ### Multi-quantity lines
-Some Costco receipts use `2 @ 3.99` format for multi-unit purchases. Not yet observed in OCR output. If encountered, add a quantity multiplier parse step in Pass 1.
+Some Costco receipts use `2 @ 3.99` format for multi-unit purchases. **Still not observed** — the 2026-08-11 receipt that looked like a multi-quantity case turned out to be the same SKU printed on two separate lines, which the parser already handles. If the `2 @ 3.99` format does turn up, add a quantity multiplier in the greedy pass and set `quantity` on the emitted item; `unit_price` is treated as per-unit throughout the app (mobile computes line totals as `unit_price × quantity − discount`), so the pieces are already in place.
 
 ### Regex-based BOB detection
 `***BOB*** 0.00` lines may vary. Current `aggregateLinePattern` catches `\*{2,}` which covers this, but confirm if BOB ever appears without asterisks.

@@ -6,12 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A gamified Costco membership companion app (iOS/Android, mobile-only for v1) that turns warehouse visits into a "treasure hunt" while providing receipt OCR tracking, sliding-window price-match alerts, and a barcode-based product lookup. Open-source solo side project, not affiliated with Costco.
 
-Repo layout: **three directories in this working tree, two independent Git repos**.
+Repo layout: **one Git repo rooted at `costco-app/`**, containing three directories. (Verified 2026-08-11 — `git rev-parse --show-toplevel` from `costco-mobile/` and `costco-backend/` both return the `costco-app/` root, and both share the same `origin`. Older notes describing these as "two independent repos" are stale.) Note the folder was renamed from `Costco app` to `costco-app` on 2026-08-11: React Native's iOS build scripts don't quote paths, so a space broke the build.
 
 ```
 Costco app/                  ← this directory (top-level docs, not itself the app code)
-├── costco-mobile/           ← separate git repo: Expo + React Native app
-├── costco-backend/          ← separate git repo: Supabase migrations + Edge Functions
+├── costco-mobile/           ← Expo + React Native app
+├── costco-backend/          ← Supabase migrations + Edge Functions
 └── supabase/                ← local Supabase CLI link metadata only (not app code)
 ```
 
@@ -165,9 +165,10 @@ PostHog is the **sole** analytics/error/session tool (Sentry was removed 2026-08
 **Sprints 1–9: code-complete.** Auth, receipt OCR ingestion, price matching, push notifications, barcode scanning, warehouse check-in, badge engine, spend analytics dashboard, home screen — all screens and Edge Functions exist, `npx tsc --noEmit` passes clean, no TODOs in the codebase.
 
 **Not done:**
-- Real-device/TestFlight testing (`TEST_PLAN.md` all pending). **Blocked on Apple Developer Program enrollment** (2026-08-11): `expo prebuild` + `expo run:ios --device` both work, CocoaPods installed, `ios/` generated, iPhone paired — but a free Personal Team cannot provision this app because it uses Sign In with Apple *and* Push Notifications, both of which Apple restricts to paid accounts. Enrollment paid for but not yet approved. Two paths once it clears: re-select the (now paid) Team in Xcode → Signing & Capabilities. To test *before* it clears, temporarily remove `expo-apple-authentication` + `expo-notifications` from `app.json` plugins and rebuild — everything except Apple login and push works on a Personal Team.
-- `eas.json` / EAS build configuration
-- Apple Developer Program enrollment approval (paid 2026-08-11, awaiting confirmation)
+- ~~Real-device build blocked~~ **Done 2026-08-11 — the app is built, signed, and installed on a physical iPhone.** See "Device build — the five blockers" below; every one is fixed and the fixes are durable. On-device *testing* of camera/GPS/push flows is still pending (that's now just legwork, not a blocker).
+- `eas.json` / EAS build configuration — still the path to TestFlight / sharing builds with anyone else
+- ~~Apple Developer Program enrollment~~ **Done** (enrolled + PLA accepted 2026-08-11).
+- ~~Sign in with Apple not working~~ **Done 2026-08-11.** The failure (`Provider (Issuer appleid.apple.com is not enabled)`) was Supabase-side, not app code. Fixed by enabling the Apple provider with Client ID `com.twonk0609.costco-app` and a client-secret JWT. Verified via `GET /auth/v1/settings` → `apple: true`. **The secret expires 2027-02-10** (Apple's 6-month cap) — regenerate with `costco-backend/scripts/generate-apple-client-secret.mjs`, which takes the `.p8` + Key ID and mints the ES256 JWT Supabase expects (pasting the raw `.p8` gives "Secret key should be a JWT"). The `.p8` itself is gitignored (`*.p8`) — Apple only lets you download it once.
 - ~~Confirming Edge Function secrets are set~~ **Done (2026-08-11).** `supabase secrets list` confirms all of them present: `GOOGLE_CLOUD_VISION_API_KEY`, `RAPIDAPI_KEY`, `USDA_FDC_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, plus the auto-managed `SUPABASE_*` set and the newly-added `POSTHOG_PROJECT_TOKEN`/`POSTHOG_HOST`. Open Food Facts needs no key.
 - Privacy policy (required for App Store — app uses location + receipt data)
 - App Store screenshots/listing copy
@@ -175,6 +176,25 @@ PostHog is the **sole** analytics/error/session tool (Sentry was removed 2026-08
 - Google Places-seeded warehouses get a synthetic `warehouse_code` (`GP-######`), not Costco's real store number — `ingest-receipt` now self-heals this: when a receipt's exact code lookup misses, it falls back to matching the receipt header's OCR text against a seeded warehouse's **postal code first, city name second** (postal code disambiguates cities with more than one Costco), links the receipt, and overwrites that warehouse's placeholder code with the real one parsed from the receipt (see `PARSER_DECISIONS.md`, "Warehouse resolution — postal-code/city fallback"). **Not yet live-verified** against a real non-Bay-Area receipt.
 - ~~`20260805000000_receipt_items_update_policy.sql` not confirmed applied~~ **Done — verified live 2026-08-11.** `pg_policies` confirms `receipt_items` has all three policies (`receipt_items_select_own`, `_insert_own`, `_update_own`), so inline line-item editing on receipt-success works. `supabase migration list` also shows every local migration matched remotely, with no drift.
 - **`POSTHOG_PROJECT_TOKEN`/`POSTHOG_HOST` need to be set as Supabase Edge Function secrets** for backend error/event capture (see "PostHog / Observability" above) — not yet confirmed set. Mobile-side PostHog already works independently of this.
+
+## Device build — the five blockers (all fixed 2026-08-11)
+
+Getting the app onto a physical iPhone hit five distinct failures. Each fix is durable; recorded here so they aren't re-diagnosed from scratch.
+
+1. **Apple Program License Agreement not accepted.** Symptom: `Unable to process request - PLA Update available`, and profile generation fails. Enrolling and paying isn't enough — the PLA must be accepted at developer.apple.com before Apple will issue any provisioning profile.
+2. **`NODE_BINARY` pinned to a deleted Homebrew path.** `ios/.xcode.env.local` had `/opt/homebrew/Cellar/node/26.6.0/bin/node`; Homebrew had upgraded to 26.7.0 and deleted that directory, so the Hermes script phase died with `No such file or directory`. Fixed by pointing at the stable symlink `/opt/homebrew/bin/node`, which survives version bumps. **Recurs on any Node major upgrade if someone re-pins a Cellar path.**
+3. **A space in the project path.** The folder was `~/Desktop/Costco app`. `expo-constants` generates `bash -l -c "$PODS_TARGET_SRCROOT/../scripts/get-app-config-ios.sh"` — unquoted, so bash split at the space and tried to run `/Users/.../Desktop/Costco`. **React Native iOS builds do not support spaces in the project path.** Fixed by renaming to `costco-app`. Don't reintroduce a space.
+4. **Stale CocoaPods state after the rename.** Codegen outputs (`*JSI-generated.cpp`, `*-generated.mm`) went missing with paths baked in from the old location. Fixed with `pod install`.
+5. **Xcode user script sandboxing.** Xcode 15+ defaults `ENABLE_USER_SCRIPT_SANDBOXING = YES`, which blocks React Native's bundle script from writing `ip.txt` into the `.app`. Editing `project.pbxproj` works but `expo prebuild` reverts it, and `expo-build-properties` doesn't expose this setting — so there's now a custom config plugin at `costco-mobile/plugins/withScriptSandboxDisabled.js`, registered in `app.json`. Verified by resetting the value to `YES`, running `prebuild`, and confirming it returned to `NO`.
+
+**Debug vs Release on device:** a Debug build has no embedded JS bundle — it streams from Metro over the LAN and dies with `No script URL provided / unsanitizedScriptURLString = (null)` if the phone can't reach the Mac. **For real-world testing (e.g. GPS check-in at an actual warehouse), build Release** — it embeds `main.jsbundle` (~5.6 MB) and runs fully standalone:
+```bash
+cd costco-mobile/ios && xcodebuild -workspace costcomobile.xcworkspace \
+  -configuration Release -scheme costcomobile \
+  -destination "id=<device-udid>" DEVELOPMENT_TEAM=XX3T25NCVV \
+  -allowProvisioningUpdates -allowProvisioningDeviceRegistration
+xcrun devicectl device install app --device <device-udid> <path-to>/costcomobile.app
+```
 
 **All four Edge Functions redeployed 2026-08-11** via `supabase functions deploy` (CLI works now — see Commands), carrying the QA-pass fixes below plus the PostHog exception capture added earlier. Live-verified after deploy: `barcode-lookup` returns real Open Food Facts data on a fresh UPC (NOVA 1, Nutri-Score B, 6 classified ingredients, `source: 'off'`) and correct cached data on a repeat lookup — confirming the stale-cache bug is actually fixed in production, not just locally. `check-in` correctly 401s without auth, `ingest-receipt` 400s on missing params and 500s (into the PostHog catch) on malformed JSON, `price-match-check` reachable.
 

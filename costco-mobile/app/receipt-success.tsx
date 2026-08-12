@@ -233,10 +233,12 @@ export default function ReceiptSuccessScreen() {
     { month: 'long', day: 'numeric', year: 'numeric' },
   );
 
-  // unit_price is currently always the line's full price, not a true per-unit
-  // price — the OCR parser doesn't yet split multi-quantity lines (see
-  // PARSER_DECISIONS.md), so this deliberately doesn't multiply by quantity.
-  const itemTotal = items.reduce((sum, i) => sum + i.unit_price, 0);
+  // unit_price is a true PER-UNIT price, so a line's contribution is
+  // unit_price × quantity. Receipts parsed from OCR always come in at
+  // quantity 1 (Costco prints each unit on its own line), so this matches
+  // the printed total there; it only diverges once a user manually sets a
+  // quantity, which is exactly the intent — see EditableItemRow.
+  const itemTotal = items.reduce((sum, i) => sum + i.unit_price * i.quantity, 0);
   const totalSavings = items.reduce((sum, i) => sum + i.discount_amount, 0);
   const subtotal = itemTotal - totalSavings;
   const grandTotal = (receipt.total_amount ?? subtotal) + (receipt.tax_amount ?? 0);
@@ -516,7 +518,17 @@ function EditableItemRow({
           </Text>
         </View>
         <View style={styles.itemPricing}>
-          <Text style={styles.itemPrice}>${item.unit_price.toFixed(2)}</Text>
+          {/* Show the line total (unit × qty) as the headline number, with the
+              per-unit breakdown underneath — otherwise bumping quantity to 2
+              leaves the price looking unchanged, which reads as a bug. */}
+          <Text style={styles.itemPrice}>
+            ${(item.unit_price * item.quantity).toFixed(2)}
+          </Text>
+          {item.quantity > 1 && (
+            <Text style={styles.itemUnitPrice}>
+              ${item.unit_price.toFixed(2)} each
+            </Text>
+          )}
           {item.discount_amount > 0 && (
             <Text style={styles.itemDiscount}>−${item.discount_amount.toFixed(2)}</Text>
           )}
@@ -540,7 +552,7 @@ function EditableItemRow({
           />
         </View>
         <View style={styles.editField}>
-          <Text style={styles.editFieldLabel}>PRICE</Text>
+          <Text style={styles.editFieldLabel}>PRICE EACH</Text>
           <TextInput
             style={styles.editInput}
             value={price}
@@ -560,6 +572,20 @@ function EditableItemRow({
           />
         </View>
       </View>
+      {/* Live line total — recalculates as QTY/PRICE/DISCOUNT are typed, so
+          bumping quantity visibly changes something. Without this the price
+          field stays put (it's per-unit) and the edit looks like a no-op. */}
+      <Text style={styles.editLineTotal}>
+        Line total:{'  '}
+        <Text style={styles.editLineTotalValue}>
+          ${Math.max(
+            0,
+            (Math.max(1, parseInt(qty, 10) || 1) * (parseFloat(price) || 0)) - (parseFloat(discount) || 0),
+          ).toFixed(2)}
+        </Text>
+        {(parseInt(qty, 10) || 1) > 1 ? `   (${Math.max(1, parseInt(qty, 10) || 1)} × $${(parseFloat(price) || 0).toFixed(2)})` : ''}
+      </Text>
+
       <View style={styles.editActionsRow}>
         <Pressable
           style={({ pressed }) => [styles.editDoneBtn, pressed && { opacity: 0.85 }, saving && { opacity: 0.6 }]}
@@ -795,6 +821,14 @@ const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
   itemPricing: { alignItems: 'flex-end' },
   itemPrice: { fontSize: fontSize.md, fontWeight: '700', color: Colors.gray[800] },
   itemDiscount: { fontSize: fontSize.sm, color: Colors.savings, marginTop: 2, fontWeight: '600' },
+  itemUnitPrice: { fontSize: fontSize.xs, color: Colors.gray[400], marginTop: 2 },
+  editLineTotal: {
+    fontSize: fontSize.sm,
+    color: Colors.gray[500],
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  editLineTotalValue: { fontWeight: '800', color: Colors.gray[900] },
   separator: { height: 1, backgroundColor: Colors.border, marginLeft: spacing.lg },
 
   // Inline item editing
