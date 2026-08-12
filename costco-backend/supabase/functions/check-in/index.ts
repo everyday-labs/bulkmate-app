@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { capturePostHogException } from '../_shared/posthog.ts';
 
 // ---------------------------------------------------------------------------
 // Fan-tier thresholds
@@ -120,6 +121,7 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  let userId: string | undefined;
   try {
     const authHeader = req.headers.get('Authorization') ?? '';
     const supabase = createClient(
@@ -130,6 +132,7 @@ serve(async (req) => {
     const { data: { user }, error: authErr } = await supabase.auth.getUser(
       authHeader.replace('Bearer ', ''),
     );
+    userId = user?.id;
     if (authErr || !user) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -259,6 +262,7 @@ serve(async (req) => {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unexpected error';
     console.error('check-in error:', message);
+    await capturePostHogException(err, { functionName: 'check-in' }, userId);
     return new Response(
       JSON.stringify({ error: message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 },

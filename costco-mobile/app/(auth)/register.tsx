@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -15,12 +15,15 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { posthog } from '../../lib/posthog';
-import { Colors } from '../../constants/colors';
+import { useThemeColors } from '../../contexts/ThemeContext';
+import type { ColorScheme } from '../../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../../constants/theme';
 
 export default function RegisterScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const Colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,6 +41,7 @@ export default function RegisterScreen() {
     setLoading(true);
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) {
+      posthog?.capture('sign_up_failed', { sign_up_method: 'email', error: error.message });
       Alert.alert('Sign up failed', error.message);
     } else {
       posthog?.capture('user_registered', { sign_up_method: 'email' });
@@ -117,7 +121,11 @@ export default function RegisterScreen() {
             }
           </Pressable>
 
-          <Pressable onPress={() => router.back()} hitSlop={8}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={8}
+            style={({ pressed }) => pressed && { opacity: 0.6 }}
+          >
             <Text style={styles.switchText}>
               Already have an account?{'  '}
               <Text style={styles.switchLink}>Sign in</Text>
@@ -133,7 +141,7 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing['2xl'] },
 
@@ -142,7 +150,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: radius['2xl'],
-    backgroundColor: Colors.costcoRed,
+    backgroundColor: Colors.costcoRedSolid,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
@@ -198,7 +206,7 @@ const styles = StyleSheet.create({
   },
 
   primaryBtn: {
-    backgroundColor: Colors.costcoRed,
+    backgroundColor: Colors.costcoRedSolid,
     borderRadius: radius.lg,
     paddingVertical: spacing.lg,
     alignItems: 'center',

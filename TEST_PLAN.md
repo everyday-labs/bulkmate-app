@@ -1,8 +1,22 @@
 # Costco Companion App — Test Plan
 
-**Last updated:** 2026-07-13  
-**Model:** Claude Sonnet 4.6  
+**Last updated:** 2026-08-11  
 **Status legend:** ⬜ Pending · 🔄 In Progress · ✅ Pass · ❌ Fail
+
+---
+
+## Current testing status (2026-08-11)
+
+**Verified in the iOS Simulator (Expo Go, against the real deployed backend):** Home screen (stats, Recent feed with day dividers + filter chips), Product Detail (including all three fallback states: no price data, no ingredients match, true 404), Receipt History, unified History screen, Spend Analytics, and Profile all render correctly with zero runtime errors. Warehouse data verified live: 723 rows across 11+ countries.
+
+**Not yet verified — needs a real device:**
+- Everything camera-dependent (receipt capture/OCR, barcode scanning) — the simulator has no usable camera
+- Real GPS check-in at an actual warehouse (the 50m radius is enforced server-side)
+- Push notifications (removed from Expo Go in SDK 53 — needs a dev build)
+- Sign in with Apple
+- **Dark mode** — `simctl ui appearance dark` didn't propagate to the running Expo Go app; check manually via Profile → Preferences → Appearance
+
+**Blocker for device testing:** Apple Developer Program enrollment is pending. A free Personal Team can't provision this app because it uses both Sign In with Apple and Push Notifications. See `CLAUDE.md` → Build Status for the workaround if you want to test before enrollment clears.
 
 ---
 
@@ -106,6 +120,13 @@
 | 9.4 | API hit | Scan uncached product | RapidAPI called, product name/price/image shown | ⬜ |
 | 9.5 | Unknown SKU | Scan non-Costco barcode | "Product not found" message | ⬜ |
 | 9.6 | OCR history | Product scanned by others | Price history section shows min/max/avg | ⬜ |
+| 9.7 | Ingredients — Open Food Facts match | Scan a real UPC OFF has (e.g. a Kirkland Signature item) | Ingredients card shows NOVA + Nutri-Score badges, clean/watch/avoid tally, inline highlighted text, `source: 'off'` | ⬜ |
+| 9.8 | Ingredients — no match anywhere | Scan a product neither OFF nor FDC has | No ingredients card shown (screen still renders normally, no error) | ⬜ |
+| 9.9 | Ingredients — cache hit | Scan the same product twice | Second lookup doesn't re-call OFF/FDC (check function logs for no `Open Food Facts`/`FDC` line) | ⬜ |
+| 9.10 | Ingredients — OFF down, FDC fallback works | Simulate an Open Food Facts network failure (or scan a UPC only FDC has) | Falls back to FDC raw text + keyword classification, `source: 'fdc'`, no NOVA/Nutri-Score badges shown | ⬜ |
+| 9.11 | Ingredients — both sources down | Simulate failures for both OFF and FDC (or unset `USDA_FDC_API_KEY`) | Rest of product detail (price, OCR history) still loads normally; no ingredients card, no error surfaced | ⬜ |
+| 9.12 | Partial hit — RapidAPI has no match, ingredients do | Scan a real UPC/EAN (RapidAPI's search frequently doesn't recognize 12-13 digit barcodes even when OFF/FDC do — confirmed against multiple real UPCs) | Product screen still opens (`source: 'partial'`), shows name/brand from OFF/FDC + ingredients card; no price section, no crash — not a 404 | ⬜ |
+| 9.13 | Nutri-Score badge contrast | View a product with each Nutri-Score grade (A-E) in both light and dark mode | Letter is legible against its badge color for every grade — a real contrast bug (white text on B/C/D) was caught and fixed before shipping | ⬜ |
 
 ---
 
@@ -141,10 +162,12 @@
 |---|------|-------|----------|--------|
 | 12.1 | Greeting | Open Home | Time-appropriate greeting ("Good morning/afternoon/evening, [name]") | ⬜ |
 | 12.2 | Spend stats | After scanning receipts | Total Spent, Total Saved, and Receipts count cards populate | ⬜ |
-| 12.3 | Recent receipts | After scanning | Last 3 receipts listed with warehouse, date, item count, total | ⬜ |
-| 12.4 | "See all" | Tap See all | Opens full receipt history | ⬜ |
-| 12.5 | Pull to refresh | Pull down on Home | Data reloads | ⬜ |
-| 12.6 | Empty state | Fresh account | "No receipts yet" empty state with CTA button | ⬜ |
+| 12.3 | Recent feed — merged | After scanning receipts and viewing products | Receipts and viewed products appear together in one "Recent" feed, sorted newest-first, grouped under day dividers (Today/Yesterday/N days ago/date) | ⬜ |
+| 12.4 | Recent feed — filter chips | Tap "Receipts" / "Viewed" / "All" chips | List narrows to just that kind; "All" shows both again | ⬜ |
+| 12.5 | Recent feed — empty filter | Tap a filter chip with no matching items (e.g. "Receipts" when only products have been viewed) | Shows "No receipts yet." / "No viewed products yet." message instead of a blank gap | ⬜ |
+| 12.6 | "See all" | Tap See all | Opens `/history` (Receipts / Barcode / Check-ins tabs) | ⬜ |
+| 12.7 | Pull to refresh | Pull down on Home | Data reloads | ⬜ |
+| 12.8 | Empty state | Fresh account | "No receipts yet" empty state with CTA button | ⬜ |
 
 ---
 
@@ -166,7 +189,7 @@
 
 | # | Test | Steps | Expected | Status |
 |---|------|-------|----------|--------|
-| 14.1 | Avatar initials | Open Profile | First 2 letters of email shown in navy circle | ⬜ |
+| 14.1 | Avatar | Open Profile | Member badge illustration shown in navy circle (no photo upload — same for every user) | ⬜ |
 | 14.2 | Fan tier card | After any check-in | Tier name, emoji, star count, progress bar | ⬜ |
 | 14.3 | Badge grid | After earning badges | Grid of badge cards with icon, name, earned date | ⬜ |
 | 14.4 | No badges | Fresh account | Empty state: "Check in at a Costco to earn your first badge" | ⬜ |
@@ -182,7 +205,8 @@
 |---|------|----------|--------|
 | X.1 | No internet on any screen | No crash; screens show last loaded data or empty state | ⬜ |
 | X.2 | Invalid auth token | API calls return 401, user prompted to re-login | ⬜ |
-| X.3 | RapidAPI key missing | Barcode lookup returns "Product not found in cache", no crash | ⬜ |
+| X.3 | RapidAPI key missing | Barcode lookup returns "Product not found" (or a partial ingredients/OCR-only result if either has data), no crash | ⬜ |
 | X.4 | Very long product name | Truncated at 50 chars (alerts), 60 chars (push notifications) | ⬜ |
 | X.5 | Price alert delta ≤ $0.01 | No alert created (noise filter) | ⬜ |
 | X.6 | Check-in with no warehouses seeded | "No warehouses found" 500 error handled gracefully | ⬜ |
+| X.7 | USDA FDC key missing (OFF still primary, needs no key) | Barcode lookup still returns price/OCR data normally; ingredients come from Open Food Facts if it has a match, otherwise no ingredients section | ⬜ |

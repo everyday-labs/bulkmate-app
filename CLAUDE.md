@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A gamified Costco membership companion app (iOS/Android, mobile-only for v1) that turns warehouse visits into a "treasure hunt" while providing receipt OCR tracking, sliding-window price-match alerts, and a barcode-based product lookup. Open-source solo side project, not affiliated with Costco. Not monetized.
+A gamified Costco membership companion app (iOS/Android, mobile-only for v1) that turns warehouse visits into a "treasure hunt" while providing receipt OCR tracking, sliding-window price-match alerts, and a barcode-based product lookup. Open-source solo side project, not affiliated with Costco.
 
 Repo layout: **three directories in this working tree, two independent Git repos**.
 
@@ -28,10 +28,13 @@ There is **no monorepo and no NestJS/AWS Lambda backend** — that was the origi
 | Push notifications | Expo Push API |
 | OCR | Google Cloud Vision (`DOCUMENT_TEXT_DETECTION`), called server-side from the `ingest-receipt` function |
 | Pricing/barcode data | RapidAPI `costco-live-data.p.rapidapi.com` |
-| Error tracking | Sentry (`@sentry/react-native`), guard DSN with `if (dsn && dsn !== 'placeholder')` |
+| Ingredient data | Open Food Facts (free, primary — real NOVA/Nutri-Score/additive data), USDA FoodData Central (free, fallback — raw text only), both called server-side from `barcode-lookup` |
+| Analytics, error tracking & session replay | PostHog (`posthog-react-native` on mobile, direct HTTP capture calls from Edge Functions) — see "PostHog / Observability" below |
 | Offline queue | `expo-file-system/next` + AsyncStorage + NetInfo listener |
 | Mobile testing | Expo Go (QR code scan) |
 | Web dashboard | Not built — deferred to v2+ |
+
+See `costco-backend/EXTERNAL_APIS.md` for every third-party API call in the app — endpoint, auth, caching policy, and (critically) what happens when each one fails. Every external client lives in `costco-backend/supabase/functions/_shared/`, one file per API, and none of them (except Vision, intentionally) is allowed to throw — a failed enrichment call must degrade gracefully, never take down the whole request.
 
 **Expo SDK is pinned at 54** (`costco-mobile/package.json`) to match the installed Expo Go client. Do not upgrade to SDK 56 without first confirming Expo Go on the test device supports it — `costco-mobile/AGENTS.md` currently points at v56 docs, which is stale/wrong; treat the pinned `package.json` version as the source of truth, not that file.
 
@@ -42,6 +45,7 @@ There is **no monorepo and no NestJS/AWS Lambda backend** — that was the origi
 npm install --legacy-peer-deps   # required — peer dep conflicts otherwise
 npx expo start --clear           # dev server + QR code
 npx expo run:ios                 # run on iOS simulator
+npx expo run:ios --device <udid> # build + install on a physical iPhone (needs paid Apple team, see Build Status)
 npx expo run:android             # run on Android emulator
 npx tsc --noEmit                 # typecheck (strict mode)
 
@@ -50,7 +54,7 @@ supabase db push                 # apply migrations to linked remote project
 supabase functions deploy <name> # deploy a single Edge Function
 ```
 
-**Supabase CLI auth is currently broken** (token format issue) — Edge Function deploys and secret-setting are done manually via the Supabase dashboard, not `supabase functions deploy` / `supabase secrets set`, until that's resolved.
+**Supabase CLI works** (verified 2026-08-11, CLI v2.111.0, project linked and authenticated) — `supabase functions deploy <name>` works directly and is the preferred path. This was broken earlier in the project's history (token format issue) and older notes may still say deploys must be done by hand via the dashboard; that's stale. Docker isn't running locally, so deploys emit a `WARNING: Docker is not running` line — harmless, the bundle still uploads and deploys fine.
 
 No `eas.json` exists yet — EAS build config has not been set up (this is the next unstarted piece of work, part of app store prep).
 
@@ -68,7 +72,7 @@ Most reads (receipts, receipt_items, badges, profile) go straight from the mobil
 
 - `ingest-receipt` — receipt image → Google Cloud Vision OCR → `parser.ts` → validated `receipt_items` insert
 - `price-match-check` — compares `receipt_items.unit_price - discount_amount` against `products.current_price` (fetched/cached from RapidAPI), writes `price_alerts`, sends push
-- `barcode-lookup` — SKU → `product_lookups` cache, else RapidAPI live fetch
+- `barcode-lookup` — SKU → `product_lookups` cache, else RapidAPI live fetch; also resolves a good/watch/avoid-classified ingredient list via Open Food Facts (primary — real NOVA/Nutri-Score/additive data) falling back to USDA FoodData Central (raw text only) (independent 30-day cache, degrades to no ingredients card on failure — never fails the price lookup)
 - `check-in` — GPS coords + warehouse token → Haversine 50m validation → `check_ins` insert, `total_stars`/`fan_tier` recalculation, badge awarding via `trigger_key`
 
 The mobile app handles two on-device hardware concerns before ever hitting the backend:
@@ -100,44 +104,101 @@ Key enums:
 
 **FR-300 — Geo-Fenced Check-In & Badge Engine** ✅ built. `check-in` Edge Function: GPS coords + warehouse token → Haversine validation within 50m → insert `check_ins`, recalculate `total_stars` + `fan_tier`, award badges by `trigger_key`, return payload for the client's unlock animation.
 
+**FR-400 — Ingredient Good/Watch/Avoid Highlighting** ✅ built and live-verified, redeploy pending for the latest rebuild. `barcode-lookup` resolves ingredients by exact-UPC lookup against **Open Food Facts** (primary — real NOVA processing group, Nutri-Score, detected additive E-codes, high/low nutrient-level flags), falling back to **USDA FoodData Central** (raw text only, weaker keyword classification) when OFF has no match. Classification is cross-referenced against a curated additive table (`_shared/additiveDatabase.ts`, ~25 E-codes with documented concern) rather than guessing from ingredient-label wording. Cached 30 days. Rendered as an `IngredientsCard` on the product detail screen (`costco-mobile/app/product/[sku].tsx`) with NOVA/Nutri-Score badges — only shown when a match is found, no error state when it isn't. Full detail in `costco-backend/EXTERNAL_APIS.md`.
+
+History: first version (2026-08-06, before the OFF rebuild) used only USDA FDC with a plain substring keyword classifier. Live-testing that day found two real bugs, both fixed same-day: (1) RapidAPI's search doesn't recognize raw UPC/EAN barcodes, so the ingredients it had already resolved were being discarded behind a hard 404 — fixed via the `source: 'partial'` response path (still in place); (2) the substring classifier missed plain "sugar" entirely. Coverage verification for Open Food Facts (2026-08-06): 5/5 real Kirkland UPCs found individually, plus 1,557 Kirkland Signature and 567 Costco-brand-tagged products confirmed in the database via their search API — strong enough signal to make OFF primary and demote FDC to a fallback. **The OFF rebuild is deployed** — `barcode-lookup` redeployed and the `20260807000000_ingredient_off_fields.sql` migration applied, both confirmed 2026-08-06. Spot-verified live against the deployed function that same day: an unmatched-by-price barcode still returned real Open Food Facts ingredient text with a clean tally and correct empty-state pricing sections, and a fully-unmatched barcode returned a clean "Product Not Found" state with no crash.
+
 **Status caveat**: all of the above is code-complete but **has not been exercised end-to-end on a real device/build** — `TEST_PLAN.md` at the repo root has ~90 test cases across 14 features and all are still marked ⬜ Pending.
 
 ## Non-Functional Requirements
 
-- **NFR-01 Security**: RLS policies enforce per-user access at the DB level (see `20260626000000_security_hardening.sql`). No app-layer AES-256 field encryption is implemented on top of that — if stricter at-rest encryption is required, that's still open work.
+- **NFR-01 Security**: RLS policies enforce per-user access at the DB level (see `20260626000000_security_hardening.sql`). **Verified live 2026-08-11** via `pg_policies`: `receipts` SELECT/DELETE are both `auth.uid() = user_id`, `receipt_items` has SELECT/INSERT/UPDATE scoped through its parent receipt, and `feature_requests` has INSERT-only for anon (no SELECT — a write-only public inbox, by design). Mobile screens additionally pass an explicit `.eq('user_id', ...)` as defense-in-depth; RLS remains the actual enforcement. No app-layer AES-256 field encryption on top of that — if stricter at-rest encryption is required, that's still open work.
+- **Handy**: `supabase db query --linked "<SQL>"` runs read-only SQL against the remote DB — the fastest way to verify a policy/schema claim instead of assuming. (Without `--linked` it targets the local Docker DB, which isn't running.)
 - **NFR-02 Performance**: Barcode lookup (`barcode-lookup` function) targets < 350ms via `product_lookups` cache-first, RapidAPI live-fetch fallback.
 - **NFR-03 Scalability**: No load testing has been done against the 50k evaluations/minute OCR batch target from the original spec — not yet relevant at solo-dev/pre-launch scale.
 
 ## Data Sourcing (No Official Costco API)
 
-Costco has no public developer API. Do not call `api.costco.com` or any Costco internal endpoint — they're session-cookie protected and will break without notice. Two sources are used instead:
+Costco has no public developer API. Do not call `api.costco.com` or any Costco internal endpoint — they're session-cookie protected and will break without notice. Three sources are used instead — see `costco-backend/EXTERNAL_APIS.md` for full detail on each (endpoint, auth, caching, fallback behavior):
 
 1. **RapidAPI `costco-live-data.p.rapidapi.com`** — barcode/SKU → pricing, used by `barcode-lookup` and `price-match-check`. Requires `RAPIDAPI_KEY` set as an Edge Function secret. (Unwrangle/Apify were evaluated early on but RapidAPI is what's actually wired up.)
-2. **Crowdsourced OCR ledger** — every receipt scan captures SKU + price + warehouse + date into `receipt_items`/`products`, building an internal historical price index over time.
+2. **Open Food Facts** — barcode/UPC → real structured ingredient classification (NOVA, Nutri-Score, additive E-codes, nutrient levels), used by `barcode-lookup` as the primary source for the good/watch/avoid ingredient highlighting. Free, no key required (descriptive User-Agent required instead). Coverage confirmed via manual spike: 5/5 real Kirkland UPCs found, 1,557 Kirkland Signature + 567 Costco-brand-tagged products in the database.
+3. **USDA FoodData Central** — same ingredient feature, but only as a fallback when Open Food Facts has no match for a UPC; returns raw ingredient text only, classified with a weaker keyword heuristic. Free, requires `USDA_FDC_API_KEY`.
+4. **Crowdsourced OCR ledger** — every receipt scan captures SKU + price + warehouse + date into `receipt_items`/`products`, building an internal historical price index over time.
 
-## UI Color Palette ("Warm Intelligence" design system)
+## UI Color Palette ("Warehouse Red & Cream" design system)
 
-| Token | Hex | Usage |
+Adopted app-wide 2026-08-04, replacing the earlier "Warm Intelligence" palette. Lives entirely in `costco-mobile/constants/colors.ts` as `LightColors` + `DarkColors` (same token names in both, so screens never branch on scheme themselves) — there is no separate `colors.warehouse.ts` file; that was a temporary parallel file used only by the now-deleted `app/(demo)/` mockup screens (see below) and no longer exists.
+
+| Token | Hex (light) | Usage |
 |---|---|---|
-| Costco Red | `#E31837` | Primary CTAs |
-| Executive Navy | `#005EA6` | Authority/totals |
-| Gold Star Accent | `#FFC72C` | Badges/gamification |
-| Background (warm parchment) | `#F7F5F2` | Screen background |
+| Costco Red | `#D1373A` | Primary CTAs |
+| Executive Navy | `#1B2A4A` | Authority/totals (inverts to a light cream in dark mode — see caveat below) |
+| Gold Star Accent | `#C9A84C` | Badges/gamification |
+| Background (warehouse cream) | `#FDFAF3` | Screen background |
 
 Full design conventions (Pressable over TouchableOpacity, shadow tokens, ALL-CAPS section labels, safe-area insets, etc.) live in `costco-mobile/constants/theme.ts` — follow the existing patterns there rather than hardcoding new values.
+
+**Dark mode** (added 2026-08-05): `contexts/ThemeContext.tsx` provides `useThemeColors()`/`useTheme()`; user picks Light/Dark/System in Profile → Preferences → Appearance, persisted via AsyncStorage. Screens build their `StyleSheet` via a `makeStyles(Colors)` factory called with `useMemo` inside the component (StyleSheets can't be reactive at module scope) — this is the established pattern, follow it for any new screen.
+
+**Caveat for new opaque-fill UI** (chips, avatar circles, active pills, badge stamps): dark mode's gray scale is the light scale *reversed*, and a few brand tokens (`executiveNavy*`) invert too, so they read correctly as *text* on a dark background. That inversion breaks anything reusing those same tokens as a **solid background fill** paired with hardcoded white text/icons — the fill goes light while the text stays white, and both vanish into each other. Two such bugs were found and fixed this way already (profile avatar, ScanFAB speed-dial labels). Use the non-inverting `navySolid` / `darkSolid` tokens for this instead of `executiveNavy*` or `gray[700+]`. See `costco-mobile/docs/design-system/reference-app-audit-2026-08-05.md` for the full writeup and a suggested automated-contrast-check follow-up.
+
+The `app/(demo)/` design-system preview screens (a fake-data showcase of this palette + scan/celebration animations) were built 2026-08-04 and removed 2026-08-05 once the palette and animations were adopted directly into the real app — if you see references to them elsewhere, they're stale.
+
+## PostHog / Observability
+
+PostHog is the **sole** analytics/error/session tool (Sentry was removed 2026-08-06) — one project covers usage analytics, funnels, session replay, and error tracking end to end, across both mobile and backend.
+
+**Mobile (`costco-mobile/lib/posthog.ts`)**: initializes `posthog-react-native` from `POSTHOG_PROJECT_TOKEN`/`POSTHOG_HOST` (injected via `app.config.js` from `.env`, read at runtime via `expo-constants`). `null` (all `posthog?.` calls become no-ops) if either is unset — mirrors the existing external-API-client "never breaks the app" pattern, just for the analytics layer instead of a data fetch.
+- `PostHogProvider` + `PostHogErrorBoundary` wrap the app in `app/_layout.tsx`, with a themed `ErrorFallback` (`components/ErrorFallback.tsx`) instead of a blank screen on an uncaught React render error.
+- `errorTracking.autocapture` is on for uncaught exceptions, unhandled promise rejections, and `console.error` calls — this is what actually makes PostHog "catch everything," not just the error boundary (which only sees React render-tree errors).
+- `enableSessionReplay: true`, with `maskAllTextInputs`/`maskAllImages` on — replay is masked by default because receipts show real prices and personal purchase data; never disable masking without a specific reason.
+- Screen views and app-lifecycle events autocapture by default (`PostHogProvider`'s default `captureScreens: true`, `captureAppLifecycleEvents: true`); touch autocapture is left off.
+- Manual `posthog?.capture(...)` calls exist for both the "completed" and "failed" side of every core funnel step (sign-up, sign-in, receipt upload, product scan, warehouse check-in) — the failed-side events (`*_failed`, with a `reason`) are what make funnel drop-off/issue analysis possible; they were largely missing before 2026-08-06 and were added specifically for this.
+- `posthog?.identify()` / `posthog?.reset()` are called on sign-in/sign-out in `_layout.tsx` to tie events to a user without needing that logic duplicated per screen.
+
+**Backend (`costco-backend/supabase/functions/_shared/posthog.ts`)**: `capturePostHogEvent` / `capturePostHogException`, called from the top-level `catch` of every Edge Function (`ingest-receipt`, `barcode-lookup`, `check-in`, `price-match-check`) so server-side failures land in the same PostHog project as mobile crashes. Deliberately uses a raw `fetch` to PostHog's `/capture/` HTTP endpoint rather than the `posthog-node` SDK — `posthog-node` buffers and flushes on an interval, which doesn't survive a Deno Edge Function's isolate being frozen the instant a response returns; a single awaited fetch does. Never throws, same rule as every other `_shared` client.
+- **`POSTHOG_PROJECT_TOKEN` and `POSTHOG_HOST` are set** as Edge Function secrets (2026-08-11, via `supabase secrets set`, same values as `costco-mobile/.env`), so backend capture is live rather than a no-op. Verified after setting: both error paths (`ingest-receipt`, `barcode-lookup` on malformed JSON) still return correctly in ~1s with the now-real awaited PostHog capture in the path, and the happy path is unaffected. **Not verified: whether PostHog actually received the events** — the project token is write-only, so confirming delivery needs a look at PostHog's Activity/Error Tracking view in the dashboard.
 
 ## Build Status (verified 2026-08-04)
 
 **Sprints 1–9: code-complete.** Auth, receipt OCR ingestion, price matching, push notifications, barcode scanning, warehouse check-in, badge engine, spend analytics dashboard, home screen — all screens and Edge Functions exist, `npx tsc --noEmit` passes clean, no TODOs in the codebase.
 
 **Not done:**
-- Real-device/TestFlight testing (`TEST_PLAN.md` all pending)
+- Real-device/TestFlight testing (`TEST_PLAN.md` all pending). **Blocked on Apple Developer Program enrollment** (2026-08-11): `expo prebuild` + `expo run:ios --device` both work, CocoaPods installed, `ios/` generated, iPhone paired — but a free Personal Team cannot provision this app because it uses Sign In with Apple *and* Push Notifications, both of which Apple restricts to paid accounts. Enrollment paid for but not yet approved. Two paths once it clears: re-select the (now paid) Team in Xcode → Signing & Capabilities. To test *before* it clears, temporarily remove `expo-apple-authentication` + `expo-notifications` from `app.json` plugins and rebuild — everything except Apple login and push works on a Personal Team.
 - `eas.json` / EAS build configuration
-- Apple Developer account setup confirmation
-- Confirming Edge Function secrets (`GOOGLE_CLOUD_VISION_API_KEY`, `RAPIDAPI_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) are actually set on the deployed functions
+- Apple Developer Program enrollment approval (paid 2026-08-11, awaiting confirmation)
+- ~~Confirming Edge Function secrets are set~~ **Done (2026-08-11).** `supabase secrets list` confirms all of them present: `GOOGLE_CLOUD_VISION_API_KEY`, `RAPIDAPI_KEY`, `USDA_FDC_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, plus the auto-managed `SUPABASE_*` set and the newly-added `POSTHOG_PROJECT_TOKEN`/`POSTHOG_HOST`. Open Food Facts needs no key.
 - Privacy policy (required for App Store — app uses location + receipt data)
 - App Store screenshots/listing copy
-- Warehouse seed data is Bay Area only (15 locations) — fine for a regional soft-launch, not national
+- ~~Warehouse seed data was Bay Area-only~~ **Done.** `costco-backend/scripts/seed-warehouses-from-google-places.mjs` generates a global seed with `tier` derived from real Google Places rating × review count. **Applied and live-verified: 723 warehouses** (511 USA, 74 Canada, 25 Mexico, 24 UK, 21 Japan, 18 South Korea, 16 Australia, + others), tiered 574 Common / 129 Rare / 20 Legendary. Migrations `20260809000000` (schema) through `20260809000006` (data cleanup) are all applied. Re-run the script periodically — Costco opens/closes locations and ratings drift.
+- Google Places-seeded warehouses get a synthetic `warehouse_code` (`GP-######`), not Costco's real store number — `ingest-receipt` now self-heals this: when a receipt's exact code lookup misses, it falls back to matching the receipt header's OCR text against a seeded warehouse's **postal code first, city name second** (postal code disambiguates cities with more than one Costco), links the receipt, and overwrites that warehouse's placeholder code with the real one parsed from the receipt (see `PARSER_DECISIONS.md`, "Warehouse resolution — postal-code/city fallback"). **Not yet live-verified** against a real non-Bay-Area receipt.
+- ~~`20260805000000_receipt_items_update_policy.sql` not confirmed applied~~ **Done — verified live 2026-08-11.** `pg_policies` confirms `receipt_items` has all three policies (`receipt_items_select_own`, `_insert_own`, `_update_own`), so inline line-item editing on receipt-success works. `supabase migration list` also shows every local migration matched remotely, with no drift.
+- **`POSTHOG_PROJECT_TOKEN`/`POSTHOG_HOST` need to be set as Supabase Edge Function secrets** for backend error/event capture (see "PostHog / Observability" above) — not yet confirmed set. Mobile-side PostHog already works independently of this.
+
+**All four Edge Functions redeployed 2026-08-11** via `supabase functions deploy` (CLI works now — see Commands), carrying the QA-pass fixes below plus the PostHog exception capture added earlier. Live-verified after deploy: `barcode-lookup` returns real Open Food Facts data on a fresh UPC (NOVA 1, Nutri-Score B, 6 classified ingredients, `source: 'off'`) and correct cached data on a repeat lookup — confirming the stale-cache bug is actually fixed in production, not just locally. `check-in` correctly 401s without auth, `ingest-receipt` 400s on missing params and 500s (into the PostHog catch) on malformed JSON, `price-match-check` reachable.
+
+**Final QA pass (2026-08-11).** Two parallel deep code reviews (mobile + backend) plus a simulator visual walkthrough. Six real bugs found and fixed:
+1. **Analytics double-counted spend** (`app/(tabs)/analytics.tsx`) — multiplied `unit_price × quantity`, but the OCR parser stores the *full line price* in `unit_price` (see `PARSER_DECISIONS.md`; `receipt-success.tsx` already documented this and deliberately didn't multiply). Any item edited to quantity > 1 showed inflated spend, disagreeing with every other screen.
+2. **Home stats silently capped at 50 receipts** (`app/(tabs)/index.tsx`) — `Total Spent`/`Receipts` came from a `.limit(50)` query while Analytics used an unbounded one, so the two screens would visibly disagree past 50 receipts. Split into a separate unbounded totals query.
+3. **Stale ingredient cache returned empty data** (`barcode-lookup/index.ts`) — pre-OFF-rebuild rows stored `ingredients_json` as a flat array; the new code read `.items` off it, got `undefined`, and rendered an empty ingredients card for up to 30 days instead of refetching. Now detects the old shape via `Array.isArray` and falls through to a refetch, self-healing the row.
+4. **OCR header slicing didn't trim blank lines** (`ingest-receipt/index.ts`) — Vision commonly emits blank lines near the top, which shrank the effective postal-code search window below the intended 12 lines.
+5. **Full receipt OCR text was logged in plaintext** (`ingest-receipt/index.ts`) — member numbers and every line item went to Supabase function logs on every scan. Now logs length only; use the RLS-scoped `ocr_raw` column for debugging.
+6. **`receipts.tsx` failed to load after adding user-scoping** — its `useFocusEffect` had an empty dep array, so `load()` fired before auth resolved and queried `user_id = ''` (malformed UUID → error state). Caught in simulator testing, fixed by keying the effect on `session?.user.id`.
+
+Also hardened: all `receipts` queries now pass an explicit `.eq('user_id', ...)` alongside RLS (defense-in-depth — previously some screens relied on RLS alone while sibling queries in the same file filtered explicitly; note `receipt_items` has no `user_id` column and is correctly still RLS-only, scoped via its parent receipt), and `receipt-success.tsx`'s full-screen image viewer switched from a module-scope `Dimensions.get()` (stale on rotation/iPad split-screen) to the reactive `useWindowDimensions()` hook.
+
+Visual verification in the iOS Simulator: Home, Product Detail, History, Receipts, Analytics, and Profile all render correctly with zero Metro runtime errors. **Dark mode was not visually verified** — `simctl ui ... appearance dark` didn't propagate to the running Expo Go app; check it manually via Profile → Preferences → Appearance.
+
+**Recently added (2026-08-06):** ingredient good/watch/avoid highlighting on the product detail screen (FR-400, see above) went through three rounds the same day: (1) shipped with USDA FDC + a substring keyword classifier; (2) live-testing against the deployed function found RapidAPI doesn't recognize raw UPC/EAN barcodes, so successfully-resolved ingredients were being discarded behind a hard 404 — fixed via the `source: 'partial'` response path, and separately found the keyword classifier missed plain "sugar"; (3) rebuilt entirely around **Open Food Facts** as the primary classification source (real NOVA/Nutri-Score/additive data via a new curated `_shared/additiveDatabase.ts`, ~25 E-codes), demoting USDA FDC to a fallback for raw text only. Mobile's `IngredientsCard` gained NOVA/Nutri-Score badges — while building those, caught and fixed a real contrast bug (white text on the Nutri-Score B/C/D badge colors, computed as low as 1.53:1) before it ever shipped. **This rebuild is deployed** — `barcode-lookup` redeployed and the `nova_group`/`nutriscore_grade` migration applied, both confirmed 2026-08-06.
+
+Separately that day: the four (now five) external API clients were consolidated into `costco-backend/supabase/functions/_shared/`, one file per API, documented in `costco-backend/EXTERNAL_APIS.md` — this also fixed a real gap where `barcode-lookup`'s RapidAPI call had no error handling (a network failure there would have 500'd the whole product lookup instead of degrading gracefully, unlike the equivalent call in `price-match-check`, which already had it).
+
+**Recently added (2026-08-06, later same day):** home screen's separate "Recently Viewed" (horizontal product scroll) and "Recent Receipts" (vertical list) sections were merged into a single **Recent** feed (`costco-mobile/app/(tabs)/index.tsx`) — receipts and viewed products sorted together newest-first, grouped under day dividers (Today / Yesterday / N days ago / date), with All / Receipts / Viewed filter chips and an empty-state message when a filter yields nothing. "See all" now points at the existing `/history` screen instead of the receipts-only `/receipts` route. Live-verified in the iOS Simulator via Expo Go against the real deployed backend: feed sorts/groups correctly, updates live after a new product view, "See all" navigation works, and product-detail fallback states (no price data, no ingredients match, true 404) all degrade cleanly with no crashes.
+
+**Recently added (2026-08-06, later same day):** PostHog made the sole analytics/error/session tool, replacing Sentry (`@sentry/react-native` removed from mobile entirely — package, `app.json` plugin, DSN init in `_layout.tsx`). Enabled error-tracking autocapture (uncaught exceptions, unhandled rejections, console errors) and masked session replay in `lib/posthog.ts`; added a themed `ErrorFallback` for `PostHogErrorBoundary`; added the missing "failed" half of every core funnel event (`sign_in_failed`, `sign_up_failed`, `receipt_upload_failed`, `product_scan_failed`, `warehouse_check_in_failed`) so drop-off is actually visible, not just success. Also wired PostHog into the backend for the first time — `_shared/posthog.ts`, called from every Edge Function's top-level catch — so server-side failures land in the same project. See "PostHog / Observability" above for the full picture.
+
+**Recently added (2026-08-05):** dark mode (Light/Dark/System, Profile → Preferences → Appearance); scan/check-in celebration animations (`components/ScanEffects.tsx` — drawn checkmark, confetti, ring halo, star toss, wobble, viewfinder sweep) wired into `receipt-camera.tsx` and the Home check-in modal; inline-editable receipt line items on `receipt-success.tsx` (tap a row to fix an OCR misread). See `costco-mobile/docs/design-system/reference-app-audit-2026-08-05.md` for a reference-app design audit with a prioritized list of what to build next (dedicated Alerts screen, unified Scan screen with per-mode coaching, additional celebration animations).
 
 ## Deployment
 
@@ -146,5 +207,5 @@ Full design conventions (Pressable over TouchableOpacity, shadow tokens, ALL-CAP
 | Mobile builds | Expo EAS (not yet configured) |
 | OTA updates | EAS Update, once builds exist |
 | Backend + DB | Supabase (Postgres + Auth + Edge Functions + Storage) |
-| Error tracking | Sentry |
+| Analytics, error tracking & session replay | PostHog |
 | CI/CD | None for v1 (manual deploys) |

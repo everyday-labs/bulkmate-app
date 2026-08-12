@@ -1,3 +1,9 @@
+> **Status (2026-08-05)**: this plan was executed as an interactive `app/(demo)/` mockup on
+> 2026-08-04, then the palette + component patterns were adopted directly into the real app and
+> the demo screens were deleted (their job was done — see `CLAUDE.md`'s palette section). For
+> further design-system work, including a second reference-app audit and a prioritized backlog,
+> see `reference-app-audit-2026-08-05.md` in this same folder.
+
 # Costco Companion App — Design System & Animation Plan
 
 ## Goal

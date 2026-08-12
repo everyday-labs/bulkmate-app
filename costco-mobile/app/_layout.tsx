@@ -1,18 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
-import * as Sentry from '@sentry/react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { PostHogErrorBoundary, PostHogProvider } from 'posthog-react-native';
 import { posthog } from '../lib/posthog';
 import { useAuth } from '../hooks/useAuth';
 import { drainQueue } from '../lib/receiptUpload';
-
-const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
-if (sentryDsn && sentryDsn !== 'placeholder') {
-  Sentry.init({ dsn: sentryDsn, enabled: !__DEV__ });
-}
+import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
+import { ErrorFallback } from '../components/ErrorFallback';
 
 // Show notifications as banners even when the app is foregrounded
 Notifications.setNotificationHandler({
@@ -26,7 +23,16 @@ Notifications.setNotificationHandler({
 });
 
 export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootLayoutInner />
+    </ThemeProvider>
+  );
+}
+
+function RootLayoutInner() {
   const { session, loading } = useAuth();
+  const { resolvedScheme } = useTheme();
   const segments = useSegments();
   const router = useRouter();
   const notifListenerRef = useRef<Notifications.EventSubscription | null>(null);
@@ -63,13 +69,10 @@ export default function RootLayout() {
   }, []);
 
   // Auth-gated routing
-  // (demo) hosts the standalone Warehouse Red & Cream design-system screens —
-  // unauthenticated by design, since they render fake data only.
   useEffect(() => {
     if (loading) return;
     const inAuthGroup = segments[0] === '(auth)';
-    const inDemoGroup = segments[0] === '(demo)';
-    if (!session && !inAuthGroup && !inDemoGroup) {
+    if (!session && !inAuthGroup) {
       router.replace('/(auth)/login');
     } else if (session && inAuthGroup) {
       router.replace('/(tabs)');
@@ -80,12 +83,9 @@ export default function RootLayout() {
   useEffect(() => {
     if (loading) return;
 
-    // Foreground notification received (informational — no action needed)
-    notifListenerRef.current = Notifications.addNotificationReceivedListener(
-      (notification) => {
-        console.log('Notification received in foreground:', notification.request.identifier);
-      },
-    );
+    // Foreground notification received — no action needed, the badge/list
+    // updates reactively from the underlying data the notification refers to.
+    notifListenerRef.current = Notifications.addNotificationReceivedListener(() => {});
 
     // User tapped a notification — route to the relevant screen
     responseListenerRef.current = Notifications.addNotificationResponseReceivedListener(
@@ -105,17 +105,17 @@ export default function RootLayout() {
 
   const content = (
     <SafeAreaProvider>
+      <StatusBar style={resolvedScheme === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="(demo)" />
       </Stack>
     </SafeAreaProvider>
   );
 
   return posthog ? (
     <PostHogProvider client={posthog}>
-      <PostHogErrorBoundary>{content}</PostHogErrorBoundary>
+      <PostHogErrorBoundary fallback={ErrorFallback}>{content}</PostHogErrorBoundary>
     </PostHogProvider>
   ) : (
     content

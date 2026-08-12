@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -16,12 +16,15 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { posthog } from '../../lib/posthog';
-import { Colors } from '../../constants/colors';
+import { useThemeColors } from '../../contexts/ThemeContext';
+import type { ColorScheme } from '../../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../../constants/theme';
 
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const Colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,8 +37,10 @@ export default function LoginScreen() {
     }
     setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) Alert.alert('Sign in failed', error.message);
-    else {
+    if (error) {
+      posthog?.capture('sign_in_failed', { sign_in_method: 'email', error: error.message });
+      Alert.alert('Sign in failed', error.message);
+    } else {
       posthog?.identify(
         data.user.id,
         data.user.email ? { email: data.user.email } : undefined,
@@ -57,8 +62,10 @@ export default function LoginScreen() {
         provider: 'apple',
         token: credential.identityToken!,
       });
-      if (error) Alert.alert('Apple sign-in failed', error.message);
-      else {
+      if (error) {
+        posthog?.capture('sign_in_failed', { sign_in_method: 'apple', error: error.message });
+        Alert.alert('Apple sign-in failed', error.message);
+      } else {
         posthog?.identify(
           data.user.id,
           data.user.email ? { email: data.user.email } : undefined,
@@ -66,7 +73,9 @@ export default function LoginScreen() {
         posthog?.capture('user_signed_in', { sign_in_method: 'apple' });
       }
     } catch (e: any) {
+      // User cancelling the Apple sheet isn't a failure worth tracking.
       if (e.code !== 'ERR_REQUEST_CANCELED') {
+        posthog?.capture('sign_in_failed', { sign_in_method: 'apple', error: e.message ?? String(e) });
         Alert.alert('Apple sign-in failed', 'Please try again.');
       }
     }
@@ -143,7 +152,11 @@ export default function LoginScreen() {
             }
           </Pressable>
 
-          <Pressable onPress={() => router.push('/(auth)/register')} hitSlop={8}>
+          <Pressable
+            onPress={() => router.push('/(auth)/register')}
+            hitSlop={8}
+            style={({ pressed }) => pressed && { opacity: 0.6 }}
+          >
             <Text style={styles.switchText}>
               New here?{'  '}
               <Text style={styles.switchLink}>Create an account</Text>
@@ -173,7 +186,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing['2xl'] },
 
@@ -183,7 +196,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: radius['2xl'],
-    backgroundColor: Colors.costcoRed,
+    backgroundColor: Colors.costcoRedSolid,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
@@ -242,7 +255,7 @@ const styles = StyleSheet.create({
 
   // Buttons
   primaryBtn: {
-    backgroundColor: Colors.costcoRed,
+    backgroundColor: Colors.costcoRedSolid,
     borderRadius: radius.lg,
     paddingVertical: spacing.lg,
     alignItems: 'center',
