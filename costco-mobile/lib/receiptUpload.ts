@@ -34,12 +34,33 @@ export async function uploadReceipt(imageUri: string): Promise<UploadReceiptResu
 
   if (storageError) throw storageError;
 
-  const { data, error: fnError } = await supabase.functions.invoke('ingest-receipt', {
-    body: { imagePath: filePath, userId: session.user.id },
-  });
+  // The image is uploaded before the receipt row exists, so any path that
+  // doesn't end in a row owning this file has to delete it again — otherwise
+  // it is orphaned in Storage forever, invisible in the app and not covered by
+  // "delete this receipt". These are full receipt photos, which on a Costco
+  // receipt include the membership number, so leaving them behind is a privacy
+  // problem, not just wasted space.
+  const discardUpload = async () => {
+    const { error } = await supabase.storage.from('receipts').remove([filePath]);
+    if (error) console.warn('Could not remove orphaned receipt upload:', error.message);
+  };
 
-  if (fnError) throw fnError;
-  if (!data?.receiptId) throw new Error('No receipt ID returned from server');
+  let data;
+  try {
+    const { data: fnData, error: fnError } = await supabase.functions.invoke('ingest-receipt', {
+      body: { imagePath: filePath, userId: session.user.id },
+    });
+    if (fnError) throw fnError;
+    if (!fnData?.receiptId) throw new Error('No receipt ID returned from server');
+    data = fnData;
+  } catch (err) {
+    await discardUpload();
+    throw err;
+  }
+
+  // A duplicate returns the *existing* receipt, which already has its own
+  // image. The one just uploaded is referenced by nothing.
+  if (data.duplicate) await discardUpload();
 
   return {
     receiptId: data.receiptId,

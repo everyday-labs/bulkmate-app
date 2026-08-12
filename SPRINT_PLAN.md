@@ -1,4 +1,4 @@
-# Costco Companion App — Sprint Plan
+# Bulkmate — Sprint Plan
 
 **Project:** Gamified Costco membership companion app (iOS/Android)
 **Solo developer:** balajic0623
@@ -85,7 +85,7 @@
 | 1 | Seed `warehouses` table with US locations (lat/lng from public store locator) |
 | 2 | `expo-location` foreground GPS permission flow |
 | 3 | Manual tap check-in button on Home screen |
-| 4 | `check-in` Edge Function — Haversine 150m validation, insert `user_badges`, increment `total_stars` |
+| 4 | `check-in` Edge Function — Haversine radius validation, insert `user_badges`, increment `total_stars` (planned at 150m; **shipped at 50m** — `CHECK_IN_RADIUS_M`) |
 | 5 | Same-day cooldown guard (no double check-in at same warehouse) |
 
 ---
@@ -222,7 +222,7 @@
 | 4 | Seed `warehouses` table (Bay Area first, expand before public launch) |
 | 5 | `expo-location` foreground GPS permission flow |
 | 6 | Check-in button on Home screen |
-| 7 | `check-in` Edge Function — Haversine 150m validation, increment `total_stars`, cooldown guard |
+| 7 | `check-in` Edge Function — Haversine radius validation, increment `total_stars`, cooldown guard (planned at 150m; **shipped at 50m** — `CHECK_IN_RADIUS_M`) |
 
 ---
 

@@ -1,6 +1,8 @@
-# Costco Warehouse Companion
+# Bulkmate
 
-An open-source, gamified Costco membership companion app for iOS, Android, and Web. Built as a personal side project to solve real pain points — receipt tracking, price-match alerts, and making warehouse visits a little more fun.
+An open-source, gamified warehouse-club companion app for iOS and Android. Built as a personal side project to solve real pain points — receipt tracking, price-match alerts, and making warehouse visits a little more fun.
+
+> **Naming note:** this app was called "Costco Companion" during early development and was renamed to **Bulkmate** before beta distribution. An app named and branded as Costco implies an affiliation that doesn't exist — an App Review rejection trigger and a trademark exposure. Factual references to Costco throughout the app and these docs are deliberate: it genuinely reads Costco receipts, and describing that is nominative use. Only the app's *own* branding changed.
 
 ---
 
@@ -13,6 +15,9 @@ An open-source, gamified Costco membership companion app for iOS, Android, and W
 - **Spend analytics** — Monthly spend chart, top items by cost, in-store savings vs. price-match savings breakdown.
 - **Product barcode scanner** — Scan any product barcode for pricing, reviews, and community price history, plus a good/watch/avoid ingredient breakdown sourced from Open Food Facts (NOVA processing group, Nutri-Score, and flagged additives) when available.
 - **Unified Recent feed** — Receipts and viewed products show up together on the home screen in one chronological feed, grouped by day, with quick filter chips to narrow it to just receipts or just viewed items.
+- **Check-in on receipt scan** — Scanning a receipt is proof you were at the warehouse, so it earns the same star as a GPS check-in, dated to the receipt's transaction date rather than the day you uploaded it. Scanning twice from one trip is a silent no-op, not a double award.
+- **Manual warehouse picker** — When the parser can't match a receipt's header to a known warehouse, a searchable picker lets you choose it by name, city, or ZIP. It's never required: the receipt is already saved, and "Can't find my warehouse" keeps it that way.
+- **Account deletion** — Delete your account and everything in it from inside the app: every receipt and scanned image, all items, price alerts, check-ins, stars, and badges.
 
 ## Why these features exist
 
@@ -26,13 +31,15 @@ Costco already has a real, generous price-adjustment policy — most members jus
 
 ## Repo layout
 
-Two independent git repos live side by side in this working tree — there is no monorepo:
+**One git repo** rooted at `costco-app/`, containing two directories. (Earlier notes describing these as two independent repos were wrong — `git rev-parse --show-toplevel` from either directory returns the same root, and both share one `origin`.)
 
 ```
-Costco app/
+costco-app/
 ├── costco-mobile/    ← Expo + React Native app (this is what you build/run)
 └── costco-backend/   ← Supabase migrations + Edge Functions
 ```
+
+The directory must not contain a space in its path — React Native's iOS build scripts don't quote paths, so `Costco app/` broke the build and was renamed.
 
 ## Architecture
 
@@ -68,7 +75,7 @@ No official Costco API exists, so pricing, ingredient, and OCR data are sourced 
 | **Open Food Facts** | Primary ingredient classification — real NOVA processing group, Nutri-Score (A–E), detected additive E-codes, and high/low nutrient-level flags for the good/watch/avoid ingredient breakdown | `barcode-lookup` | None (descriptive User-Agent required) | Free |
 | **USDA FoodData Central** | Fallback ingredient source when Open Food Facts has no match for a UPC — raw ingredient text only, classified with a weaker keyword heuristic | `barcode-lookup` | API key (query param) | Free |
 | **Expo Push API** | Delivers the "price drop" push notification when a price-match alert fires | `price-match-check` | None (per-device push token) | Free |
-| **PostHog** | Usage analytics, funnels, session replay (masked), and error tracking — mobile client events plus every Edge Function's caught exceptions, all in one project | Mobile app-wide + all 4 Edge Functions | Project token | Free tier |
+| **PostHog** | Usage analytics, funnels, session replay (masked), and error tracking — mobile client events plus every Edge Function's caught exceptions, all in one project | Mobile app-wide + all 5 Edge Functions | Project token | Free tier |
 
 Every client except Google Vision is built to **never throw** — a failure degrades gracefully (null/empty result, no ingredients card, no crash) rather than taking down the rest of the request. Vision is the one intentional exception: OCR is the entire input to the receipt pipeline, not an enrichment, so there's nothing sensible to fall back to.
 
@@ -106,6 +113,31 @@ Scan the QR code in the **Expo Go** app on your phone to run it instantly.
 
 You'll need a Supabase project with the migrations in `costco-backend/supabase/migrations/` applied, and the Edge Functions in `costco-backend/supabase/functions/` deployed.
 
+```bash
+# Backend — the Supabase CLI works; deploys do not need the dashboard
+supabase db push                    # apply migrations to the linked project
+supabase functions deploy <name>    # deploy one Edge Function
+```
+
+### Building for a device or TestFlight
+
+`eas.json` defines `development`, `preview`, and `production` profiles. Environment variables are
+deliberately **not** committed there — `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`,
+`POSTHOG_PROJECT_TOKEN`, and `POSTHOG_HOST` are read from `process.env` (the PostHog pair via
+`app.config.js` → `extra`) and must be registered as EAS environment variables, or the build ships
+with no Supabase URL and fails silently at runtime.
+
+```bash
+npx eas-cli build --platform ios --profile production --auto-submit
+```
+
+The first run needs an interactive Apple login to mint a distribution certificate; after that it
+runs unattended. `submit.production.ios.ascAppId` is already set, so uploads need no prompts.
+
+**Any change needs a redeploy to take effect.** Mobile JS is embedded in the native binary — a
+Release build is not Metro-tethered, so a working-tree fix is invisible on device until you rebuild.
+Edge Functions only change on `supabase functions deploy`.
+
 ## Gotchas & known limitations
 
 Real traps hit while building this — worth knowing before you dig into the code or hit the same wall:
@@ -114,7 +146,7 @@ Real traps hit while building this — worth knowing before you dig into the cod
 - **RapidAPI's search doesn't reliably match a raw scanned barcode.** Its `query` param expects a Costco item number or product name, not a 12–13 digit UPC/EAN — the exact format a camera scan produces. Confirmed against real UPCs where it returned zero results even though other sources resolved them fine. `barcode-lookup` handles this with a "partial hit" response (price sections just render empty) rather than a flat 404.
 - **`fetch(file://...)` and `Blob` are both broken for local files on React Native.** Reading a captured photo/receipt image must go through `File(uri).bytes()` from `expo-file-system/next` — the web-standard patterns silently fail or behave differently here.
 - **Expo SDK is pinned to 54**, matching the Expo Go client used for testing. `costco-mobile/AGENTS.md` currently links to v56 docs, which is stale — treat the pinned version in `package.json` as the source of truth, not that file.
-- **Supabase CLI auth is currently broken** (token format issue). Migrations and Edge Function deploys/secrets are done manually via the Supabase dashboard, not `supabase db push` / `supabase functions deploy`, until that's resolved.
+- **Receipt images are uploaded to Storage *before* the receipt row exists.** Any path that doesn't end in a row owning that file has to delete it again, or the image is orphaned forever — invisible in the app and not covered by "delete this receipt". The non-obvious case is a *duplicate*: `ingest-receipt` returns the existing receipt's id, so the file just uploaded is referenced by nothing. This leaked 16 images before it was fixed, and orphans matter because a receipt photo carries the membership number.
 - **Open Food Facts rate-limits anonymous requests more aggressively.** A generic `curl`/fetch with no `User-Agent` can get a 503-style "temporarily unavailable" response — always send a descriptive one (app name + contact), as `_shared/openFoodFacts.ts` does.
 - **A few dark-mode color tokens invert on purpose, and that can bite you.** `executiveNavy` (and similar) intentionally flips per theme so it still reads correctly as *text* on a dark background — but that breaks it if reused as a solid opaque fill paired with hardcoded white text/icons (two real bugs shipped this way before being caught). Use the non-inverting `navySolid`/`darkSolid` tokens for solid-fill UI instead.
 - **Check-in geofencing is foreground-only in v1** — no background location. The 50m radius check is enforced server-side in the `check-in` Edge Function; the client's GPS reading is never trusted on its own.
@@ -135,6 +167,15 @@ I share projects like this publicly because I believe in building tools that sol
 - Building something useful for myself and sharing it.
 - Learning by building real things, not toy demos.
 - Open-sourcing everything so others can benefit and contribute.
+
+---
+
+## Privacy
+
+The app stores receipt images, the full OCR text extracted from them (which on a Costco receipt
+includes your membership number), itemized purchase history, GPS coordinates for check-ins, and
+masked analytics. See [`costco-mobile/docs/PRIVACY.md`](./costco-mobile/docs/PRIVACY.md) for exactly
+what is collected, which third parties process it, and how to delete it.
 
 ---
 

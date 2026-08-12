@@ -26,6 +26,7 @@ import {
   requestAndSavePushToken,
 } from '../lib/notifications';
 import { BellRing } from '../components/Motion';
+import { WarehousePickerModal, type PickableWarehouse } from '../components/WarehousePickerModal';
 
 type ReceiptItem = {
   id: string;
@@ -44,6 +45,7 @@ type ReceiptDetails = {
   tax_amount: number | null;
   image_path: string | null;
   imageUrl: string | null;
+  warehouse_id: string | null;
   warehouse_name: string | null;
   warehouse_address: string | null;
   warehouse_city: string | null;
@@ -66,6 +68,9 @@ export default function ReceiptSuccessScreen() {
   const [showImageModal, setShowImageModal] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
+  const [showWarehousePicker, setShowWarehousePicker] = useState(false);
+  const [linkingWarehouse, setLinkingWarehouse] = useState(false);
+  const [warehouseSkipped, setWarehouseSkipped] = useState(false);
   const promptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -82,7 +87,7 @@ export default function ReceiptSuccessScreen() {
         await Promise.all([
           supabase
             .from('receipts')
-            .select('id, transaction_date, transaction_number, total_amount, tax_amount, image_path, warehouses(name, address, city, state)')
+            .select('id, transaction_date, transaction_number, total_amount, tax_amount, image_path, warehouse_id, warehouses(name, address, city, state)')
             .eq('id', id)
             .single(),
           supabase
@@ -114,6 +119,7 @@ export default function ReceiptSuccessScreen() {
         tax_amount: receiptRow.tax_amount ?? null,
         image_path: receiptRow.image_path ?? null,
         imageUrl,
+        warehouse_id: receiptRow.warehouse_id ?? null,
         warehouse_name: wh.name ?? null,
         warehouse_address: wh.address ?? null,
         warehouse_city: wh.city ?? null,
@@ -196,6 +202,57 @@ export default function ReceiptSuccessScreen() {
     }
   }
 
+  async function handlePickWarehouse(warehouse: PickableWarehouse) {
+    setLinkingWarehouse(true);
+    try {
+      // Goes through the check-in function rather than updating `receipts`
+      // directly, so a manually-picked warehouse earns the same star/badge
+      // reward that an auto-matched one does.
+      const { data, error } = await supabase.functions.invoke('check-in', {
+        body: { receipt_id: receipt!.id, warehouse_id: warehouse.id },
+      });
+      if (error) throw error;
+
+      setReceipt((prev) =>
+        prev
+          ? {
+              ...prev,
+              warehouse_id: warehouse.id,
+              warehouse_name: warehouse.name,
+              warehouse_address: warehouse.address,
+              warehouse_city: warehouse.city,
+              warehouse_state: warehouse.state,
+            }
+          : prev,
+      );
+      setShowWarehousePicker(false);
+      posthog?.capture('receipt_warehouse_picked', { warehouse_id: warehouse.id });
+
+      if (data && !data.already_checked_in) {
+        Alert.alert(
+          'Visit credited',
+          `You earned a star for your visit to ${warehouse.name}.`,
+        );
+      }
+    } catch (e: unknown) {
+      Alert.alert(
+        'Couldn\'t save warehouse',
+        e instanceof Error ? e.message : 'Please try again.',
+      );
+    } finally {
+      setLinkingWarehouse(false);
+    }
+  }
+
+  function handleSkipWarehouse() {
+    // The receipt is already saved with a null warehouse_id — nothing to
+    // undo, this just stops the card from reading as a required action. The
+    // card stays tappable so the warehouse can still be added later.
+    setShowWarehousePicker(false);
+    setWarehouseSkipped(true);
+    posthog?.capture('receipt_warehouse_skipped');
+  }
+
   async function shareReceiptId() {
     if (!receipt!.transaction_number) return;
     try {
@@ -275,23 +332,55 @@ export default function ReceiptSuccessScreen() {
               </View>
             )}
 
-            {/* Warehouse card */}
-            <View style={styles.warehouseCard}>
-              <View style={styles.warehouseIconWrap}>
-                <Text style={styles.warehouseIcon}>🏪</Text>
+            {/* Warehouse card — or a picker prompt when the receipt header
+                couldn't be matched to a seeded warehouse. */}
+            {receipt.warehouse_id ? (
+              <View style={styles.warehouseCard}>
+                <View style={styles.warehouseIconWrap}>
+                  <Text style={styles.warehouseIcon}>🏪</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.warehouseName}>
+                    {receipt.warehouse_name ?? 'Costco Warehouse'}
+                  </Text>
+                  {receipt.warehouse_address && (
+                    <Text style={styles.warehouseDetail}>{receipt.warehouse_address}</Text>
+                  )}
+                  {warehouseLocation ? (
+                    <Text style={styles.warehouseDetail}>{warehouseLocation}</Text>
+                  ) : null}
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.warehouseName}>
-                  {receipt.warehouse_name ?? 'Costco Warehouse'}
-                </Text>
-                {receipt.warehouse_address && (
-                  <Text style={styles.warehouseDetail}>{receipt.warehouse_address}</Text>
-                )}
-                {warehouseLocation ? (
-                  <Text style={styles.warehouseDetail}>{warehouseLocation}</Text>
-                ) : null}
-              </View>
-            </View>
+            ) : (
+              <Pressable
+                onPress={() => setShowWarehousePicker(true)}
+                style={({ pressed }) => [
+                  styles.warehouseCard,
+                  !warehouseSkipped && styles.warehouseUnknownCard,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <View style={styles.warehouseIconWrap}>
+                  <Text style={styles.warehouseIcon}>{warehouseSkipped ? '🏪' : '📍'}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.warehouseName}>
+                    {warehouseSkipped
+                      ? 'Saved without a warehouse'
+                      : 'I’m unable to find the correct warehouse from your receipt'}
+                  </Text>
+                  <Text
+                    style={
+                      warehouseSkipped ? styles.warehouseDetail : styles.warehouseUnknownAction
+                    }
+                  >
+                    {warehouseSkipped
+                      ? 'Your receipt and items are safe. Tap to add a warehouse anytime.'
+                      : 'Tap to choose your warehouse'}
+                  </Text>
+                </View>
+              </Pressable>
+            )}
 
             {/* Transaction number */}
             {receipt.transaction_number ? (
@@ -381,6 +470,14 @@ export default function ReceiptSuccessScreen() {
           <Text style={styles.deleteButtonText}>Delete Receipt</Text>
         </Pressable>
       </View>
+
+      <WarehousePickerModal
+        visible={showWarehousePicker}
+        saving={linkingWarehouse}
+        onClose={() => setShowWarehousePicker(false)}
+        onSelect={handlePickWarehouse}
+        onSkip={handleSkipWarehouse}
+      />
 
       <NotificationPrompt
         visible={showNotifPrompt}
@@ -728,6 +825,17 @@ const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
     marginBottom: 2,
   },
   warehouseDetail: { fontSize: fontSize.sm, color: Colors.gray[400], marginTop: 2 },
+  warehouseUnknownCard: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: Colors.costcoRed,
+  },
+  warehouseUnknownAction: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: Colors.costcoRed,
+    marginTop: 4,
+  },
 
   // Transaction number
   tcRow: {

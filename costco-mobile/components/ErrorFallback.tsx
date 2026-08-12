@@ -19,7 +19,7 @@ export function ErrorFallback(_props: PostHogErrorBoundaryFallbackProps) {
       <Text style={styles.icon}>⚠️</Text>
       <Text style={styles.title}>Something went wrong</Text>
       <Text style={styles.subtitle}>
-        The app hit an unexpected error. Close and reopen Costco Companion to
+        The app hit an unexpected error. Close and reopen Bulkmate to
         keep going — this has already been reported.
       </Text>
     </View>

@@ -1,4 +1,6 @@
-# App Overview — Costco Warehouse Companion
+# App Overview — Bulkmate
+
+*(Renamed from "Costco Companion" before beta distribution — see the README's naming note.)*
 
 A gamified, open-source Costco membership companion app (iOS/Android, mobile-only for v1). It turns the boring parts of being a Costco member — tracking receipts, catching price drops, remembering which warehouse you visited — into something closer to a collection game. Not affiliated with Costco.
 
@@ -18,6 +20,9 @@ Scan your receipt and the app quietly does two useful things: it logs everything
 | **Sliding-window price match** | Every scanned item is watched for 30 days. If the price drops, you get a push notification telling you the refund you may be owed. |
 | **Barcode / product lookup** | Scan any product in-store to pull its current price, brand, and rating — plus, where available, a good/watch/avoid ingredient breakdown. |
 | **Geo-fenced check-ins** | Check in at a warehouse when your GPS is within range; earns 1 star, capped at once per warehouse per day. |
+| **Check-in on receipt scan** | Scanning a receipt also earns a star — a receipt is proof you were there. Dated to the receipt's transaction date, not the upload date, and a repeat from the same trip is a silent no-op. |
+| **Manual warehouse picker** | When a receipt header can't be matched to a known warehouse, a searchable picker lets you pick it by name, city, or ZIP. Optional — the receipt saves either way. |
+| **Account deletion** | Profile → Delete Account removes the account and every receipt, image, item, alert, check-in, star, and badge. |
 | **Fan tier progression** | Cumulative stars advance you through 5 named tiers. |
 | **Badge engine** | 10 badges tied to check-in counts, warehouse diversity, warehouse rarity, and tier milestones. |
 | **Spend analytics dashboard** | Monthly spend, top items by cost, in-store vs. price-match savings breakdown. |
@@ -72,7 +77,7 @@ Additive flags are a curated judgment call the team maintains, not a claim of nu
 3. Insert a `check_ins` row. A unique index (`check_ins_user_warehouse_day`) caps it at **one check-in per warehouse per day** — a repeat same-day check-in returns `already_checked_in: true` and awards nothing.
 4. On a new check-in: `total_stars += 1`, tier is recalculated (see below), badges are re-evaluated.
 
-> Note: `CLAUDE.md` describes the check-in radius as 150m — the deployed Edge Function (`CHECK_IN_RADIUS_M`) actually enforces **50m**. Treat the code as source of truth.
+> Note: the check-in radius is **50m**, set by `CHECK_IN_RADIUS_M` in the `check-in` Edge Function. Early planning docs say 150m; that was never what shipped. Code is the source of truth.
 
 ### Badge evaluation
 

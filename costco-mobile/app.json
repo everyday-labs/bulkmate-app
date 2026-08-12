@@ -1,19 +1,23 @@
 {
   "expo": {
-    "name": "costco-mobile",
+    "name": "Bulkmate",
     "slug": "costco-app",
-    "scheme": "costco",
+    "scheme": "bulkmate",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.twonk0609.costco-app"
+      "bundleIdentifier": "com.twonk0609.bulkmate",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationAlwaysUsageDescription": "This app uses your location to confirm you're at a warehouse when you check in."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#1B2A4A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -26,7 +30,6 @@
     "plugins": [
       "expo-router",
       "expo-apple-authentication",
-      "expo-secure-store",
       [
         "expo-notifications",
         {
@@ -35,10 +38,20 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "This app uses the camera to scan your receipts and product barcodes.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Costco uses your location to verify you're at a warehouse and award check-in badges.",
-          "locationWhenInUsePermission": "Costco uses your location to verify you're at a warehouse and award check-in badges."
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationWhenInUsePermission": "This app uses your location to confirm you're at a warehouse when you check in.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
         }
       ],
       "expo-font",
