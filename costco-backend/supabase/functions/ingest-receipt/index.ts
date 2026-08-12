@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { awardCheckIn } from '../_shared/checkInRewards.ts';
 import { extractTextFromImage } from '../_shared/googleVision.ts';
 import { capturePostHogException } from '../_shared/posthog.ts';
 import { parseReceiptText } from './parser.ts';
@@ -16,15 +17,24 @@ import { parseReceiptText } from './parser.ts';
 // every later scan there hits the fast exact-match path above with no
 // fallback needed.
 //
-// Postal code is tried first and preferred: a city can have more than one
-// Costco (ambiguous by city name alone), but a postal code narrows to a
-// single store far more reliably. City name is a second-tier fallback for
-// when a receipt doesn't clearly show its postal code. Both searches are
-// restricted to the receipt's header region (first ~12 OCR lines, before
-// the item section) rather than the full text — searching the whole receipt
-// risks a false hit inside a long barcode/transaction-number digit run
-// lower down (e.g. a 5-digit postal code coincidentally appearing as a
-// substring of a 16-digit barcode string).
+// Matching is CITY-FIRST, with postal code only used to disambiguate between
+// same-city candidates. An earlier version had this backwards (postal code
+// first, city as fallback) and produced a real production failure: a Santa
+// Clara, CA receipt contains the phone number "(408) 567-9000", and Taichung
+// City, Taiwan has postal code "408" — so `\b408\b` matched, the receipt was
+// linked to a warehouse in Taiwan, and the self-heal then overwrote that
+// warehouse's code with the US store number. 10 seeded warehouses have
+// postal codes of 3 characters or fewer, so this was systemic, not a
+// one-off.
+//
+// A city name is a much stronger signal: it's printed in the receipt header
+// as a word, and it can't collide with an area code or street number the way
+// a bare 3-digit string can. Postal codes are still useful, but only to pick
+// between warehouses that already agree on the city.
+//
+// The search is restricted to the receipt's header region (first ~12
+// non-blank OCR lines) — scanning the whole receipt risks false hits inside
+// long barcode/transaction-number digit runs lower down.
 async function matchWarehouseByReceiptHeader(
   supabase: ReturnType<typeof createClient>,
   rawText: string,
@@ -47,24 +57,26 @@ async function matchWarehouseByReceiptHeader(
   if (!candidates?.length) return null;
   const rows = candidates as { id: string; warehouse_code: string; city: string | null; postal_code: string | null }[];
 
-  // \b word-boundary anchors matter here: without them, a 5-digit postal
-  // code could match as a false substring inside a longer, unrelated digit
-  // run (e.g. "95110" inside "295110123"). Internal whitespace becomes \s*
-  // (zero or more) so "K2G 5W5" also matches OCR variants like "K2G5W5" or
-  // "K2G  5W5".
-  const byPostalCode = rows.filter((w) => {
-    if (!w.postal_code) return false;
+  // Step 1 — city must appear in the header. This is the required signal.
+  const byCity = rows.filter((w) => w.city && headerText.includes(w.city.toUpperCase()));
+  if (byCity.length === 0) return null;
+  if (byCity.length === 1) return byCity[0];
+
+  // Step 2 — several warehouses share this city, so use the postal code to
+  // pick one. \b anchors stop a code matching inside a longer digit run
+  // (e.g. "95110" inside "295110123"); internal whitespace becomes \s* so
+  // Canada's "K2G 5W5" still matches "K2G5W5". Codes shorter than 4 chars
+  // are skipped entirely — they're too collision-prone to trust even here.
+  const byPostalCode = byCity.filter((w) => {
+    if (!w.postal_code || w.postal_code.replace(/\s/g, '').length < 4) return false;
     const escaped = w.postal_code.toUpperCase()
       .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       .replace(/\s+/g, '\\s*');
     return new RegExp(`\\b${escaped}\\b`).test(headerText);
   });
   if (byPostalCode.length === 1) return byPostalCode[0];
-  if (byPostalCode.length > 1) return null; // ambiguous — don't guess
 
-  const byCity = rows.filter((w) => w.city && headerText.includes(w.city.toUpperCase()));
-  if (byCity.length === 1) return byCity[0];
-  return null; // no match, or ambiguous — don't guess
+  return null; // still ambiguous — don't guess
 }
 
 serve(async (req) => {
@@ -266,6 +278,46 @@ serve(async (req) => {
 
     // 8. Trigger price match check in the background — fire-and-forget so it
     //    doesn't block the response. Errors are logged but not surfaced to client.
+    // Scanning a receipt is proof the user was physically at the warehouse, so
+    // it earns the same check-in reward as a GPS check-in — dated to the
+    // receipt's transaction date, not today, since receipts are often uploaded
+    // days later. The one-per-warehouse-per-day unique index makes a repeat
+    // (second receipt from the same trip, or a GPS check-in already logged
+    // that day) a silent no-op rather than a double award.
+    let checkIn: { warehouseName: string; totalStars: number; fanTier: string; tierUpgraded: boolean; newBadges: unknown[] } | null = null;
+    if (warehouseId) {
+      try {
+        const { data: wh } = await supabase
+          .from('warehouses')
+          .select('name, tier')
+          .eq('id', warehouseId)
+          .maybeSingle();
+
+        const award = await awardCheckIn(
+          supabase,
+          {
+            user_id: userId,
+            warehouse_id: warehouseId,
+            checked_in_at: `${parsed.transactionDate}T12:00:00Z`,
+          },
+          (wh?.tier as string) ?? 'Common',
+        );
+
+        if (!award.already_checked_in) {
+          checkIn = {
+            warehouseName: (wh?.name as string) ?? 'Costco',
+            totalStars: award.total_stars,
+            fanTier: award.fan_tier,
+            tierUpgraded: award.tier_upgraded,
+            newBadges: award.new_badges,
+          };
+        }
+      } catch (err) {
+        // A failed check-in must never cost the user their receipt.
+        console.warn('12. check-in award failed (non-blocking):', err instanceof Error ? err.message : String(err));
+      }
+    }
+
     const priceMatchUrl = `${supabaseUrl}/functions/v1/price-match-check`;
     fetch(priceMatchUrl, {
       method: 'POST',
@@ -293,6 +345,7 @@ serve(async (req) => {
         subtotal: parsed.subtotal,
         subtotalSource: parsed.subtotal !== null ? 'receipt' : 'computed',
         duplicate: false,
+        checkIn,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
     );

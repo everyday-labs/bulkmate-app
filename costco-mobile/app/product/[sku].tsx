@@ -214,7 +214,7 @@ export default function ProductDetailScreen() {
 
           {product.sale_price == null && product.online_price == null && (
             <Text style={styles.priceUnavailableText}>
-              No current Costco pricing for this item — it may not be a warehouse item, or hasn't been scanned by another Companion user yet.
+              No current Costco pricing for this item — it may not be a warehouse item, or hasn't been scanned by another Bulkmate user yet.
             </Text>
           )}
 
@@ -262,7 +262,7 @@ export default function ProductDetailScreen() {
         <View style={styles.historyCard}>
           <Text style={styles.cardSectionLabel}>IN-STORE PRICE HISTORY</Text>
           <Text style={styles.historySubtitle}>
-            From Costco Companion receipt scans
+            From Bulkmate receipt scans
           </Text>
 
           {hasOCRData ? (

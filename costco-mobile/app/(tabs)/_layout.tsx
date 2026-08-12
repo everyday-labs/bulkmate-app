@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../contexts/ThemeContext';
 import { fontSize, letterSpacing } from '../../constants/theme';
 import { ScanFAB } from '../../components/ScanFAB';
@@ -15,6 +16,12 @@ function tabIcon(filled: IoniconsName, outline: IoniconsName) {
 
 export default function TabsLayout() {
   const Colors = useThemeColors();
+  // The tab bar sits at the very bottom of the screen, so on any device with
+  // a home indicator (or software nav bar on Android) it has to reserve that
+  // space itself — otherwise the system gesture bar draws straight over the
+  // Home/Stats/Profile labels. Previously height/paddingBottom were fixed at
+  // 60/8, which only looked right on devices with no inset.
+  const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1 }}>
       <Tabs
@@ -31,8 +38,8 @@ export default function TabsLayout() {
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.06,
             shadowRadius: 8,
-            height: 60,
-            paddingBottom: 8,
+            height: 60 + insets.bottom,
+            paddingBottom: 8 + insets.bottom,
           },
           tabBarLabelStyle: {
             fontSize: fontSize.xs,

@@ -15,7 +15,7 @@
 // limited more aggressively, which we hit firsthand while spike-testing.
 
 const OFF_PRODUCT_URL = 'https://world.openfoodfacts.org/api/v2/product';
-const USER_AGENT = 'CostcoCompanion/1.0 (balajic1992@gmail.com) - Supabase Edge Function';
+const USER_AGENT = 'Bulkmate/1.0 (balajic0623@gmail.com) - Supabase Edge Function';
 
 const FIELDS = [
   'product_name',

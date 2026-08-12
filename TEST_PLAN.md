@@ -1,4 +1,4 @@
-# Costco Companion App — Test Plan
+# Bulkmate — Test Plan
 
 **Last updated:** 2026-08-11  
 **Status legend:** ⬜ Pending · 🔄 In Progress · ✅ Pass · ❌ Fail
@@ -9,8 +9,10 @@
 
 **Verified in the iOS Simulator (Expo Go, against the real deployed backend):** Home screen (stats, Recent feed with day dividers + filter chips), Product Detail (including all three fallback states: no price data, no ingredients match, true 404), Receipt History, unified History screen, Spend Analytics, and Profile all render correctly with zero runtime errors. Warehouse data verified live: 723 rows across 11+ countries.
 
+**Verified on a physical iPhone (2026-08-11):** the full receipt pipeline end to end — camera capture → Google Vision OCR → parsing → line-item display → totals. Confirmed against a real Almaden #470 receipt: 5 units across 4 rows, instant savings captured, multi-buy merged by SKU, and the total reconciling to the printed $48.75. Two real parser bugs were found and fixed via this receipt (CRV deposit stealing an item's price; repeat SKUs not merged) — see `costco-backend/PARSER_DECISIONS.md`.
+
 **Not yet verified — needs a real device:**
-- Everything camera-dependent (receipt capture/OCR, barcode scanning) — the simulator has no usable camera
+- Barcode scanning (the simulator has no usable camera)
 - Real GPS check-in at an actual warehouse (the 50m radius is enforced server-side)
 - Push notifications (removed from Expo Go in SDK 53 — needs a dev build)
 - Sign in with Apple
@@ -48,11 +50,13 @@
 
 | # | Test | Steps | Expected | Status |
 |---|------|-------|----------|--------|
-| 3.1 | Happy path | Point camera at a real Costco receipt, tap capture | Spinner shows, then routes to receipt-success with parsed items | ⬜ |
-| 3.2 | Item list accuracy | Check parsed items | SKUs, prices, and savings match the physical receipt | ⬜ |
-| 3.3 | Discount capture | Receipt with instant savings | Negative `X.XX-` amounts captured as `discount_amount` | ⬜ |
-| 3.4 | Warehouse match | Receipt from a seeded warehouse | Correct warehouse name shown on success screen | ⬜ |
+| 3.1 | Happy path | Point camera at a real Costco receipt, tap capture | Spinner shows, then routes to receipt-success with parsed items | ✅ 2026-08-11 (device) |
+| 3.2 | Item list accuracy | Check parsed items | SKUs, prices, and savings match the physical receipt | ✅ 2026-08-11 — Almaden #470, 5 units / 4 rows, total $48.75 matches receipt |
+| 3.3 | Discount capture | Receipt with instant savings | Negative `X.XX-` amounts captured as `discount_amount` | ✅ 2026-08-11 — $2.30 instant savings captured on BIENA EDMAME |
+| 3.4 | Warehouse match | Receipt from a seeded warehouse | Correct warehouse name shown on success screen | ⬜ (receipt was Almaden #470 — a `GP-` seeded row, so this also exercises the self-healing `warehouse_code` path; not yet confirmed) |
 | 3.5 | Duplicate receipt | Scan same receipt twice | `duplicate: true` flag returned; user notified (not a crash) | ⬜ |
+| 3.6 | Multi-buy merged by SKU | Receipt with the same SKU on two lines | One row with quantity ×2, correct line total, no false item-count mismatch | ✅ 2026-08-11 — SKU 1518783 → `$12.99 ×2` |
+| 3.7 | CRV deposit not mistaken for item price | Receipt with `CA REDEMP V` bottle-deposit lines | Item keeps its real price; deposit excluded from item rows | ✅ 2026-08-11 — was the root cause of a wrong total; fixed and re-verified on device |
 
 ---
 

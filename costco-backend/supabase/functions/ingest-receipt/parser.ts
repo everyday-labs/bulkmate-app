@@ -164,6 +164,13 @@ function extractTransactionNumber(lines: string[]): string | null {
 //   Pass 2 — zip: each SKU entry without an inline price consumes the next
 //            standalone price in sequence.
 //
+// A warehouse street address ("1601 Coleman Ave", "5301 Almaden Expressway")
+// has the same shape as a SKU line — leading digits then text — so it must be
+// excluded explicitly. Matches a trailing street-type word; no real Costco
+// item description ends in one of these.
+const STREET_ADDRESS_PATTERN =
+  /\b(AVE|AVENUE|ST|STREET|RD|ROAD|BLVD|BOULEVARD|DR|DRIVE|WAY|LN|LANE|PKWY|PARKWAY|HWY|HIGHWAY|EXPY|EXPRESSWAY|CT|COURT|PL|PLACE|TER|TERRACE|CIR|CIRCLE)\.?$/i;
+
 function extractItems(lines: string[]): ParsedItem[] {
   // Find the item section: after the Member line, before SUBTOTAL.
   let itemStart = -1;
@@ -172,7 +179,11 @@ function extractItems(lines: string[]): ParsedItem[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (itemStart === -1) {
-      if (/Member/i.test(line)) {
+      // Fuzzy "Member": Vision routinely confuses M/N and b/h in this word —
+      // a real receipt came through as "OX Nember 111894060404", which the
+      // old exact /Member/i missed, sending the parser down the fallback path
+      // and swallowing the store's street address as an item.
+      if (/\b[MN]e[mn][bh]er\b/i.test(line)) {
         // Member number may be on same line ("59 Member 112051125767") or next line
         itemStart = /\d/.test(line) ? i + 1 : i + 2;
       }
@@ -185,10 +196,14 @@ function extractItems(lines: string[]): ParsedItem[] {
     }
   }
 
-  // Fallback: no Member line found — start at first SKU-like line
+  // Fallback: no Member line found — start at first SKU-like line that isn't
+  // the warehouse's own street address. "1601 Coleman Ave" satisfies the
+  // SKU shape (4-9 leading digits) and was really parsed as a $29.99 item on
+  // a live receipt, which then consumed the first real item's price and
+  // shifted every subsequent price by one.
   if (itemStart === -1) {
     for (let i = 0; i < lines.length; i++) {
-      if (/^[A-Z]?[0-9]{4,9}(\s|$)/.test(lines[i])) {
+      if (/^[A-Z]?[0-9]{3,9}(\s|$)/.test(lines[i]) && !STREET_ADDRESS_PATTERN.test(lines[i])) {
         itemStart = i;
         break;
       }
@@ -205,9 +220,20 @@ function extractItems(lines: string[]): ParsedItem[] {
   const couponPattern   = /^\d{10,}/;
   // SKU with inline price at end: "1234 ITEM NAME 8.99" or "1234567 8.99 A"
   // Min 4 digits: some Costco SKUs (e.g. 7812 YELLOW ONION) are 4 digits.
-  const skuWithPrice    = /^([A-Z]?[0-9]{4,9})\s+(.*?)\s+(\d{1,3}\.\d{2})\s*[A-Z]?\s*$/;
+  // Optional leading letter may be attached ("E200303") or space-separated
+  // ("E 200303 PEELD GARLIC") — Vision emits both. The old patterns only
+  // allowed the attached form, silently dropping the spaced ones.
+  //
+  // Minimum SKU length is 3, not 4: a real receipt had "177 4LB ORG FUJI",
+  // and dropping it didn't just lose that item — it shifted every following
+  // price by one, corrupting three neighbouring items too. Verified against
+  // the full 12-case layout regression: lowering the floor changed no other
+  // result. The section boundaries (Member → SUBTOTAL) plus the aggregate and
+  // street-address filters are what keep short numbers from being misread as
+  // SKUs, not the digit count itself.
+  const skuWithPrice    = /^(?:[A-Z]\s*)?([0-9]{3,9})\s+(.*?)\s+(\d{1,3}\.\d{2})\s*[A-Z]?\s*$/;
   // SKU without price: "1234 ITEM NAME" or just "1234567"
-  const skuOnly         = /^([A-Z]?[0-9]{4,9})(?:\s+(.*))?$/;
+  const skuOnly         = /^(?:[A-Z]\s*)?([0-9]{3,9})(?:\s+(.*))?$/;
   // Standalone price on its own line: "8.99", "24.99 A", ".99" (OCR-dropped leading digit)
   // \d* allows zero leading digits; \s*[A-Z]?\s* allows optional trailing tax code letter.
   const standalonePrice = /^(\d*\.\d{2})\s*[A-Z]?\s*$/;
@@ -228,6 +254,9 @@ function extractItems(lines: string[]): ParsedItem[] {
 
   for (const line of itemLines) {
     if (!line || aggregateLinePattern.test(line)) continue;
+    // Belt-and-braces: even inside the item section, never treat a street
+    // address as an item (a mis-detected section start can drag the header in).
+    if (STREET_ADDRESS_PATTERN.test(line)) continue;
 
     // Coupon / CRV barcode lines carry no item data — skip the line itself.
     // (Deliberately no "skip the next price" flag here; see the greedy
@@ -276,6 +305,54 @@ function extractItems(lines: string[]): ParsedItem[] {
         const idx = pending.shift()!;
         skuEntries[idx].price = price;
         lastPricedIdx = idx;
+      }
+    }
+  }
+
+  // ── Trailing-price recovery ───────────────────────────────────────────────
+  // On badly column-ordered scans, Vision can flush the entire right-hand
+  // price column *after* the SUBTOTAL/TOTAL labels, stranding the last few
+  // items' prices below the section boundary. Observed on a real 17-item
+  // receipt where "KS COCNT WTR" and "SNAPWARE18PC" had their prices ($12.99,
+  // $24.99) printed after "TOTAL NUMBER OF ITEMS SOLD".
+  //
+  // Only runs when SKUs are still unpriced, and stops the moment they're all
+  // filled — so the trailing subtotal/tax/total figures are never consumed.
+  // Sub-$1 amounts are skipped here because CRV deposits interleave with the
+  // real prices in this block; that guard is deliberately scoped to this
+  // recovery path so it can't affect the legitimate sub-$1 item case handled
+  // in the main pass.
+  if (pending.length > 0) {
+    // `recovering` gates price consumption, but the loop deliberately keeps
+    // running one step past the last assignment so a savings line printed
+    // immediately after the final recovered price still lands (a real receipt
+    // had SNAPWARE18PC's "5.00-" on the line right after its $24.99).
+    let recovering = true;
+    for (let i = subtotalIdx; i < lines.length; i++) {
+      const line = lines[i];
+      if (STREET_ADDRESS_PATTERN.test(line) || couponPattern.test(line)) continue;
+
+      const sav = line.match(savingsLine);
+      if (sav) {
+        if (recovering && lastPricedIdx !== null) {
+          skuEntries[lastPricedIdx].discountAmount = parseFloat(sav[1]);
+        }
+        continue;
+      }
+
+      const px = line.match(standalonePrice);
+      if (px) {
+        const price = parseFloat(px[1]);
+        if (price < 1) continue; // CRV deposit interleaved in this block
+        if (pending.length > 0) {
+          const idx = pending.shift()!;
+          skuEntries[idx].price = price;
+          lastPricedIdx = idx;
+        } else {
+          // First non-item price after everything is filled — from here on
+          // we're into subtotal/tax/total territory, so stop absorbing.
+          recovering = false;
+        }
       }
     }
   }

@@ -8,6 +8,7 @@ import {
   Linking,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -111,6 +112,7 @@ export default function ProfileScreen() {
   const [earnedMap, setEarnedMap] = useState<Record<string, string>>({});
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -167,6 +169,52 @@ export default function ProfileScreen() {
     } finally {
       setEnablingNotifs(false);
     }
+  }
+
+  async function performAccountDeletion() {
+    setDeletingAccount(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-account');
+      if (error) throw error;
+      if (!data?.deleted) throw new Error('Account could not be deleted.');
+
+      posthog?.capture('account_deleted');
+      // The auth user is gone, so the cached session is now invalid — clearing
+      // it locally is what actually returns the app to the signed-out state.
+      posthog?.reset();
+      await supabase.auth.signOut();
+    } catch (e: unknown) {
+      setDeletingAccount(false);
+      Alert.alert(
+        'Couldn\'t delete account',
+        e instanceof Error
+          ? e.message
+          : 'Something went wrong. Your account has not been deleted — please try again.',
+      );
+    }
+  }
+
+  function handleDeleteAccount() {
+    Alert.alert(
+      'Delete Account',
+      'This permanently deletes your account and everything in it — every receipt and its scanned image, all your items and price alerts, your check-ins, stars and badges.\n\nThis cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          style: 'destructive',
+          onPress: () =>
+            Alert.alert(
+              'Are you sure?',
+              'There is no way to recover this data afterwards.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete Forever', style: 'destructive', onPress: performAccountDeletion },
+              ],
+            ),
+        },
+      ],
+    );
   }
 
   const email = session?.user.email ?? '';
@@ -445,6 +493,30 @@ export default function ProfileScreen() {
               <Text style={styles.rowSubtitle}>You can sign back in anytime</Text>
             </View>
           </Pressable>
+
+          <View style={styles.rowSeparator} />
+
+          <Pressable
+            style={({ pressed }) => [styles.settingsRow, pressed && styles.rowPressed]}
+            onPress={handleDeleteAccount}
+            disabled={deletingAccount}
+          >
+            <View style={[styles.rowIconWrap, styles.rowIconDanger]}>
+              {deletingAccount ? (
+                <ActivityIndicator size="small" color={Colors.costcoRed} />
+              ) : (
+                <Text style={styles.rowIcon}>✕</Text>
+              )}
+            </View>
+            <View style={styles.rowContent}>
+              <Text style={[styles.rowTitle, { color: Colors.costcoRed }]}>
+                {deletingAccount ? 'Deleting account…' : 'Delete Account'}
+              </Text>
+              <Text style={styles.rowSubtitle}>
+                Permanently erases your receipts, check-ins and badges
+              </Text>
+            </View>
+          </Pressable>
         </View>
 
         {/* ── About ── */}
@@ -473,11 +545,11 @@ export default function ProfileScreen() {
           </View>
 
           <Text style={styles.aboutDisclaimer}>
-            Not affiliated with or endorsed by Costco Wholesale Corporation. Provided as-is — no warranties, no liability. Prices shown are crowdsourced and may not be accurate.
+            Bulkmate is an independent app and is not affiliated with, endorsed by, or sponsored by Costco Wholesale Corporation. “Costco” and “Kirkland Signature” are trademarks of Costco Wholesale Corporation, used here only to describe the receipts and warehouses this app works with. Provided as-is — no warranties, no liability. Prices shown are crowdsourced and may not be accurate.
           </Text>
         </View>
 
-        <Text style={styles.version}>Costco Companion · v1.0.0 · MIT License</Text>
+        <Text style={styles.version}>Bulkmate · v1.0.0 · MIT License</Text>
       </View>
     </ScrollView>
   );
@@ -811,19 +883,30 @@ const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
   rowTitle: { fontSize: fontSize.md, fontWeight: '600', color: Colors.gray[800], marginBottom: 2 },
   rowSubtitle: { fontSize: fontSize.xs, color: Colors.gray[400], lineHeight: 16 },
   rowSeparator: { height: 1, backgroundColor: Colors.border, marginLeft: 74 },
+  // Background must match the parent settingsCard (`surface`), not gray[50].
+  // The gray scale is reversed in dark mode, so gray[50] there (#1A1714) is
+  // *darker* than the card (#221E18) and rendered as a visible band — and
+  // because only paddingBottom was set, that band began abruptly at the
+  // buttons' top edge, reading as a background "cut in half". In light mode
+  // gray[50] is #FAFAF8 on a white card, so the seam was invisible and the
+  // bug only showed in dark mode.
   themeSegmentRow: {
     flexDirection: 'row',
     gap: spacing.xs,
     paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xs,
     paddingBottom: spacing.lg,
-    backgroundColor: Colors.gray[50],
+    backgroundColor: Colors.surface,
   },
   themeSegment: {
     flex: 1,
     paddingVertical: spacing.sm,
     borderRadius: radius.md,
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    // surfaceSunken reads as a recessed well against `surface` in *both*
+    // themes (light #F0E6D6, dark #2A241C), unlike the gray scale which
+    // flips relative order between them.
+    backgroundColor: Colors.surfaceSunken,
   },
   themeSegmentActive: { backgroundColor: Colors.navySolid },
   themeSegmentText: { fontSize: fontSize.sm, fontWeight: '600', color: Colors.gray[600] },
