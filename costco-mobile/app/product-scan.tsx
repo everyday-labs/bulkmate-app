@@ -1,18 +1,25 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { posthog } from '../lib/posthog';
-import { Colors } from '../constants/colors';
+import { useThemeColors } from '../contexts/ThemeContext';
+import type { ColorScheme } from '../constants/colors';
 import { spacing, fontSize, radius, letterSpacing } from '../constants/theme';
+import { BarcodeSweep } from '../components/Motion';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 
 export default function ProductScanScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  // Camera viewfinder chrome (topBar/frame/statusOverlay/etc.) stays dark
+  // regardless of app theme, matching camera-app convention — only the
+  // pre-permission screen below is regular themed app UI.
+  const Colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +30,9 @@ export default function ProductScanScreen() {
   if (!permission.granted) {
     return (
       <View style={[styles.permissionContainer, { paddingTop: insets.top + spacing['3xl'] }]}>
-        <Text style={styles.permissionIcon}>📦</Text>
+        <BarcodeSweep color={Colors.gray[400]}>
+          <Text style={styles.permissionIcon}>📦</Text>
+        </BarcodeSweep>
         <Text style={styles.permissionTitle}>Camera Access Needed</Text>
         <Text style={styles.permissionSubtitle}>
           Point your camera at any Costco shelf tag or product barcode to look up pricing.
@@ -34,7 +43,11 @@ export default function ProductScanScreen() {
         >
           <Text style={styles.permissionBtnText}>Allow Camera</Text>
         </Pressable>
-        <Pressable style={styles.cancelLink} onPress={() => router.back()} hitSlop={8}>
+        <Pressable
+          style={({ pressed }) => [styles.cancelLink, pressed && { opacity: 0.6 }]}
+          onPress={() => router.back()}
+          hitSlop={8}
+        >
           <Text style={styles.cancelLinkText}>Cancel</Text>
         </Pressable>
       </View>
@@ -59,6 +72,7 @@ export default function ProductScanScreen() {
       });
 
       if (res.status === 404) {
+        posthog?.capture('product_scan_failed', { reason: 'not_found' });
         setError(`No Costco product found for "${data}". Try scanning the shelf tag instead.`);
         hasScanned.current = false;
         setScanning(false);
@@ -74,7 +88,9 @@ export default function ProductScanScreen() {
       // Navigate to product detail — pass the resolved Costco SKU from the API response
       router.replace(`/product/${product.sku}`);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+      const message = e instanceof Error ? e.message : 'Something went wrong. Please try again.';
+      posthog?.capture('product_scan_failed', { reason: 'error', error: message });
+      setError(message);
       hasScanned.current = false;
       setScanning(false);
     }
@@ -154,7 +170,7 @@ const FRAME_SIZE = 260;
 const CORNER_SIZE = 24;
 const CORNER_THICKNESS = 3;
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.black },
 
   // Permission screen
@@ -181,7 +197,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing['2xl'],
   },
   permissionBtn: {
-    backgroundColor: Colors.costcoRed,
+    backgroundColor: Colors.costcoRedSolid,
     borderRadius: radius.lg,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing['3xl'],
@@ -300,7 +316,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   retryBtn: {
-    backgroundColor: Colors.costcoRed,
+    backgroundColor: Colors.costcoRedSolid,
     borderRadius: radius.md,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.xl,

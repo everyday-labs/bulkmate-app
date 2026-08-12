@@ -23,5 +23,26 @@ if (__DEV__ && !host) {
 }
 
 export const posthog = projectToken && host
-  ? new PostHog(projectToken, { host })
+  ? new PostHog(projectToken, {
+      host,
+      // PostHog is the sole error tracker (Sentry was removed) — capture
+      // uncaught JS exceptions, unhandled promise rejections, and
+      // console.error calls automatically, in addition to the React render
+      // errors PostHogErrorBoundary already catches in _layout.tsx.
+      errorTracking: {
+        autocapture: {
+          uncaughtExceptions: true,
+          unhandledRejections: true,
+          console: ['error'],
+        },
+      },
+      // Session replay for understanding user journeys end-to-end. Masked
+      // by default — receipts show real prices and personal purchase data,
+      // so recordings must never capture typed input or on-screen images.
+      enableSessionReplay: true,
+      sessionReplayConfig: {
+        maskAllTextInputs: true,
+        maskAllImages: true,
+      },
+    })
   : null;

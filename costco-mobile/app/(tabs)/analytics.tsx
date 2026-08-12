@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,18 +8,20 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { Colors } from '../../constants/colors';
+import { useThemeColors } from '../../contexts/ThemeContext';
+import type { ColorScheme } from '../../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../../constants/theme';
+import { FloatView, ShimmerIcon, TagSwing, BellRing, ScanLineIcon, PinPulse } from '../../components/Motion';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type MonthBucket = { label: string; spend: number; receipts: number };
+type MonthBucket = { key: string; label: string; spend: number; receipts: number };
 type TopItem = { description: string; total_spend: number; quantity: number };
 type AnalyticsData = {
   totalSpend: number;
@@ -59,7 +61,10 @@ function last6Months(): { key: string; label: string }[] {
 
 export default function AnalyticsScreen() {
   const { session } = useAuth();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
+  const Colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -67,7 +72,8 @@ export default function AnalyticsScreen() {
   useFocusEffect(
     useCallback(() => {
       load(false);
-    }, []),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [session?.user.id]),
   );
 
   async function load(isRefresh: boolean) {
@@ -121,7 +127,7 @@ export default function AnalyticsScreen() {
           return d === key;
         });
         const spend = monthReceipts.reduce((s: number, r: any) => s + (r.total_amount ?? 0), 0);
-        return { label, spend, receipts: monthReceipts.length };
+        return { key, label, spend, receipts: monthReceipts.length };
       });
 
       // Top items by total spend (group by description)
@@ -129,8 +135,12 @@ export default function AnalyticsScreen() {
       for (const item of itemList as any[]) {
         const key = item.description ?? item.sku ?? 'Unknown';
         const existing = itemMap.get(key) ?? { total_spend: 0, quantity: 0 };
+        // unit_price is already the line's full price, not a true per-unit
+        // price — the OCR parser doesn't split multi-quantity lines (see
+        // PARSER_DECISIONS.md), so this must not also multiply by quantity,
+        // same convention as receipt-success.tsx's itemTotal.
         itemMap.set(key, {
-          total_spend: existing.total_spend + Number(item.unit_price ?? 0) * Number(item.quantity ?? 1),
+          total_spend: existing.total_spend + Number(item.unit_price ?? 0),
           quantity: existing.quantity + Number(item.quantity ?? 1),
         });
       }
@@ -186,7 +196,7 @@ export default function AnalyticsScreen() {
         </View>
       ) : !data || data.totalReceipts === 0 ? (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyIcon}>📊</Text>
+          <FloatView><Text style={styles.emptyIcon}>📊</Text></FloatView>
           <Text style={styles.emptyTitle}>No data yet</Text>
           <Text style={styles.emptySubtitle}>
             Scan a few Costco receipts to unlock your spend analytics.
@@ -202,6 +212,7 @@ export default function AnalyticsScreen() {
               icon="💳"
               accent={Colors.executiveNavy}
               bg={Colors.infoBg}
+              styles={styles}
             />
             <MetricCard
               label="In-Store Saved"
@@ -209,6 +220,7 @@ export default function AnalyticsScreen() {
               icon="🏷"
               accent={Colors.savings}
               bg={Colors.savingsBg}
+              styles={styles}
             />
             <MetricCard
               label="Price Match"
@@ -216,6 +228,7 @@ export default function AnalyticsScreen() {
               icon="🔔"
               accent={Colors.goldStarDark}
               bg={Colors.warningBg}
+              styles={styles}
             />
             <MetricCard
               label="Avg Basket"
@@ -223,20 +236,26 @@ export default function AnalyticsScreen() {
               icon="🧾"
               accent={Colors.costcoRed}
               bg={Colors.errorBg}
+              styles={styles}
             />
           </View>
 
           {/* ── Monthly spend chart ── */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>MONTHLY SPEND</Text>
-            <MonthlyChart buckets={data.monthlyBuckets} />
+            <MonthlyChart
+              buckets={data.monthlyBuckets}
+              styles={styles}
+              Colors={Colors}
+              onSelectMonth={(b) => router.push({ pathname: '/receipts', params: { month: b.key, label: b.label } })}
+            />
           </View>
 
           {/* ── Top items ── */}
           {data.topItems.length > 0 && (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>TOP ITEMS BY SPEND</Text>
-              <TopItemsList items={data.topItems} />
+              <TopItemsList items={data.topItems} styles={styles} Colors={Colors} />
             </View>
           )}
 
@@ -246,13 +265,15 @@ export default function AnalyticsScreen() {
             <SavingsBreakdown
               inStore={data.totalSaved}
               priceMatch={data.priceMatchSavings}
+              styles={styles}
+              Colors={Colors}
             />
           </View>
 
           {/* ── Activity stats ── */}
           <View style={styles.activityRow}>
-            <ActivityStat icon="🧾" value={data.totalReceipts} label="Receipts" />
-            <ActivityStat icon="📍" value={data.warehouseVisits} label="Check-ins" />
+            <ActivityStat icon="🧾" value={data.totalReceipts} label="Receipts" styles={styles} />
+            <ActivityStat icon="📍" value={data.warehouseVisits} label="Check-ins" styles={styles} />
           </View>
         </>
       )}
@@ -264,15 +285,27 @@ export default function AnalyticsScreen() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
+type Styles = ReturnType<typeof makeStyles>;
+
 function MetricCard({
-  label, value, icon, accent, bg,
+  label, value, icon, accent, bg, styles,
 }: {
-  label: string; value: string; icon: string; accent: string; bg: string;
+  label: string; value: string; icon: string; accent: string; bg: string; styles: Styles;
 }) {
   return (
     <View style={styles.metricCard}>
       <View style={[styles.metricIconWrap, { backgroundColor: bg }]}>
-        <Text style={styles.metricIcon}>{icon}</Text>
+        {icon === '💳' ? (
+          <ShimmerIcon><Text style={styles.metricIcon}>{icon}</Text></ShimmerIcon>
+        ) : icon === '🏷' ? (
+          <TagSwing><Text style={styles.metricIcon}>{icon}</Text></TagSwing>
+        ) : icon === '🔔' ? (
+          <BellRing><Text style={styles.metricIcon}>{icon}</Text></BellRing>
+        ) : icon === '🧾' ? (
+          <ScanLineIcon color={accent}><Text style={styles.metricIcon}>{icon}</Text></ScanLineIcon>
+        ) : (
+          <Text style={styles.metricIcon}>{icon}</Text>
+        )}
       </View>
       <Text style={[styles.metricValue, { color: accent }]}>{value}</Text>
       <Text style={styles.metricLabel}>{label}</Text>
@@ -280,18 +313,28 @@ function MetricCard({
   );
 }
 
-function MonthlyChart({ buckets }: { buckets: MonthBucket[] }) {
+function MonthlyChart({
+  buckets, styles, Colors, onSelectMonth,
+}: {
+  buckets: MonthBucket[]; styles: Styles; Colors: ColorScheme; onSelectMonth: (b: MonthBucket) => void;
+}) {
   const maxSpend = Math.max(...buckets.map((b) => b.spend), 1);
 
   return (
     <View style={styles.chartArea}>
-      {/* Bars */}
+      {/* Bars — tap a month with receipts to see just those receipts */}
       <View style={styles.barsRow}>
         {buckets.map((b, i) => {
           const heightPct = b.spend / maxSpend;
           const isActive = i === buckets.length - 1;
+          const hasReceipts = b.receipts > 0;
           return (
-            <View key={b.label} style={styles.barColumn}>
+            <Pressable
+              key={b.label}
+              style={({ pressed }) => [styles.barColumn, pressed && hasReceipts && { opacity: 0.7 }]}
+              onPress={() => hasReceipts && onSelectMonth(b)}
+              disabled={!hasReceipts}
+            >
               <Text style={styles.barAmount}>
                 {b.spend > 0 ? `$${b.spend >= 1000 ? (b.spend / 1000).toFixed(1) + 'k' : b.spend.toFixed(0)}` : ''}
               </Text>
@@ -309,7 +352,7 @@ function MonthlyChart({ buckets }: { buckets: MonthBucket[] }) {
               <Text style={[styles.barLabel, isActive && { color: Colors.costcoRed, fontWeight: '700' }]}>
                 {b.label}
               </Text>
-            </View>
+            </Pressable>
           );
         })}
       </View>
@@ -317,7 +360,7 @@ function MonthlyChart({ buckets }: { buckets: MonthBucket[] }) {
   );
 }
 
-function TopItemsList({ items }: { items: TopItem[] }) {
+function TopItemsList({ items, styles, Colors }: { items: TopItem[]; styles: Styles; Colors: ColorScheme }) {
   const maxSpend = Math.max(...items.map((i) => i.total_spend), 1);
 
   return (
@@ -351,7 +394,7 @@ function TopItemsList({ items }: { items: TopItem[] }) {
   );
 }
 
-function SavingsBreakdown({ inStore, priceMatch }: { inStore: number; priceMatch: number }) {
+function SavingsBreakdown({ inStore, priceMatch, styles, Colors }: { inStore: number; priceMatch: number; styles: Styles; Colors: ColorScheme }) {
   const total = inStore + priceMatch;
   const inStorePct = total > 0 ? (inStore / total) * 100 : 50;
   const priceMatchPct = 100 - inStorePct;
@@ -394,10 +437,16 @@ function SavingsBreakdown({ inStore, priceMatch }: { inStore: number; priceMatch
   );
 }
 
-function ActivityStat({ icon, value, label }: { icon: string; value: number; label: string }) {
+function ActivityStat({ icon, value, label, styles }: { icon: string; value: number; label: string; styles: Styles }) {
   return (
     <View style={styles.activityCard}>
-      <Text style={styles.activityIcon}>{icon}</Text>
+      {icon === '🧾' ? (
+        <ScanLineIcon color="rgba(150,150,150,0.65)"><Text style={styles.activityIcon}>{icon}</Text></ScanLineIcon>
+      ) : icon === '📍' ? (
+        <PinPulse color="rgba(150,150,150,0.5)"><Text style={styles.activityIcon}>{icon}</Text></PinPulse>
+      ) : (
+        <Text style={styles.activityIcon}>{icon}</Text>
+      )}
       <Text style={styles.activityValue}>{value}</Text>
       <Text style={styles.activityLabel}>{label}</Text>
     </View>
@@ -408,7 +457,7 @@ function ActivityStat({ icon, value, label }: { icon: string; value: number; lab
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   scroll: { paddingHorizontal: spacing['2xl'] },
 

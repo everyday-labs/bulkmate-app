@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../constants/colors';
+import { useThemeColors } from '../../contexts/ThemeContext';
 import { fontSize, letterSpacing } from '../../constants/theme';
 import { ScanFAB } from '../../components/ScanFAB';
 
@@ -14,6 +14,7 @@ function tabIcon(filled: IoniconsName, outline: IoniconsName) {
 }
 
 export default function TabsLayout() {
+  const Colors = useThemeColors();
   return (
     <View style={{ flex: 1 }}>
       <Tabs

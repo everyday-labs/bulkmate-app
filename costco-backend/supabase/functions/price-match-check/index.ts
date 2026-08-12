@@ -1,6 +1,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { fetchFromRapidApi } from '../_shared/rapidApi.ts';
+import { sendExpoPushNotifications, type ExpoPushMessage } from '../_shared/expoPush.ts';
+import { capturePostHogException } from '../_shared/posthog.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,98 +33,11 @@ type PriceResult = {
 };
 
 // ---------------------------------------------------------------------------
-// Costco Live Data API (RapidAPI)
-//
-// Endpoint: GET /search?query=<sku>
-// Host: costco-live-data.p.rapidapi.com
-//
-// Key price fields from the response:
-//   item_location_pricing_salePrice  — current warehouse/sale price  ← use for matching
-//   item_location_pricing_listPrice  — original list price
-//   item_warehouse_onlinePrice       — online-only price
+// Costco Live Data API (RapidAPI) — client lives in ../_shared/rapidApi.ts,
+// shared with barcode-lookup. See ../../../EXTERNAL_APIS.md for details.
 // ---------------------------------------------------------------------------
 
-const RAPIDAPI_HOST = 'costco-live-data.p.rapidapi.com';
 const PRICE_CACHE_TTL_HOURS = 72;
-
-type RapidAPIProduct = {
-  item_location_pricing_salePrice?: number;
-  item_location_pricing_listPrice?: number;
-  item_warehouse_onlinePrice?: number;
-  price?: number;
-  brand?: string;
-  Brand_attr?: string[];
-  image_url?: string;
-  item_collateral_primaryimage?: string;
-  pdp_url?: string;
-  review_rating?: number;
-  item_ratings?: number;
-};
-
-async function fetchFromRapidAPI(
-  sku: string,
-  apiKey: string,
-): Promise<{
-  sale_price: number | null;
-  list_price: number | null;
-  online_price: number | null;
-  brand: string | null;
-  image_url: string | null;
-  pdp_url: string | null;
-  rating: number | null;
-} | null> {
-  try {
-    const url = `https://${RAPIDAPI_HOST}/search?query=${encodeURIComponent(sku)}&rows=1`;
-    const res = await fetch(url, {
-      headers: {
-        'x-rapidapi-host': RAPIDAPI_HOST,
-        'x-rapidapi-key': apiKey,
-      },
-    });
-
-    if (!res.ok) {
-      console.warn(`RapidAPI ${res.status} for SKU ${sku}`);
-      return null;
-    }
-
-    const json = await res.json();
-    const products: RapidAPIProduct[] = json?.products ?? [];
-    if (!products.length) return null;
-
-    const p = products[0];
-
-    // Prefer the warehouse sale price for matching against in-store receipts.
-    // Fall back to the generic `price` convenience field.
-    const sale_price =
-      p.item_location_pricing_salePrice != null
-        ? Number(p.item_location_pricing_salePrice)
-        : p.price != null
-        ? Number(p.price)
-        : null;
-
-    const list_price =
-      p.item_location_pricing_listPrice != null
-        ? Number(p.item_location_pricing_listPrice)
-        : null;
-
-    const online_price =
-      p.item_warehouse_onlinePrice != null
-        ? Number(p.item_warehouse_onlinePrice)
-        : null;
-
-    const brand =
-      (Array.isArray(p.Brand_attr) ? p.Brand_attr[0] : null) ?? p.brand ?? null;
-
-    const image_url = p.image_url ?? p.item_collateral_primaryimage ?? null;
-    const pdp_url = p.pdp_url ?? null;
-    const rating = p.review_rating ?? p.item_ratings ?? null;
-
-    return { sale_price, list_price, online_price, brand, image_url, pdp_url, rating };
-  } catch (err) {
-    console.warn(`RapidAPI fetch failed for SKU ${sku}:`, err);
-    return null;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // OCR ledger: median net-paid price from other users' recent receipts.
@@ -181,15 +97,19 @@ async function resolvePrice(
     .maybeSingle();
 
   // 2. Check cache — if API price is fresh, skip the API call
-  let apiResult: Awaited<ReturnType<typeof fetchFromRapidAPI>> = null;
+  let apiResult: Awaited<ReturnType<typeof fetchFromRapidApi>> = null;
   let apiSource: 'cache' | 'rapidapi' = 'cache';
 
   if (product?.api_price_updated_at) {
     const ageHours =
       (Date.now() - new Date(product.api_price_updated_at).getTime()) / (1000 * 60 * 60);
     if (ageHours < PRICE_CACHE_TTL_HOURS && product.api_sale_price != null) {
-      // Cache hit — reconstruct a minimal result from stored values
+      // Cache hit — reconstruct a minimal result from stored values. Only
+      // sale_price is meaningful here; the rest are unused by this function
+      // but required to satisfy the shared RapidApiProduct shape.
       apiResult = {
+        sku,
+        name: '',
         sale_price: Number(product.api_sale_price),
         list_price: null,
         online_price: null,
@@ -197,6 +117,8 @@ async function resolvePrice(
         image_url: null,
         pdp_url: null,
         rating: null,
+        total_reviews: null,
+        in_warehouse: true,
       };
       apiSource = 'cache';
     }
@@ -207,7 +129,7 @@ async function resolvePrice(
 
   // 4. API call if cache missed
   if (!apiResult && apiKey) {
-    apiResult = await fetchFromRapidAPI(sku, apiKey);
+    apiResult = await fetchFromRapidApi(sku, apiKey);
     apiSource = 'rapidapi';
   }
 
@@ -303,48 +225,8 @@ async function updateReceiptLedger(
 }
 
 // ---------------------------------------------------------------------------
-// Expo Push API — send notifications in batches of up to 100
+// Expo Push API — client lives in ../_shared/expoPush.ts.
 // ---------------------------------------------------------------------------
-
-type ExpoPushMessage = {
-  to: string;
-  title: string;
-  body: string;
-  data?: Record<string, string>;
-  sound?: 'default';
-  channelId?: string;
-};
-
-async function sendExpoPushNotifications(messages: ExpoPushMessage[]): Promise<void> {
-  if (messages.length === 0) return;
-
-  // Expo supports up to 100 messages per request
-  const chunks: ExpoPushMessage[][] = [];
-  for (let i = 0; i < messages.length; i += 100) {
-    chunks.push(messages.slice(i, i + 100));
-  }
-
-  for (const chunk of chunks) {
-    try {
-      const res = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(chunk),
-      });
-      if (!res.ok) {
-        console.warn('Expo Push API error:', res.status, await res.text());
-      } else {
-        const result = await res.json();
-        console.log(`Expo push sent ${chunk.length} messages:`, JSON.stringify(result?.data?.slice(0, 3)));
-      }
-    } catch (err) {
-      console.warn('Expo push fetch failed:', err);
-    }
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Main handler
@@ -531,6 +413,7 @@ serve(async (req) => {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unexpected error';
     console.error('price-match-check error:', message);
+    await capturePostHogException(err, { functionName: 'price-match-check' });
     return new Response(
       JSON.stringify({ error: message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 },

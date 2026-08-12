@@ -1,3 +1,15 @@
+// Google Cloud Vision — OCR for receipt images. Used only by ingest-receipt,
+// the very first step of the receipt-scan pipeline (image → raw text →
+// parser.ts). See ../../../EXTERNAL_APIS.md for auth and cost.
+//
+// Unlike the other three external clients in this directory, this one
+// throws on failure rather than returning null. That's intentional: OCR
+// isn't an enrichment step, it's the entire input to the rest of the
+// pipeline — there's nothing meaningful to fall back to if we can't read
+// the receipt, so the caller (ingest-receipt/index.ts) lets the error
+// propagate to its top-level catch and returns a clean error response,
+// prompting the user to retry the scan.
+
 const VISION_API_URL = 'https://vision.googleapis.com/v1/images:annotate';
 
 export async function extractTextFromImage(base64Image: string): Promise<string> {

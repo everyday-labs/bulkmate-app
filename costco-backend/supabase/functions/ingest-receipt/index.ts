@@ -1,18 +1,83 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
-import { extractTextFromImage } from './ocr.ts';
+import { extractTextFromImage } from '../_shared/googleVision.ts';
+import { capturePostHogException } from '../_shared/posthog.ts';
 import { parseReceiptText } from './parser.ts';
+
+// Warehouses seeded from Google Places (scripts/seed-warehouses-from-google-places.mjs)
+// get a synthetic `GP-######` code — Places has no concept of Costco's real
+// internal store number, so an exact warehouse_code lookup will always miss
+// for them. Fallback: check whether the receipt's OCR text contains that
+// warehouse's postal code or city name. On a match, link the receipt and —
+// since the receipt's real code (parsed.warehouseCode) is already known —
+// overwrite that warehouse's placeholder code with the real one. The first
+// receipt scanned at any given warehouse "teaches" the DB its true code;
+// every later scan there hits the fast exact-match path above with no
+// fallback needed.
+//
+// Postal code is tried first and preferred: a city can have more than one
+// Costco (ambiguous by city name alone), but a postal code narrows to a
+// single store far more reliably. City name is a second-tier fallback for
+// when a receipt doesn't clearly show its postal code. Both searches are
+// restricted to the receipt's header region (first ~12 OCR lines, before
+// the item section) rather than the full text — searching the whole receipt
+// risks a false hit inside a long barcode/transaction-number digit run
+// lower down (e.g. a 5-digit postal code coincidentally appearing as a
+// substring of a 16-digit barcode string).
+async function matchWarehouseByReceiptHeader(
+  supabase: ReturnType<typeof createClient>,
+  rawText: string,
+): Promise<{ id: string; warehouse_code: string } | null> {
+  // Joined with spaces, not newlines — OCR sometimes splits a multi-token
+  // postal code (e.g. Canada's "K2G 5W5") across two lines, and a space-
+  // joined string lets the \s* below still match across that split.
+  // Trim + drop blank lines first, like parser.ts's `lines` does — Vision
+  // OCR commonly emits blank/whitespace-only lines near the top of a
+  // receipt, which would otherwise shrink the effective header window
+  // below the intended 12 real lines and could push the postal code/city
+  // just outside it.
+  const headerText = rawText.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 12).join(' ').toUpperCase();
+
+  const { data: candidates } = await supabase
+    .from('warehouses')
+    .select('id, warehouse_code, city, postal_code')
+    .like('warehouse_code', 'GP-%');
+
+  if (!candidates?.length) return null;
+  const rows = candidates as { id: string; warehouse_code: string; city: string | null; postal_code: string | null }[];
+
+  // \b word-boundary anchors matter here: without them, a 5-digit postal
+  // code could match as a false substring inside a longer, unrelated digit
+  // run (e.g. "95110" inside "295110123"). Internal whitespace becomes \s*
+  // (zero or more) so "K2G 5W5" also matches OCR variants like "K2G5W5" or
+  // "K2G  5W5".
+  const byPostalCode = rows.filter((w) => {
+    if (!w.postal_code) return false;
+    const escaped = w.postal_code.toUpperCase()
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\s+/g, '\\s*');
+    return new RegExp(`\\b${escaped}\\b`).test(headerText);
+  });
+  if (byPostalCode.length === 1) return byPostalCode[0];
+  if (byPostalCode.length > 1) return null; // ambiguous — don't guess
+
+  const byCity = rows.filter((w) => w.city && headerText.includes(w.city.toUpperCase()));
+  if (byCity.length === 1) return byCity[0];
+  return null; // no match, or ambiguous — don't guess
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  let userId: string | undefined;
   try {
     const body = await req.json();
     console.log('1. Request body:', JSON.stringify(body));
-    const { imagePath, userId } = body;
+    const { imagePath } = body;
+    userId = body.userId;
 
     if (!imagePath || !userId) {
       return errorResponse('imagePath and userId are required', 400);
@@ -51,7 +116,13 @@ serve(async (req) => {
     // 3. OCR
     console.log('6. Calling Vision API...');
     const rawText = await extractTextFromImage(base64);
-    console.log('7. OCR text length:', rawText.length, '| Full text:', rawText);
+    // Deliberately not logging rawText itself — it's the full receipt OCR
+    // output (member number, every item, prices), and Supabase function
+    // logs aren't a place for that in plaintext. parsed.* below already
+    // gives enough signal to debug most OCR issues; use ocr_raw on the
+    // stored receipt row (RLS-scoped to the owning user) if you need the
+    // actual text for a specific failure.
+    console.log('7. OCR text length:', rawText.length);
 
     // 4. Parse
     const parsed = parseReceiptText(rawText);
@@ -75,8 +146,31 @@ serve(async (req) => {
         .from('warehouses')
         .select('id')
         .eq('warehouse_code', parsed.warehouseCode)
-        .single();
+        .maybeSingle();
       warehouseId = warehouse?.id ?? null;
+
+      // Exact code miss — try the postal-code/city fallback against
+      // Google-Places-seeded warehouses (synthetic GP-###### codes). See
+      // matchWarehouseByReceiptHeader's comment above for why.
+      if (!warehouseId) {
+        const headerMatch = await matchWarehouseByReceiptHeader(supabase, rawText);
+        if (headerMatch) {
+          warehouseId = headerMatch.id;
+          console.log(`10. Header fallback match: warehouse ${headerMatch.id} (was ${headerMatch.warehouse_code}) — backfilling real code ${parsed.warehouseCode}`);
+
+          const { error: codeUpdateError } = await supabase
+            .from('warehouses')
+            .update({ warehouse_code: parsed.warehouseCode })
+            .eq('id', headerMatch.id);
+          if (codeUpdateError) {
+            // Most likely cause: parsed.warehouseCode already belongs to
+            // another row (a bad OCR read, or a genuine duplicate-code edge
+            // case). Never fail the receipt over this — the warehouse link
+            // itself (warehouseId) is still valid either way.
+            console.warn('Could not backfill warehouse_code:', codeUpdateError.message);
+          }
+        }
+      }
     }
 
     // 5b. Duplicate detection — check before inserting
@@ -108,7 +202,7 @@ serve(async (req) => {
     }
 
     if (duplicateReceiptId) {
-      console.log('9. Duplicate detected — existing receipt:', duplicateReceiptId, '— removing orphan image');
+      console.log('9a. Duplicate detected — existing receipt:', duplicateReceiptId, '— removing orphan image');
       await supabase.storage.from('receipts').remove([imagePath]);
       return new Response(
         JSON.stringify({ receiptId: duplicateReceiptId, itemCount: 0, duplicate: true }),
@@ -117,7 +211,7 @@ serve(async (req) => {
     }
 
     // 6. Insert receipt
-    console.log('9. Inserting receipt for user:', userId);
+    console.log('9b. Inserting receipt for user:', userId);
     const { data: receipt, error: receiptError } = await supabase
       .from('receipts')
       .insert({
@@ -201,6 +295,7 @@ serve(async (req) => {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unexpected error';
     console.error('Unhandled exception:', message, err instanceof Error ? err.stack : '');
+    await capturePostHogException(err, { functionName: 'ingest-receipt' }, userId);
     return errorResponse(message, 500);
   }
 });

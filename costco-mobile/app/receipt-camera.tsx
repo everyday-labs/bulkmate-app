@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { File, Paths } from 'expo-file-system/next';
 import NetInfo from '@react-native-community/netinfo';
@@ -8,15 +8,27 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { uploadReceipt } from '../lib/receiptUpload';
 import { enqueue } from '../lib/offlineQueue';
 import { posthog } from '../lib/posthog';
-import { Colors } from '../constants/colors';
+import { useThemeColors } from '../contexts/ThemeContext';
+import type { ColorScheme } from '../constants/colors';
 import { spacing, fontSize, radius } from '../constants/theme';
+import { ScanFrame, type ScanFrameState } from '../components/ScanEffects';
+
+const SUCCESS_HOLD_MS = 850;
+const ERROR_HOLD_MS = 1400;
 
 export default function ReceiptCameraScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
-  const [capturing, setCapturing] = useState(false);
+  const [scanState, setScanState] = useState<ScanFrameState>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const capturing = scanState !== 'idle';
+  // The camera viewfinder chrome itself (container/topBar/controls below)
+  // stays dark regardless of app theme, matching native camera-app
+  // convention — only the pre-permission screen is regular themed app UI.
+  const Colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   if (!permission) return <View style={styles.container} />;
 
@@ -24,16 +36,19 @@ export default function ReceiptCameraScreen() {
     return (
       <View style={styles.permissionContainer}>
         <Text style={styles.permissionText}>Camera access is needed to scan receipts.</Text>
-        <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
+        <Pressable
+          style={({ pressed }) => [styles.permissionButton, pressed && { opacity: 0.7 }]}
+          onPress={requestPermission}
+        >
           <Text style={styles.permissionButtonText}>Allow Camera</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
     );
   }
 
   async function capture() {
     if (!cameraRef.current || capturing) return;
-    setCapturing(true);
+    setScanState('scanning');
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
       if (!photo?.uri) throw new Error('No photo captured');
@@ -51,17 +66,27 @@ export default function ReceiptCameraScreen() {
           is_duplicate: result.duplicate,
           has_item_count_mismatch: result.itemCountMismatch,
         });
-        router.replace(`/receipt-success?receiptId=${result.receiptId}&duplicate=${result.duplicate}`);
+        setScanState('success');
+        setTimeout(() => {
+          router.replace(`/receipt-success?receiptId=${result.receiptId}&duplicate=${result.duplicate}`);
+        }, SUCCESS_HOLD_MS);
       } else {
         await enqueue(destUri);
         posthog?.capture('receipt_upload_queued_offline');
-        Alert.alert('Saved', 'Receipt saved. Will upload when connected.');
-        router.back();
+        setScanState('success');
+        setTimeout(() => {
+          Alert.alert('Saved', 'Receipt saved. Will upload when connected.');
+          router.back();
+        }, SUCCESS_HOLD_MS);
       }
     } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Something went wrong. Please try again.');
-    } finally {
-      setCapturing(false);
+      posthog?.capture('receipt_upload_failed', { error: e.message ?? String(e) });
+      setErrorMessage(e.message ?? 'Something went wrong. Please try again.');
+      setScanState('error');
+      setTimeout(() => {
+        setScanState('idle');
+        setErrorMessage(null);
+      }, ERROR_HOLD_MS);
     }
   }
 
@@ -69,35 +94,53 @@ export default function ReceiptCameraScreen() {
     <View style={styles.container}>
       <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
 
+      <ScanFrame
+        state={scanState}
+        idleLabel="Align receipt in frame"
+        scanningLabel="Reading receipt…"
+        successLabel="Receipt captured"
+        errorLabel="Couldn't read that"
+        errorSubLabel={errorMessage ?? undefined}
+      />
+
       {/* Top instruction bar — clears the notch / Dynamic Island */}
-      <View style={[styles.topBar, { paddingTop: insets.top + spacing.md }]}>
-        <Text style={styles.hint}>Lay the receipt flat and capture the full receipt</Text>
-      </View>
+      {scanState === 'idle' && (
+        <View style={[styles.topBar, { paddingTop: insets.top + spacing.md }]}>
+          <Text style={styles.hint}>Lay the receipt flat and capture the full receipt</Text>
+        </View>
+      )}
 
-      {/* Bottom controls — clears the home indicator */}
-      <View style={[styles.controls, { bottom: insets.bottom + spacing['3xl'] }]}>
-        <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
-          <Text style={styles.cancelText}>Cancel</Text>
-        </TouchableOpacity>
+      {/* Bottom controls — clears the home indicator. Hidden mid-scan so they
+          don't overlap the ScanFrame status pill or get tapped during an
+          in-flight upload. */}
+      {scanState === 'idle' && (
+        <View style={[styles.controls, { bottom: insets.bottom + spacing['3xl'] }]}>
+          <Pressable
+            style={({ pressed }) => [styles.cancelButton, pressed && { opacity: 0.6 }]}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.cancelText}>Cancel</Text>
+          </Pressable>
 
-        <TouchableOpacity style={styles.captureButton} onPress={capture} disabled={capturing}>
-          {capturing
-            ? <ActivityIndicator color={Colors.white} />
-            : <View style={styles.captureInner} />
-          }
-        </TouchableOpacity>
+          <Pressable
+            style={({ pressed }) => [styles.captureButton, pressed && { opacity: 0.8 }]}
+            onPress={capture}
+          >
+            <View style={styles.captureInner} />
+          </Pressable>
 
-        <View style={{ width: 64 }} />
-      </View>
+          <View style={{ width: 64 }} />
+        </View>
+      )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.black },
   permissionContainer: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing['2xl'],
@@ -109,7 +152,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing['2xl'],
   },
   permissionButton: {
-    backgroundColor: Colors.costcoRed,
+    backgroundColor: Colors.costcoRedSolid,
     borderRadius: radius.md,
     paddingVertical: 14,
     paddingHorizontal: spacing['3xl'],

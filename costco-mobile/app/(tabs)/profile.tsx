@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,21 +11,49 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
 import * as Notifications from 'expo-notifications';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { requestAndSavePushToken } from '../../lib/notifications';
 import { posthog } from '../../lib/posthog';
-import { Colors } from '../../constants/colors';
+import { useTheme, type ThemeMode } from '../../contexts/ThemeContext';
+import type { ColorScheme } from '../../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../../constants/theme';
+import { Sparkle, Shimmer, BellRing, Twinkle, CartRoll } from '../../components/Motion';
 
 type PermissionStatus = 'granted' | 'denied' | 'undetermined' | 'loading';
 
-type UserBadge = {
+type Badge = {
   id: string;
-  earned_at: string;
-  badge: { name: string; description: string | null; icon: string | null };
+  name: string;
+  description: string | null;
+  icon: string | null;
+  trigger_key: string | null;
 };
+
+type BadgeRarity = 'Common' | 'Rare' | 'Legendary';
+
+// Same three-tier language as `warehouse_tier` in the DB — ties the badge
+// collection into the same rarity system as warehouse check-ins.
+const BADGE_RARITY: Record<string, BadgeRarity> = {
+  first_checkin: 'Common',
+  five_checkins: 'Common',
+  three_warehouses: 'Common',
+  ten_checkins: 'Rare',
+  five_warehouses: 'Rare',
+  ten_stars: 'Rare',
+  rare_warehouse: 'Rare',
+  legendary_warehouse: 'Legendary',
+  gold_star_guru: 'Legendary',
+  executive_explorer: 'Legendary',
+};
+
+function rarityColor(Colors: ColorScheme, rarity: BadgeRarity): string {
+  if (rarity === 'Legendary') return Colors.goldStarAccent;
+  if (rarity === 'Rare') return Colors.executiveNavy;
+  return Colors.gray[400];
+}
 
 type ProfileData = {
   total_stars: number;
@@ -40,20 +68,26 @@ type ProfileData = {
 // Fan tier metadata
 // ---------------------------------------------------------------------------
 
-const TIER_META: Record<string, { label: string; emoji: string; color: string; nextAt: number | null }> = {
-  KirklandCadet:     { label: 'Kirkland Cadet',      emoji: '🛒', color: Colors.gray[500],        nextAt: 3  },
-  WholesaleWanderer: { label: 'Wholesale Wanderer',   emoji: '🗺',  color: Colors.executiveNavy,    nextAt: 6  },
-  BulkBuyer:         { label: 'Bulk Buyer',           emoji: '📦', color: Colors.savings,           nextAt: 11 },
-  GoldStarGuru:      { label: 'Gold Star Guru',       emoji: '🌟', color: Colors.goldStarAccent,    nextAt: 21 },
-  ExecutiveExplorer: { label: 'Executive Explorer',   emoji: '👑', color: Colors.costcoRed,         nextAt: null },
-};
+type TierMeta = { label: string; emoji: string; color: string; nextAt: number | null };
+
+function buildTierMeta(Colors: ColorScheme): Record<string, TierMeta> {
+  return {
+    KirklandCadet:     { label: 'Kirkland Cadet',      emoji: '🛒', color: Colors.gray[500],        nextAt: 3  },
+    WholesaleWanderer: { label: 'Wholesale Wanderer',   emoji: '🗺',  color: Colors.executiveNavy,    nextAt: 6  },
+    BulkBuyer:         { label: 'Bulk Buyer',           emoji: '📦', color: Colors.savings,           nextAt: 11 },
+    GoldStarGuru:      { label: 'Gold Star Guru',       emoji: '🌟', color: Colors.goldStarAccent,    nextAt: 21 },
+    ExecutiveExplorer: { label: 'Executive Explorer',   emoji: '👑', color: Colors.costcoRed,         nextAt: null },
+  };
+}
 
 const TIER_MIN: Record<string, number> = {
   KirklandCadet: 1, WholesaleWanderer: 3, BulkBuyer: 6, GoldStarGuru: 11, ExecutiveExplorer: 21,
 };
 
-function tierProgress(tier: string, stars: number): number {
-  const meta = TIER_META[tier];
+const TIER_ORDER = ['KirklandCadet', 'WholesaleWanderer', 'BulkBuyer', 'GoldStarGuru', 'ExecutiveExplorer'];
+
+function tierProgress(tierMeta: Record<string, TierMeta>, tier: string, stars: number): number {
+  const meta = tierMeta[tier];
   if (!meta || meta.nextAt === null) return 1;
   const min = TIER_MIN[tier] ?? 1;
   return Math.min(1, (stars - min) / (meta.nextAt - min));
@@ -67,10 +101,14 @@ export default function ProfileScreen() {
   const { session } = useAuth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { mode, setMode, colors: Colors } = useTheme();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const tierMeta = useMemo(() => buildTierMeta(Colors), [Colors]);
   const [permStatus, setPermStatus] = useState<PermissionStatus>('loading');
   const [enablingNotifs, setEnablingNotifs] = useState(false);
   const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [badges, setBadges] = useState<UserBadge[]>([]);
+  const [allBadges, setAllBadges] = useState<Badge[]>([]);
+  const [earnedMap, setEarnedMap] = useState<Record<string, string>>({});
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -80,7 +118,8 @@ export default function ProfileScreen() {
         setPermStatus(status as PermissionStatus);
       });
       loadProfile(false);
-    }, []),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [session?.user.id]),
   );
 
   async function loadProfile(isRefresh: boolean) {
@@ -91,26 +130,25 @@ export default function ProfileScreen() {
       const userId = session?.user.id;
       if (!userId) return;
 
-      const [{ data: profileData }, { data: badgeData }] = await Promise.all([
+      const [{ data: profileData }, { data: badgesData }, { data: userBadgesData }] = await Promise.all([
         supabase
           .from('profiles')
           .select('total_stars, fan_tier, display_name, first_name, last_name, phone_number')
           .eq('id', userId)
           .single(),
         supabase
+          .from('badges')
+          .select('id, name, description, icon, trigger_key'),
+        supabase
           .from('user_badges')
-          .select('id, earned_at, badges(name, description, icon)')
-          .eq('user_id', userId)
-          .order('earned_at', { ascending: false }),
+          .select('badge_id, earned_at')
+          .eq('user_id', userId),
       ]);
 
       if (profileData) setProfile(profileData as ProfileData);
-      setBadges(
-        (badgeData ?? []).map((b: any) => ({
-          id: b.id,
-          earned_at: b.earned_at,
-          badge: b.badges ?? { name: '?', description: null, icon: null },
-        })),
+      setAllBadges((badgesData ?? []) as Badge[]);
+      setEarnedMap(
+        Object.fromEntries((userBadgesData ?? []).map((ub: any) => [ub.badge_id, ub.earned_at])),
       );
     } catch {
       // non-critical
@@ -137,15 +175,10 @@ export default function ProfileScreen() {
   const displayName = firstName || lastName
     ? [firstName, lastName].filter(Boolean).join(' ')
     : null;
-  const initials = firstName && lastName
-    ? (firstName[0] + lastName[0]).toUpperCase()
-    : firstName
-      ? firstName.slice(0, 2).toUpperCase()
-      : email.slice(0, 2).toUpperCase();
   const tier = profile?.fan_tier ?? 'KirklandCadet';
-  const tierMeta = TIER_META[tier] ?? TIER_META.KirklandCadet;
+  const currentTierMeta = tierMeta[tier] ?? tierMeta.KirklandCadet;
   const stars = profile?.total_stars ?? 0;
-  const progress = tierProgress(tier, stars);
+  const progress = tierProgress(tierMeta, tier, stars);
 
   return (
     <ScrollView
@@ -164,7 +197,7 @@ export default function ProfileScreen() {
       <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
         <View style={styles.avatarRing}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+            <MemberBadgeIllustration size={36} />
           </View>
         </View>
         <View style={styles.headerInfo}>
@@ -197,33 +230,37 @@ export default function ProfileScreen() {
           <View style={styles.tierCard}>
             {/* Top: emoji + tier name + stars */}
             <View style={styles.tierTop}>
-              <View style={[styles.tierEmojiWrap, { backgroundColor: tierMeta.color + '18' }]}>
-                <Text style={styles.tierEmoji}>{tierMeta.emoji}</Text>
+              <View style={[styles.tierEmojiWrap, { backgroundColor: currentTierMeta.color + '18' }]}>
+                {currentTierMeta.emoji === '🛒' ? (
+                  <CartRoll><Text style={styles.tierEmoji}>{currentTierMeta.emoji}</Text></CartRoll>
+                ) : (
+                  <Text style={styles.tierEmoji}>{currentTierMeta.emoji}</Text>
+                )}
               </View>
               <View style={styles.tierInfo}>
                 <Text style={styles.tierLabel}>FAN TIER</Text>
-                <Text style={[styles.tierName, { color: tierMeta.color }]}>{tierMeta.label}</Text>
+                <Text style={[styles.tierName, { color: currentTierMeta.color }]}>{currentTierMeta.label}</Text>
               </View>
               <View style={styles.starsWrap}>
                 <Text style={styles.starsCount}>{stars}</Text>
-                <Text style={styles.starsSuffix}>⭐</Text>
+                <Twinkle><Text style={styles.starsSuffix}>⭐</Text></Twinkle>
               </View>
             </View>
 
             {/* Progress bar */}
-            {tierMeta.nextAt !== null ? (
+            {currentTierMeta.nextAt !== null ? (
               <View style={styles.progressSection}>
                 <View style={styles.progressTrack}>
-                  <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: tierMeta.color }]} />
+                  <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: currentTierMeta.color }]} />
                 </View>
                 <Text style={styles.progressLabel}>
-                  {tierMeta.nextAt - stars} more {tierMeta.nextAt - stars === 1 ? 'star' : 'stars'} to {TIER_META[nextTierKey(tier)]?.label ?? 'next tier'}
+                  {currentTierMeta.nextAt - stars} more {currentTierMeta.nextAt - stars === 1 ? 'star' : 'stars'} to {tierMeta[nextTierKey(tier)]?.label ?? 'next tier'}
                 </Text>
               </View>
             ) : (
               <View style={styles.progressSection}>
                 <View style={styles.progressTrack}>
-                  <View style={[styles.progressFill, { width: '100%', backgroundColor: tierMeta.color }]} />
+                  <View style={[styles.progressFill, { width: '100%', backgroundColor: currentTierMeta.color }]} />
                 </View>
                 <Text style={styles.progressLabel}>Maximum tier reached 🎉</Text>
               </View>
@@ -231,30 +268,96 @@ export default function ProfileScreen() {
           </View>
         )}
 
+        {/* ── Fan Tier Ladder ── */}
+        {!loadingProfile && (
+          <>
+            <Text style={styles.sectionLabel}>FAN TIER LADDER</Text>
+            <View style={styles.ladderCard}>
+              {TIER_ORDER.map((key) => {
+                const meta = tierMeta[key];
+                const reached = stars >= TIER_MIN[key];
+                const isCurrent = key === tier;
+                return (
+                  <View key={key} style={styles.ladderRow}>
+                    <View
+                      style={[
+                        styles.ladderDot,
+                        reached && { backgroundColor: meta.color, borderColor: meta.color },
+                        isCurrent && styles.ladderDotCurrent,
+                      ]}
+                    />
+                    <View style={styles.ladderBody}>
+                      <Text style={[styles.ladderTierName, reached && styles.ladderTierNameReached]}>
+                        {meta.label}
+                      </Text>
+                      <Text style={styles.ladderThreshold}>{TIER_MIN[key]}+ stars</Text>
+                    </View>
+                    {isCurrent ? (
+                      <View style={styles.currentChip}>
+                        <Text style={styles.currentChipText}>YOU</Text>
+                      </View>
+                    ) : reached ? (
+                      <Text style={styles.ladderCheck}>✓</Text>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        )}
+
         {/* ── Badges ── */}
-        <Text style={styles.sectionLabel}>YOUR BADGES</Text>
+        <View style={styles.badgesHeaderRow}>
+          <Text style={styles.sectionLabel}>YOUR BADGES</Text>
+          {!loadingProfile && allBadges.length > 0 && (
+            <Text style={styles.badgesCount}>
+              {Object.keys(earnedMap).length}/{allBadges.length} unlocked
+            </Text>
+          )}
+        </View>
         {loadingProfile ? (
           <View style={styles.badgesSkeleton}>
             <ActivityIndicator color={Colors.costcoRed} />
           </View>
-        ) : badges.length === 0 ? (
+        ) : allBadges.length === 0 ? (
           <View style={styles.emptyBadges}>
             <Text style={styles.emptyBadgesIcon}>🏅</Text>
             <Text style={styles.emptyBadgesText}>Check in at a Costco to earn your first badge</Text>
           </View>
         ) : (
           <View style={styles.badgesGrid}>
-            {badges.map((ub) => (
-              <View key={ub.id} style={styles.badgeCard}>
-                <View style={styles.badgeIconWrap}>
-                  <Text style={styles.badgeIcon}>{ub.badge.icon ?? '🏅'}</Text>
+            {allBadges.map((badge) => {
+              const earnedAt = earnedMap[badge.id];
+              const unlocked = !!earnedAt;
+              const rarity = BADGE_RARITY[badge.trigger_key ?? ''] ?? 'Common';
+              const rColor = rarityColor(Colors, rarity);
+              const isLegendary = unlocked && rarity === 'Legendary';
+              return (
+                <View key={badge.id} style={[styles.badgeCard, !unlocked && styles.badgeCardLocked]}>
+                  {isLegendary && <Shimmer width={40} style={styles.badgeShimmerClip} />}
+                  <View style={[styles.badgeIconWrap, unlocked && { backgroundColor: rColor + '22' }]}>
+                    <Text style={[styles.badgeIcon, !unlocked && styles.badgeIconLocked]}>
+                      {unlocked ? (badge.icon ?? '🏅') : '🔒'}
+                    </Text>
+                    {isLegendary && (
+                      <>
+                        <Sparkle size={9} color={rColor} delay={200} style={styles.badgeSparkleTL} />
+                        <Sparkle size={7} color={rColor} delay={600} style={styles.badgeSparkleBR} />
+                      </>
+                    )}
+                  </View>
+                  <Text style={[styles.badgeName, !unlocked && styles.badgeNameLocked]} numberOfLines={2}>
+                    {badge.name}
+                  </Text>
+                  <Text style={[styles.badgeRarity, { color: rColor }]}>{rarity}</Text>
+                  {unlocked && (
+                    <Text style={styles.badgeDate}>
+                      {new Date(earnedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </Text>
+                  )}
                 </View>
-                <Text style={styles.badgeName} numberOfLines={2}>{ub.badge.name}</Text>
-                <Text style={styles.badgeDate}>
-                  {new Date(ub.earned_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </Text>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 
@@ -279,7 +382,7 @@ export default function ProfileScreen() {
 
           <View style={styles.settingsRow}>
             <View style={styles.rowIconWrap}>
-              <Text style={styles.rowIcon}>🔔</Text>
+              <BellRing><Text style={styles.rowIcon}>🔔</Text></BellRing>
             </View>
             <View style={styles.rowContent}>
               <Text style={styles.rowTitle}>Price Alerts</Text>
@@ -294,7 +397,38 @@ export default function ProfileScreen() {
               loading={enablingNotifs}
               onEnable={handleEnableNotifications}
               onOpenSettings={() => Linking.openSettings()}
+              styles={styles}
+              Colors={Colors}
             />
+          </View>
+
+          <View style={styles.rowSeparator} />
+
+          <View style={styles.settingsRow}>
+            <View style={styles.rowIconWrap}>
+              <Text style={styles.rowIcon}>🌓</Text>
+            </View>
+            <View style={styles.rowContent}>
+              <Text style={styles.rowTitle}>Appearance</Text>
+              <Text style={styles.rowSubtitle}>Light, dark, or match your device</Text>
+            </View>
+          </View>
+          <View style={styles.themeSegmentRow}>
+            {(['light', 'dark', 'system'] as ThemeMode[]).map((option) => (
+              <Pressable
+                key={option}
+                style={({ pressed }) => [
+                  styles.themeSegment,
+                  mode === option && styles.themeSegmentActive,
+                  pressed && { opacity: 0.8 },
+                ]}
+                onPress={() => setMode(option)}
+              >
+                <Text style={[styles.themeSegmentText, mode === option && styles.themeSegmentTextActive]}>
+                  {option === 'light' ? 'Light' : option === 'dark' ? 'Dark' : 'System'}
+                </Text>
+              </Pressable>
+            ))}
           </View>
 
           <View style={styles.rowSeparator} />
@@ -318,11 +452,11 @@ export default function ProfileScreen() {
         <View style={styles.aboutCard}>
           <View style={styles.aboutBuiltBy}>
             <View style={styles.aboutAvatar}>
-              <Text style={styles.aboutAvatarText}>TK</Text>
+              <TinkerIllustration size={48} />
             </View>
             <View style={styles.aboutBuiltByText}>
               <Text style={styles.aboutName}>Tinker</Text>
-              <Text style={styles.aboutRole}>Builder · Tech Enthusiast · Dota Enjoyer</Text>
+              <Text style={styles.aboutRole}>Builder · Tech Enthusiast · Dota Noob</Text>
             </View>
           </View>
 
@@ -335,9 +469,6 @@ export default function ProfileScreen() {
           <View style={styles.aboutPillRow}>
             <View style={styles.aboutPill}>
               <Text style={styles.aboutPillText}>Open Source · MIT</Text>
-            </View>
-            <View style={styles.aboutPill}>
-              <Text style={styles.aboutPillText}>Not monetized</Text>
             </View>
           </View>
 
@@ -358,10 +489,57 @@ function nextTierKey(current: string): string {
   return order[idx + 1] ?? current;
 }
 
+// Generic member avatar — a membership-badge shape (clip tab + rounded body,
+// like an ID badge on a lanyard) with a simple person silhouette inside.
+// Stands in for a profile photo since the app has no picture-upload feature;
+// every member gets this same badge rather than photo-derived initials.
+function MemberBadgeIllustration({ size = 48 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 48 48">
+      {/* clip/tab at top, like a badge on a lanyard */}
+      <Rect x="18" y="3" width="12" height="9" rx="3" fill="#C9A84C" />
+      {/* badge body */}
+      <Rect x="7" y="9" width="34" height="36" rx="9" fill="#C9A84C" />
+      {/* inner panel */}
+      <Rect x="10.5" y="12.5" width="27" height="29" rx="6.5" fill="#1B2A4A" />
+      {/* person: head + shoulders */}
+      <Circle cx="24" cy="23.5" r="6" fill="#FFFFFF" />
+      <Path d="M13 39 C13 30.5 18 27.5 24 27.5 C30 27.5 35 30.5 35 39 Z" fill="#FFFFFF" />
+    </Svg>
+  );
+}
+
+// Minimal flat illustration for the "About" card — a person tinkering with a
+// gear/robotic part, standing in for an actual photo of "Tinker".
+function TinkerIllustration({ size = 48 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 48 48">
+      {/* head + shoulders */}
+      <Circle cx="19" cy="16" r="7" fill="#FFFFFF" opacity={0.95} />
+      <Path
+        d="M7 40 C7 28.5 12 24 19 24 C26 24 31 28.5 31 40 Z"
+        fill="#FFFFFF"
+        opacity={0.95}
+      />
+      {/* gear the figure is tinkering with */}
+      <G transform="translate(33,33)">
+        {[0, 60, 120, 180, 240, 300].map((deg) => (
+          <Rect key={deg} x={-2} y={-10} width={4} height={5} rx={1} fill="#C9A84C" transform={`rotate(${deg})`} />
+        ))}
+        <Circle cx={0} cy={0} r={7} fill="#C9A84C" />
+        <Circle cx={0} cy={0} r={3} fill="#1B2A4A" />
+      </G>
+    </Svg>
+  );
+}
+
+type Styles = ReturnType<typeof makeStyles>;
+
 function NotifControl({
-  status, loading, onEnable, onOpenSettings,
+  status, loading, onEnable, onOpenSettings, styles, Colors,
 }: {
   status: PermissionStatus; loading: boolean; onEnable: () => void; onOpenSettings: () => void;
+  styles: Styles; Colors: ColorScheme;
 }) {
   if (status === 'loading') return <ActivityIndicator size="small" color={Colors.gray[400]} />;
   if (status === 'granted') {
@@ -396,7 +574,7 @@ function NotifControl({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
 
   // Header
@@ -421,11 +599,10 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: radius.pill,
-    backgroundColor: Colors.executiveNavy,
+    backgroundColor: Colors.navySolid,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { color: Colors.white, fontSize: 20, fontWeight: '700' },
   headerInfo: { flex: 1 },
   memberLabel: {
     fontSize: fontSize.xs,
@@ -507,7 +684,40 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.xs,
   },
 
+  // Fan tier ladder
+  ladderCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: radius['2xl'],
+    padding: spacing.lg,
+    gap: spacing.md,
+    ...shadow.sm,
+  },
+  ladderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  ladderDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.gray[100],
+    borderWidth: 2,
+    borderColor: Colors.border,
+  },
+  ladderDotCurrent: { width: 14, height: 14, borderRadius: 7 },
+  ladderBody: { flex: 1 },
+  ladderTierName: { fontSize: fontSize.sm, fontWeight: '600', color: Colors.gray[400] },
+  ladderTierNameReached: { fontWeight: '700', color: Colors.gray[900] },
+  ladderThreshold: { fontSize: 10, color: Colors.gray[400], marginTop: 1 },
+  ladderCheck: { fontSize: fontSize.md, color: Colors.success, fontWeight: '700' },
+  currentChip: {
+    backgroundColor: Colors.costcoRedSubtle,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  currentChipText: { fontSize: 10, fontWeight: '800', color: Colors.costcoRed, letterSpacing: letterSpacing.caps },
+
   // Badges
+  badgesHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  badgesCount: { fontSize: fontSize.xs, color: Colors.gray[400], fontWeight: '600' },
   badgesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -520,18 +730,25 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     alignItems: 'center',
     gap: spacing.xs,
+    overflow: 'hidden',
     ...shadow.sm,
   },
+  badgeCardLocked: { opacity: 0.55, ...shadow.sm, shadowOpacity: 0 },
+  badgeShimmerClip: { borderRadius: radius.xl },
   badgeIconWrap: {
     width: 48,
     height: 48,
     borderRadius: radius.lg,
-    backgroundColor: Colors.goldStarLight + '40',
+    backgroundColor: Colors.gray[100],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
+    position: 'relative',
   },
+  badgeSparkleTL: { position: 'absolute', top: -2, left: 0 },
+  badgeSparkleBR: { position: 'absolute', bottom: 2, right: -1 },
   badgeIcon: { fontSize: 24 },
+  badgeIconLocked: { opacity: 0.5 },
   badgeName: {
     fontSize: fontSize.xs,
     fontWeight: '700',
@@ -539,6 +756,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 15,
   },
+  badgeNameLocked: { color: Colors.gray[400] },
+  badgeRarity: { fontSize: 9, fontWeight: '800', letterSpacing: letterSpacing.caps },
   badgeDate: { fontSize: 10, color: Colors.gray[400] },
 
   badgesSkeleton: {
@@ -592,6 +811,23 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: fontSize.md, fontWeight: '600', color: Colors.gray[800], marginBottom: 2 },
   rowSubtitle: { fontSize: fontSize.xs, color: Colors.gray[400], lineHeight: 16 },
   rowSeparator: { height: 1, backgroundColor: Colors.border, marginLeft: 74 },
+  themeSegmentRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.lg,
+    backgroundColor: Colors.gray[50],
+  },
+  themeSegment: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+  },
+  themeSegmentActive: { backgroundColor: Colors.navySolid },
+  themeSegmentText: { fontSize: fontSize.sm, fontWeight: '600', color: Colors.gray[600] },
+  themeSegmentTextActive: { color: Colors.white },
   rowChevron: { fontSize: 22, color: Colors.gray[300], fontWeight: '300' },
 
   // Notif controls
@@ -603,7 +839,7 @@ const styles = StyleSheet.create({
   statusDot: { width: 6, height: 6, borderRadius: radius.pill, backgroundColor: Colors.success },
   statusOn: { fontSize: fontSize.sm, fontWeight: '700', color: Colors.success },
   ctaBtn: {
-    backgroundColor: Colors.costcoRed, paddingHorizontal: spacing.lg,
+    backgroundColor: Colors.costcoRedSolid, paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm, borderRadius: radius.md, minWidth: 72, alignItems: 'center',
   },
   ctaBtnPressed: { backgroundColor: Colors.costcoRedDark },
@@ -631,11 +867,10 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: radius.pill,
-    backgroundColor: Colors.executiveNavy,
+    backgroundColor: Colors.navySolid,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  aboutAvatarText: { color: Colors.white, fontSize: fontSize.md, fontWeight: '800' },
   aboutBuiltByText: { flex: 1 },
   aboutName: { fontSize: fontSize.md, fontWeight: '700', color: Colors.gray[900] },
   aboutRole: { fontSize: fontSize.xs, color: Colors.gray[400], marginTop: 2 },

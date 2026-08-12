@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { posthog } from '../lib/posthog';
-import { Colors } from '../constants/colors';
+import { useThemeColors } from '../contexts/ThemeContext';
+import type { ColorScheme } from '../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../constants/theme';
 
 type Field = 'first' | 'last' | 'phone';
@@ -23,6 +24,8 @@ type Field = 'first' | 'last' | 'phone';
 export default function EditProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const Colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName]   = useState('');
   const [phone, setPhone]         = useState('');
@@ -93,7 +96,11 @@ export default function EditProfileScreen() {
     >
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <Pressable onPress={() => router.back()} hitSlop={8} style={styles.headerBack}>
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={8}
+          style={({ pressed }) => [styles.headerBack, pressed && { opacity: 0.6 }]}
+        >
           <Text style={styles.headerBackText}>Cancel</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Edit Profile</Text>
@@ -101,7 +108,7 @@ export default function EditProfileScreen() {
           onPress={save}
           disabled={saving}
           hitSlop={8}
-          style={styles.headerSave}
+          style={({ pressed }) => [styles.headerSave, pressed && !saving && { opacity: 0.6 }]}
         >
           {saving
             ? <ActivityIndicator size="small" color={Colors.costcoRed} />
@@ -208,7 +215,7 @@ export default function EditProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
@@ -304,7 +311,7 @@ const styles = StyleSheet.create({
   },
 
   saveBtn: {
-    backgroundColor: Colors.costcoRed,
+    backgroundColor: Colors.costcoRedSolid,
     borderRadius: radius.lg,
     paddingVertical: spacing.lg,
     alignItems: 'center',

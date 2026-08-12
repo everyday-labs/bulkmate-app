@@ -182,3 +182,19 @@ Some Costco receipts use `2 @ 3.99` format for multi-unit purchases. Not yet obs
 
 ### Warehouse code from receipt header
 Currently extracted from any line matching `#NNN` or `WAREHOUSE NNN`. Some receipts may use a different format. If warehouse is frequently `null`, inspect `ocr_raw` for the store identifier pattern.
+
+---
+
+## Warehouse resolution — postal-code/city fallback + self-healing warehouse_code (2026-08-09)
+
+**Not a parser.ts change** — this lives in `ingest-receipt/index.ts`'s warehouse-resolution step, not the pure text parser, since it needs DB access. Documented here because it depends directly on `parsed.warehouseCode`.
+
+**Problem:** `scripts/seed-warehouses-from-google-places.mjs` seeded global warehouses with synthetic `GP-######` codes (Google Places has no concept of Costco's real internal store number). The existing exact `.eq('warehouse_code', parsed.warehouseCode)` lookup will never match any of them, even though the receipt itself has the real code.
+
+**Fix — `matchWarehouseByReceiptHeader()`:** when the exact-code lookup misses, check the first ~12 lines of the receipt's OCR text (the header region, before the item section) against every `GP-`-coded warehouse's **postal code first, city name second**. Postal code is preferred and tried first — a city can have more than one Costco, so city-name-only matching is ambiguous in exactly the way a postal code isn't. City is a second-tier fallback for receipts that don't clearly show a postal code. Either tier: exactly one match → link the receipt and overwrite that warehouse's placeholder code with the real `parsed.warehouseCode` just parsed. Zero or multiple matches at a tier → don't guess, fall through (city) or leave unlinked (neither matched).
+
+**Why restricted to the header region, not the whole receipt:** searching the full OCR text risks a false hit — a 5-digit postal code can coincidentally appear as a substring inside a long, unrelated barcode/transaction-number digit run further down the receipt (`extractTransactionNumber`'s barcode fallback matches 10–20 digit strings). The postal-code regex also uses `\b` word-boundary anchors for the same reason, and treats internal whitespace as `\s*` so OCR variants like split-across-lines or dropped spaces ("K2G 5W5" / "K2G5W5" / "K2G\n5W5") still match.
+
+**Self-healing, not a one-time fix:** the first receipt scanned at any given warehouse corrects that warehouse's row permanently — every later receipt from the same physical warehouse (same real code printed on it) hits the fast exact-match path with no fallback needed. No manual per-row correction required, at the cost of the first scan at each warehouse being unlinked-then-corrected rather than linked immediately.
+
+**Not yet live-verified** — untested against a real non-Bay-Area receipt. Before trusting this at scale, scan a real receipt from a `GP-`-coded warehouse and confirm in the Supabase dashboard that (a) the receipt links to the right warehouse row and (b) that row's `warehouse_code` gets overwritten with the real value, not left as `GP-######`.

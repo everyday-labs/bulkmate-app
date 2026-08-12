@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   FlatList,
   StyleSheet,
   Pressable,
@@ -10,25 +11,28 @@ import {
   Alert,
   Modal,
   Image,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { posthog } from '../lib/posthog';
-import { Colors } from '../constants/colors';
+import { useThemeColors } from '../contexts/ThemeContext';
+import type { ColorScheme } from '../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../constants/theme';
 import {
   hasPromptedForPushPermission,
   markPushPermissionPrompted,
   requestAndSavePushToken,
 } from '../lib/notifications';
+import { BellRing } from '../components/Motion';
 
 type ReceiptItem = {
   id: string;
   sku: string;
   description: string;
   unit_price: number;
+  quantity: number;
   discount_amount: number;
 };
 
@@ -44,7 +48,6 @@ type ReceiptDetails = {
   warehouse_address: string | null;
   warehouse_city: string | null;
   warehouse_state: string | null;
-  items: ReceiptItem[];
 };
 
 export default function ReceiptSuccessScreen() {
@@ -52,11 +55,17 @@ export default function ReceiptSuccessScreen() {
   const isDuplicate = duplicate === 'true';
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const Colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const [receipt, setReceipt] = useState<ReceiptDetails | null>(null);
+  const [items, setItems] = useState<ReceiptItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [savingItemId, setSavingItemId] = useState<string | null>(null);
   const promptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -78,7 +87,7 @@ export default function ReceiptSuccessScreen() {
             .single(),
           supabase
             .from('receipt_items')
-            .select('id, sku, description, unit_price, discount_amount')
+            .select('id, sku, description, unit_price, quantity, discount_amount')
             .eq('receipt_id', id)
             .order('id'),
         ]);
@@ -109,8 +118,8 @@ export default function ReceiptSuccessScreen() {
         warehouse_address: wh.address ?? null,
         warehouse_city: wh.city ?? null,
         warehouse_state: wh.state ?? null,
-        items: items ?? [],
       });
+      setItems(items ?? []);
 
       const alreadyPrompted = await hasPromptedForPushPermission();
       if (!alreadyPrompted) {
@@ -169,6 +178,24 @@ export default function ReceiptSuccessScreen() {
     );
   }
 
+  async function handleSaveItem(
+    itemId: string,
+    patch: { quantity: number; unit_price: number; discount_amount: number },
+  ) {
+    setSavingItemId(itemId);
+    try {
+      const { error } = await supabase.from('receipt_items').update(patch).eq('id', itemId);
+      if (error) throw error;
+      setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, ...patch } : i)));
+      setEditingItemId(null);
+      posthog?.capture('receipt_item_edited');
+    } catch (e: unknown) {
+      Alert.alert('Couldn\'t save', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setSavingItemId(null);
+    }
+  }
+
   async function shareReceiptId() {
     if (!receipt!.transaction_number) return;
     try {
@@ -206,8 +233,11 @@ export default function ReceiptSuccessScreen() {
     { month: 'long', day: 'numeric', year: 'numeric' },
   );
 
-  const itemTotal = receipt.items.reduce((sum, i) => sum + i.unit_price, 0);
-  const totalSavings = receipt.items.reduce((sum, i) => sum + i.discount_amount, 0);
+  // unit_price is currently always the line's full price, not a true per-unit
+  // price — the OCR parser doesn't yet split multi-quantity lines (see
+  // PARSER_DECISIONS.md), so this deliberately doesn't multiply by quantity.
+  const itemTotal = items.reduce((sum, i) => sum + i.unit_price, 0);
+  const totalSavings = items.reduce((sum, i) => sum + i.discount_amount, 0);
   const subtotal = itemTotal - totalSavings;
   const grandTotal = (receipt.total_amount ?? subtotal) + (receipt.tax_amount ?? 0);
 
@@ -218,8 +248,9 @@ export default function ReceiptSuccessScreen() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={receipt.items}
+        data={items}
         keyExtractor={(item) => item.id}
+        extraData={[editingItemId, savingItemId]}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <>
@@ -301,37 +332,34 @@ export default function ReceiptSuccessScreen() {
 
             {/* Items section label */}
             <Text style={styles.sectionLabel}>Items</Text>
+            <Text style={styles.sectionHint}>Tap any row to fix what OCR misread</Text>
           </>
         }
         renderItem={({ item }) => (
-          <View style={styles.itemRow}>
-            <View style={styles.itemInfo}>
-              <Text style={styles.itemDescription} numberOfLines={2}>
-                {item.description}
-              </Text>
-              <Text style={styles.itemSku}>SKU {item.sku}</Text>
-            </View>
-            <View style={styles.itemPricing}>
-              <Text style={styles.itemPrice}>${item.unit_price.toFixed(2)}</Text>
-              {item.discount_amount > 0 && (
-                <Text style={styles.itemDiscount}>−${item.discount_amount.toFixed(2)}</Text>
-              )}
-            </View>
-          </View>
+          <EditableItemRow
+            item={item}
+            editing={editingItemId === item.id}
+            saving={savingItemId === item.id}
+            onEdit={() => setEditingItemId(item.id)}
+            onCancel={() => setEditingItemId(null)}
+            onSave={(patch) => handleSaveItem(item.id, patch)}
+            styles={styles}
+            Colors={Colors}
+          />
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListFooterComponent={
           <View style={styles.totalsBlock}>
-            <TotalRow label="Item total" value={itemTotal} />
+            <TotalRow label="Item total" value={itemTotal} styles={styles} Colors={Colors} />
             {totalSavings > 0 && (
-              <TotalRow label="Instant savings" value={-totalSavings} highlight="savings" />
+              <TotalRow label="Instant savings" value={-totalSavings} highlight="savings" styles={styles} Colors={Colors} />
             )}
-            <TotalRow label="Subtotal" value={subtotal} />
+            <TotalRow label="Subtotal" value={subtotal} styles={styles} Colors={Colors} />
             {receipt.tax_amount != null && (
-              <TotalRow label="Tax" value={receipt.tax_amount} />
+              <TotalRow label="Tax" value={receipt.tax_amount} styles={styles} Colors={Colors} />
             )}
             <View style={styles.grandTotalDivider} />
-            <TotalRow label="Total" value={grandTotal} bold />
+            <TotalRow label="Total" value={grandTotal} bold styles={styles} Colors={Colors} />
           </View>
         }
       />
@@ -356,6 +384,7 @@ export default function ReceiptSuccessScreen() {
         visible={showNotifPrompt}
         onAllow={handleNotifAllow}
         onDismiss={handleNotifDismiss}
+        Colors={Colors}
       />
 
       {/* Full-screen receipt image viewer */}
@@ -379,7 +408,7 @@ export default function ReceiptSuccessScreen() {
             </Pressable>
             <Image
               source={{ uri: receipt.imageUrl }}
-              style={imageViewerStyles.image}
+              style={{ width: windowWidth, height: windowHeight }}
               resizeMode="contain"
             />
           </View>
@@ -393,12 +422,15 @@ function NotificationPrompt({
   visible,
   onAllow,
   onDismiss,
+  Colors,
 }: {
   visible: boolean;
   onAllow: () => void;
   onDismiss: () => void;
+  Colors: ColorScheme;
 }) {
   const insets = useSafeAreaInsets();
+  const notifStyles = useMemo(() => makeNotifStyles(Colors), [Colors]);
   return (
     <Modal
       visible={visible}
@@ -410,7 +442,7 @@ function NotificationPrompt({
       <Pressable style={notifStyles.backdrop} onPress={onDismiss}>
         <Pressable style={[notifStyles.sheet, { paddingBottom: insets.bottom + spacing['2xl'] }]}>
           <View style={notifStyles.handle} />
-          <Text style={notifStyles.icon}>🔔</Text>
+          <BellRing><Text style={notifStyles.icon}>🔔</Text></BellRing>
           <Text style={notifStyles.title}>Stay in the loop</Text>
           <Text style={notifStyles.body}>
             Get notified when a price drops on something you bought — we'll let you know if you may
@@ -434,16 +466,140 @@ function NotificationPrompt({
   );
 }
 
+type Styles = ReturnType<typeof makeStyles>;
+
+function EditableItemRow({
+  item,
+  editing,
+  saving,
+  onEdit,
+  onCancel,
+  onSave,
+  styles,
+  Colors,
+}: {
+  item: ReceiptItem;
+  editing: boolean;
+  saving: boolean;
+  onEdit: () => void;
+  onCancel: () => void;
+  onSave: (patch: { quantity: number; unit_price: number; discount_amount: number }) => void;
+  styles: Styles;
+  Colors: ColorScheme;
+}) {
+  const [qty, setQty] = useState(String(item.quantity));
+  const [price, setPrice] = useState(String(item.unit_price));
+  const [discount, setDiscount] = useState(String(item.discount_amount));
+
+  // Reset the draft fields from the latest saved values each time editing opens.
+  useEffect(() => {
+    if (editing) {
+      setQty(String(item.quantity));
+      setPrice(String(item.unit_price));
+      setDiscount(String(item.discount_amount));
+    }
+  }, [editing, item.quantity, item.unit_price, item.discount_amount]);
+
+  if (!editing) {
+    return (
+      <Pressable
+        style={({ pressed }) => [styles.itemRow, pressed && styles.itemRowPressed]}
+        onPress={onEdit}
+      >
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemDescription} numberOfLines={2}>
+            {item.description}
+          </Text>
+          <Text style={styles.itemSku}>
+            SKU {item.sku}
+            {item.quantity > 1 ? `  ·  ×${item.quantity}` : ''}
+          </Text>
+        </View>
+        <View style={styles.itemPricing}>
+          <Text style={styles.itemPrice}>${item.unit_price.toFixed(2)}</Text>
+          {item.discount_amount > 0 && (
+            <Text style={styles.itemDiscount}>−${item.discount_amount.toFixed(2)}</Text>
+          )}
+        </View>
+      </Pressable>
+    );
+  }
+
+  return (
+    <View style={styles.editRow}>
+      <Text style={styles.editDescription} numberOfLines={2}>{item.description}</Text>
+      <View style={styles.editFieldsRow}>
+        <View style={styles.editField}>
+          <Text style={styles.editFieldLabel}>QTY</Text>
+          <TextInput
+            style={styles.editInput}
+            value={qty}
+            onChangeText={setQty}
+            keyboardType="number-pad"
+            selectTextOnFocus
+          />
+        </View>
+        <View style={styles.editField}>
+          <Text style={styles.editFieldLabel}>PRICE</Text>
+          <TextInput
+            style={styles.editInput}
+            value={price}
+            onChangeText={setPrice}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+          />
+        </View>
+        <View style={styles.editField}>
+          <Text style={styles.editFieldLabel}>DISCOUNT</Text>
+          <TextInput
+            style={styles.editInput}
+            value={discount}
+            onChangeText={setDiscount}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+          />
+        </View>
+      </View>
+      <View style={styles.editActionsRow}>
+        <Pressable
+          style={({ pressed }) => [styles.editDoneBtn, pressed && { opacity: 0.85 }, saving && { opacity: 0.6 }]}
+          disabled={saving}
+          onPress={() =>
+            onSave({
+              quantity: Math.max(1, parseInt(qty, 10) || 1),
+              unit_price: Math.max(0, parseFloat(price) || 0),
+              discount_amount: Math.max(0, parseFloat(discount) || 0),
+            })
+          }
+        >
+          {saving ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.editDoneText}>✓ Done</Text>}
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.editCancelBtn, pressed && { opacity: 0.7 }]}
+          disabled={saving}
+          onPress={onCancel}
+        >
+          <Text style={styles.editCancelText}>✕ Cancel</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 function TotalRow({
   label,
   value,
   bold,
   highlight,
+  styles,
+  Colors,
 }: {
   label: string;
   value: number;
   bold?: boolean;
   highlight?: 'savings';
+  styles: Styles;
+  Colors: ColorScheme;
 }) {
   const valueColor = highlight === 'savings' ? Colors.savings : bold ? Colors.executiveNavy : Colors.gray[600];
   const formattedValue =
@@ -458,7 +614,7 @@ function TotalRow({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   center: {
     flex: 1,
@@ -485,7 +641,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: radius.pill,
-    backgroundColor: Colors.success,
+    backgroundColor: Colors.successSolid,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
@@ -579,10 +735,10 @@ const styles = StyleSheet.create({
   copyBtn: {
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
-    backgroundColor: Colors.executiveNavy,
+    backgroundColor: Colors.navySolid,
     borderRadius: radius.md,
   },
-  copyBtnPressed: { backgroundColor: Colors.executiveNavyDark },
+  copyBtnPressed: { backgroundColor: '#12203A' },
   copyBtnText: { color: Colors.white, fontSize: fontSize.sm, fontWeight: '700' },
 
   // Receipt image thumbnail
@@ -619,6 +775,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     marginTop: spacing.sm,
   },
+  sectionHint: {
+    fontSize: fontSize.xs,
+    color: Colors.gray[400],
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -626,6 +788,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     backgroundColor: Colors.surface,
   },
+  itemRowPressed: { backgroundColor: Colors.gray[50] },
   itemInfo: { flex: 1, paddingRight: spacing.md },
   itemDescription: { fontSize: fontSize.md, color: Colors.gray[800], fontWeight: '500' },
   itemSku: { fontSize: fontSize.xs, color: Colors.gray[400], marginTop: 3, letterSpacing: letterSpacing.wide },
@@ -633,6 +796,50 @@ const styles = StyleSheet.create({
   itemPrice: { fontSize: fontSize.md, fontWeight: '700', color: Colors.gray[800] },
   itemDiscount: { fontSize: fontSize.sm, color: Colors.savings, marginTop: 2, fontWeight: '600' },
   separator: { height: 1, backgroundColor: Colors.border, marginLeft: spacing.lg },
+
+  // Inline item editing
+  editRow: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: Colors.surfaceSunken,
+    gap: spacing.sm,
+  },
+  editDescription: { fontSize: fontSize.md, color: Colors.gray[800], fontWeight: '600' },
+  editFieldsRow: { flexDirection: 'row', gap: spacing.sm },
+  editField: { flex: 1, gap: 2 },
+  editFieldLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.gray[400],
+    letterSpacing: letterSpacing.caps,
+  },
+  editInput: {
+    backgroundColor: Colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    fontSize: fontSize.md,
+    color: Colors.gray[900],
+  },
+  editActionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  editDoneBtn: {
+    flex: 1,
+    backgroundColor: Colors.successSolid,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  editDoneText: { color: Colors.white, fontSize: fontSize.sm, fontWeight: '700' },
+  editCancelBtn: {
+    flex: 1,
+    backgroundColor: Colors.gray[200],
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  editCancelText: { color: Colors.gray[700], fontSize: fontSize.sm, fontWeight: '700' },
 
   // Totals
   totalsBlock: {
@@ -671,7 +878,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   doneButton: {
-    backgroundColor: Colors.costcoRed,
+    backgroundColor: Colors.costcoRedSolid,
     borderRadius: radius.lg,
     paddingVertical: spacing.lg,
     alignItems: 'center',
@@ -691,7 +898,7 @@ const styles = StyleSheet.create({
   deleteButtonText: { color: Colors.gray[400], fontSize: fontSize.sm, fontWeight: '500' },
 });
 
-const notifStyles = StyleSheet.create({
+const makeNotifStyles = (Colors: ColorScheme) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -730,7 +937,7 @@ const notifStyles = StyleSheet.create({
   },
   allowButton: {
     width: '100%',
-    backgroundColor: Colors.costcoRed,
+    backgroundColor: Colors.costcoRedSolid,
     borderRadius: radius.lg,
     paddingVertical: spacing.lg,
     alignItems: 'center',
@@ -746,8 +953,6 @@ const notifStyles = StyleSheet.create({
   },
   dismissText: { color: Colors.gray[400], fontSize: fontSize.sm, fontWeight: '500' },
 });
-
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 const imageViewerStyles = StyleSheet.create({
   container: {
@@ -765,9 +970,9 @@ const imageViewerStyles = StyleSheet.create({
     borderRadius: radius.pill,
     zIndex: 10,
   },
-  closeText: { color: Colors.white, fontSize: fontSize.md, fontWeight: '600' },
-  image: {
-    width: SCREEN_W,
-    height: SCREEN_H,
-  },
+  closeText: { color: '#FFFFFF', fontSize: fontSize.md, fontWeight: '600' },
+  // Image dimensions are applied inline from useWindowDimensions() at the
+  // call site rather than baked in here — a module-scope Dimensions.get()
+  // is captured once at import and goes stale on rotation or iPad
+  // split-screen resize, leaving the image sized to the old window.
 });

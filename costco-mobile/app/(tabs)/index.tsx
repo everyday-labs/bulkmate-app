@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,21 +7,18 @@ import {
   Pressable,
   ActivityIndicator,
   RefreshControl,
-  Alert,
-  Modal,
-  Animated,
   Image,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Location from 'expo-location';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { posthog } from '../../lib/posthog';
-import { Colors } from '../../constants/colors';
+import { useThemeColors } from '../../contexts/ThemeContext';
+import type { ColorScheme } from '../../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../../constants/theme';
-
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+import { placeholderNameFor } from '../../lib/placeholderName';
+import { FloatView, ScanLineIcon, PinPulse, ShimmerIcon, TagSwing, FolderFlip } from '../../components/Motion';
 
 type DashboardData = {
   totalSpend: number;
@@ -57,33 +54,45 @@ type RecentLookup = {
   looked_up_at: string;
 };
 
-type CheckInResult = {
-  warehouse: { name: string; city: string; tier: string; distance_metres: number };
-  stars_earned: number;
-  total_stars: number;
-  fan_tier: string;
-  tier_upgraded: boolean;
-  already_checked_in: boolean;
-  new_badges: { trigger_key: string; name: string; icon: string | null }[];
-};
+// A single row in the merged "Recent" feed — either a receipt scan or a
+// viewed product, sorted together by timestamp.
+type ActivityItem =
+  | {
+      kind: 'receipt';
+      id: string;
+      timestamp: string;
+      warehouseName: string | null;
+      itemCount: number;
+      totalAmount: number | null;
+    }
+  | {
+      kind: 'viewed';
+      sku: string;
+      timestamp: string;
+      name: string | null;
+      imageUrl: string | null;
+      salePrice: number | null;
+    };
 
 export default function HomeScreen() {
   const { session } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const Colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const [data, setData] = useState<DashboardData | null>(null);
   const [alerts, setAlerts] = useState<PriceAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [checkingIn, setCheckingIn] = useState(false);
-  const [checkInResult, setCheckInResult] = useState<CheckInResult | null>(null);
-  const [tooFarInfo, setTooFarInfo] = useState<{ miles: string; warehouse: string } | null>(null);
-  const [recentLookups, setRecentLookups] = useState<RecentLookup[]>([]);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [activityFilter, setActivityFilter] = useState<'all' | 'receipt' | 'viewed'>('all');
+  const [firstName, setFirstName] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       load(false);
-    }, []),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [session?.user.id]),
   );
 
   async function load(isRefresh: boolean) {
@@ -91,18 +100,35 @@ export default function HomeScreen() {
     else setLoading(true);
 
     try {
-      const [{ data: receipts }, { data: items }, { data: alertRows }, { data: lookupRows }] = await Promise.all([
+      const [{ data: profileRow }, { data: allReceiptTotals }, { data: receipts }, { data: items }, { data: alertRows }, { data: lookupRows }] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('first_name')
+          .eq('id', session?.user.id ?? '')
+          .single(),
+        // Unbounded, unlike the query below — Total Spent/Receipts stats
+        // must reflect every receipt, not just the most recent 50. Kept as
+        // its own lightweight query (no relations) rather than removing the
+        // limit below, since the feed only ever needs the most recent few.
+        supabase
+          .from('receipts')
+          .select('id, total_amount')
+          .eq('user_id', session?.user.id ?? ''),
         supabase
           .from('receipts')
           .select('id, transaction_date, total_amount, warehouses(name), receipt_items(id)')
+          .eq('user_id', session?.user.id ?? '')
           .order('transaction_date', { ascending: false })
           .limit(50),
+        // No .eq('user_id') here — receipt_items has no user_id column; it's
+        // scoped through its parent receipt, so RLS is the only filter.
         supabase
           .from('receipt_items')
           .select('unit_price, discount_amount'),
         supabase
           .from('price_alerts')
           .select('id, sku, paid_price, current_price, delta, receipt_items(description, receipt_id)')
+          .eq('user_id', session?.user.id ?? '')
           .is('dismissed_at', null)
           .order('delta', { ascending: false })
           .limit(10),
@@ -113,7 +139,7 @@ export default function HomeScreen() {
           .limit(30),
       ]);
 
-      const totalSpend = (receipts ?? []).reduce(
+      const totalSpend = (allReceiptTotals ?? []).reduce(
         (sum: number, r: any) => sum + (r.total_amount ?? 0),
         0,
       );
@@ -122,7 +148,7 @@ export default function HomeScreen() {
         0,
       );
 
-      const recentReceipts: RecentReceipt[] = (receipts ?? []).slice(0, 3).map((r: any) => ({
+      const recentReceipts: RecentReceipt[] = (receipts ?? []).slice(0, 5).map((r: any) => ({
         id: r.id,
         transaction_date: r.transaction_date,
         total_amount: r.total_amount,
@@ -133,7 +159,7 @@ export default function HomeScreen() {
       setData({
         totalSpend,
         totalSavings,
-        receiptCount: (receipts ?? []).length,
+        receiptCount: (allReceiptTotals ?? []).length,
         recentReceipts,
       });
 
@@ -159,65 +185,37 @@ export default function HomeScreen() {
           if (dedupedLookups.length === 5) break;
         }
       }
-      setRecentLookups(dedupedLookups);
+
+      // Merge receipts + viewed products into one chronological feed, newest
+      // first — each side already carries its own timestamp column.
+      const merged: ActivityItem[] = [
+        ...recentReceipts.map((r): ActivityItem => ({
+          kind: 'receipt',
+          id: r.id,
+          timestamp: r.transaction_date,
+          warehouseName: r.warehouse_name,
+          itemCount: r.item_count,
+          totalAmount: r.total_amount,
+        })),
+        ...dedupedLookups.map((l): ActivityItem => ({
+          kind: 'viewed',
+          sku: l.sku,
+          timestamp: l.looked_up_at,
+          name: l.name,
+          imageUrl: l.image_url,
+          salePrice: l.sale_price,
+        })),
+      ]
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 10);
+      setActivity(merged);
+
+      setFirstName((profileRow as { first_name: string | null } | null)?.first_name ?? null);
     } catch {
       // Fail silently — dashboard is non-critical
     } finally {
       setLoading(false);
       setRefreshing(false);
-    }
-  }
-
-  async function handleCheckIn() {
-    setCheckingIn(true);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Location Required', 'Enable location access in Settings to check in at a Costco warehouse.');
-        return;
-      }
-
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const { data: { session } } = await supabase.auth.getSession();
-
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/check-in`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({ latitude: loc.coords.latitude, longitude: loc.coords.longitude }),
-      });
-
-      const json = await res.json() as CheckInResult & { error?: string; distance_metres?: number; nearest_warehouse?: { name: string } };
-
-      if (!res.ok) {
-        if (json.error === 'too_far') {
-          const distM = json.distance_metres;
-          const wh = json.nearest_warehouse?.name ?? 'the nearest Costco';
-          setTooFarInfo({
-            miles: distM != null ? (distM / 1609.34).toFixed(1) : '?',
-            warehouse: wh,
-          });
-        } else {
-          Alert.alert('Check-In Failed', json.error ?? 'Please try again.');
-        }
-        return;
-      }
-
-      // Show in-app modal (handles both already_checked_in and fresh check-in)
-      if (!json.already_checked_in) {
-        posthog?.capture('warehouse_check_in_completed', {
-          warehouse_tier: json.warehouse.tier,
-          tier_upgraded: json.tier_upgraded,
-          badges_earned_count: json.new_badges?.length ?? 0,
-        });
-      }
-      setCheckInResult(json);
-    } catch {
-      Alert.alert('Check-In Failed', 'Could not get your location. Please try again.');
-    } finally {
-      setCheckingIn(false);
     }
   }
 
@@ -231,11 +229,39 @@ export default function HomeScreen() {
     if (!error) posthog?.capture('price_alert_dismissed');
   }
 
-  const email = session?.user.email ?? '';
-  const firstName = email.split('@')[0]
-    ?.replace(/[._-]/g, ' ')
-    ?.split(' ')[0]
-    ?.replace(/^\w/, (c) => c.toUpperCase()) ?? 'there';
+  const greetingName = firstName ?? placeholderNameFor(session?.user.id);
+
+  // Receipts store a date-only string; lookups store a full timestamp. Both
+  // parse fine as a Date, so one pair of helpers covers either.
+  function activityDate(iso: string) {
+    return new Date(iso.length <= 10 ? `${iso}T00:00:00` : iso);
+  }
+
+  function dayLabelFor(iso: string) {
+    const date = activityDate(iso);
+    const dayMs = 24 * 60 * 60 * 1000;
+    const dayDiff = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(date).setHours(0, 0, 0, 0)) / dayMs);
+
+    if (dayDiff <= 0) return 'Today';
+    if (dayDiff === 1) return 'Yesterday';
+    if (dayDiff < 7) return `${dayDiff} days ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  function timeOfDayFor(iso: string) {
+    return activityDate(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  // Filter, then group consecutive same-day rows under one divider — the
+  // list is already sorted newest-first, so a single pass groups correctly.
+  const filteredActivity = activity.filter((item) => activityFilter === 'all' || item.kind === activityFilter);
+  const activityGroups: { label: string; items: ActivityItem[] }[] = [];
+  for (const item of filteredActivity) {
+    const label = dayLabelFor(item.timestamp);
+    const lastGroup = activityGroups[activityGroups.length - 1];
+    if (lastGroup && lastGroup.label === label) lastGroup.items.push(item);
+    else activityGroups.push({ label, items: [item] });
+  }
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -263,18 +289,28 @@ export default function HomeScreen() {
       {/* Greeting */}
       <View style={styles.greetingSection}>
         <Text style={styles.greetingLine}>{greeting},</Text>
-        <Text style={styles.greetingName}>{firstName}</Text>
+        <Text style={styles.greetingName}>{greetingName}</Text>
       </View>
 
       {/* Price alert cards */}
       {alerts.length > 0 && (
         <View style={styles.alertsSection}>
-          <Text style={styles.sectionLabel}>Price Alerts</Text>
+          <View style={styles.recentHeader}>
+            <Text style={styles.sectionLabel}>Price Alerts</Text>
+            <Pressable
+              onPress={() => router.push('/alerts')}
+              hitSlop={8}
+              style={({ pressed }) => pressed && { opacity: 0.6 }}
+            >
+              <Text style={styles.seeAllText}>See all</Text>
+            </Pressable>
+          </View>
           <View style={styles.alertsList}>
             {alerts.map((alert) => (
               <PriceAlertCard
                 key={alert.id}
                 alert={alert}
+                styles={styles}
                 onDismiss={() => dismissAlert(alert.id)}
                 onPress={() =>
                   alert.receipt_id
@@ -300,6 +336,7 @@ export default function HomeScreen() {
             icon="💳"
             accent={Colors.executiveNavy}
             accentBg={Colors.executiveNavySubtle}
+            styles={styles}
           />
           <StatCard
             label="Total Saved"
@@ -307,6 +344,7 @@ export default function HomeScreen() {
             icon="🏷"
             accent={Colors.savings}
             accentBg={Colors.goldStarSubtle}
+            styles={styles}
           />
           <StatCard
             label="Receipts"
@@ -314,6 +352,7 @@ export default function HomeScreen() {
             icon="🧾"
             accent={Colors.costcoRed}
             accentBg={Colors.costcoRedSubtle}
+            styles={styles}
           />
         </View>
       )}
@@ -323,152 +362,152 @@ export default function HomeScreen() {
       <View style={styles.actionsRow}>
         <Pressable
           style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}
-          onPress={() => router.push('/receipt-camera')}
+          onPress={() => router.push('/(tabs)/scan')}
         >
           <View style={[styles.actionIconWrap, { backgroundColor: Colors.costcoRedSubtle }]}>
-            <Text style={styles.actionIcon}>🧾</Text>
+            <ScanLineIcon>
+              <Text style={styles.actionIcon}>🧾</Text>
+            </ScanLineIcon>
           </View>
-          <Text style={styles.actionTitle}>Scan Receipt</Text>
-          <Text style={styles.actionSub}>Add a purchase</Text>
+          <Text style={styles.actionTitle}>Scan</Text>
+          <Text style={styles.actionSub}>Receipt, barcode, or check-in</Text>
         </Pressable>
 
         <Pressable
           style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}
-          onPress={() => router.push('/receipts')}
+          onPress={() => router.push('/history')}
         >
           <View style={[styles.actionIconWrap, { backgroundColor: Colors.executiveNavySubtle }]}>
-            <Text style={styles.actionIcon}>🗂</Text>
+            <FolderFlip><Text style={styles.actionIcon}>🗂</Text></FolderFlip>
           </View>
           <Text style={styles.actionTitle}>History</Text>
-          <Text style={styles.actionSub}>All receipts</Text>
+          <Text style={styles.actionSub}>Receipts, scans & visits</Text>
         </Pressable>
 
         <Pressable
-          style={({ pressed }) => [
-            styles.actionCard,
-            pressed && styles.actionCardPressed,
-            checkingIn && styles.actionCardMuted,
-          ]}
-          onPress={handleCheckIn}
-          disabled={checkingIn}
+          style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}
+          onPress={() => router.push({ pathname: '/(tabs)/scan', params: { mode: 'checkin' } })}
         >
           <View style={[styles.actionIconWrap, { backgroundColor: Colors.goldStarSubtle }]}>
-            {checkingIn
-              ? <ActivityIndicator size="small" color={Colors.warning} />
-              : <Text style={styles.actionIcon}>📍</Text>
-            }
+            <PinPulse color={Colors.costcoRed + '80'}>
+              <Text style={styles.actionIcon}>📍</Text>
+            </PinPulse>
           </View>
           <Text style={styles.actionTitle}>Check In</Text>
           <Text style={styles.actionSub}>Earn a star</Text>
         </Pressable>
       </View>
 
-      {/* Recently viewed products */}
-      {recentLookups.length > 0 && (
-        <View style={styles.recentLookups}>
-          <Text style={styles.sectionLabel}>Recently Viewed</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.lookupScroll}
-          >
-            {recentLookups.map((item) => (
-              <Pressable
-                key={item.sku}
-                style={({ pressed }) => [styles.lookupCard, pressed && styles.lookupCardPressed]}
-                onPress={() => router.push(`/product/${item.sku}`)}
-              >
-                <View style={styles.lookupImageWrap}>
-                  {item.image_url ? (
-                    <Image source={{ uri: item.image_url }} style={styles.lookupImage} resizeMode="contain" />
-                  ) : (
-                    <Text style={styles.lookupImageFallback}>📦</Text>
-                  )}
-                </View>
-                <Text style={styles.lookupName} numberOfLines={2}>
-                  {item.name ?? item.sku}
-                </Text>
-                {item.sale_price != null && (
-                  <Text style={styles.lookupPrice}>${item.sale_price.toFixed(2)}</Text>
-                )}
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Recent receipts */}
-      {data && data.recentReceipts.length > 0 && (
+      {/* Recent activity — receipts and viewed products merged into one feed */}
+      {activity.length > 0 && (
         <>
           <View style={styles.recentHeader}>
-            <Text style={styles.sectionLabel}>Recent Receipts</Text>
-            <Pressable onPress={() => router.push('/receipts')} hitSlop={8}>
+            <Text style={styles.sectionLabel}>Recent</Text>
+            <Pressable
+              onPress={() => router.push('/history')}
+              hitSlop={8}
+              style={({ pressed }) => pressed && { opacity: 0.6 }}
+            >
               <Text style={styles.seeAllText}>See all</Text>
             </Pressable>
           </View>
 
-          <View style={styles.recentList}>
-            {data.recentReceipts.map((r) => {
-              const date = new Date(r.transaction_date + 'T00:00:00').toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-              });
+          <View style={styles.chipRow}>
+            {(['all', 'receipt', 'viewed'] as const).map((key) => {
+              const active = activityFilter === key;
+              const label = key === 'all' ? 'All' : key === 'receipt' ? 'Receipts' : 'Viewed';
               return (
                 <Pressable
-                  key={r.id}
-                  style={({ pressed }) => [styles.recentCard, pressed && styles.recentCardPressed]}
-                  onPress={() => router.push(`/receipt-success?receiptId=${r.id}`)}
+                  key={key}
+                  onPress={() => setActivityFilter(key)}
+                  style={[styles.chip, active && styles.chipActive]}
+                  hitSlop={4}
                 >
-                  <View style={styles.recentIconWrap}>
-                    <Text style={styles.recentIcon}>🧾</Text>
-                  </View>
-                  <View style={styles.recentBody}>
-                    <Text style={styles.recentWarehouse} numberOfLines={1}>
-                      {r.warehouse_name ?? 'Costco Warehouse'}
-                    </Text>
-                    <Text style={styles.recentMeta}>
-                      {date}{'  ·  '}{r.item_count} {r.item_count === 1 ? 'item' : 'items'}
-                    </Text>
-                  </View>
-                  {r.total_amount != null && (
-                    <Text style={styles.recentTotal}>${r.total_amount.toFixed(2)}</Text>
-                  )}
-                  <Text style={styles.recentChevron}>›</Text>
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
                 </Pressable>
               );
             })}
           </View>
+
+          {activityGroups.length === 0 && (
+            <Text style={styles.activityEmptyText}>
+              No {activityFilter === 'receipt' ? 'receipts' : 'viewed products'} yet.
+            </Text>
+          )}
+
+          {activityGroups.map((group) => (
+            <View key={group.label} style={styles.activityGroup}>
+              <Text style={styles.dayDivider}>{group.label}</Text>
+              <View style={styles.recentList}>
+                {group.items.map((item) =>
+                  item.kind === 'receipt' ? (
+                    <Pressable
+                      key={`receipt-${item.id}`}
+                      style={({ pressed }) => [styles.recentCard, pressed && styles.recentCardPressed]}
+                      onPress={() => router.push(`/receipt-success?receiptId=${item.id}`)}
+                    >
+                      <View style={[styles.activityThumb, { backgroundColor: Colors.executiveNavySubtle }]}>
+                        <Text style={styles.recentIcon}>🧾</Text>
+                      </View>
+                      <View style={styles.recentBody}>
+                        <Text style={styles.recentWarehouse} numberOfLines={1}>
+                          {item.warehouseName ?? 'Costco Warehouse'}
+                        </Text>
+                        <Text style={styles.recentMeta}>
+                          Receipt{'  ·  '}{item.itemCount} {item.itemCount === 1 ? 'item' : 'items'}
+                        </Text>
+                      </View>
+                      {item.totalAmount != null && (
+                        <Text style={styles.recentTotal}>${item.totalAmount.toFixed(2)}</Text>
+                      )}
+                      <Text style={styles.recentChevron}>›</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      key={`viewed-${item.sku}`}
+                      style={({ pressed }) => [styles.recentCard, pressed && styles.recentCardPressed]}
+                      onPress={() => router.push(`/product/${item.sku}`)}
+                    >
+                      <View style={[styles.activityThumb, { backgroundColor: Colors.goldStarSubtle }]}>
+                        {item.imageUrl ? (
+                          <Image source={{ uri: item.imageUrl }} style={styles.activityThumbImage} resizeMode="contain" />
+                        ) : (
+                          <Text style={styles.recentIcon}>📦</Text>
+                        )}
+                      </View>
+                      <View style={styles.recentBody}>
+                        <Text style={styles.recentWarehouse} numberOfLines={1}>
+                          {item.name ?? item.sku}
+                        </Text>
+                        <Text style={styles.recentMeta}>
+                          Viewed{'  ·  '}{timeOfDayFor(item.timestamp)}
+                        </Text>
+                      </View>
+                      {item.salePrice != null && (
+                        <Text style={styles.recentTotal}>${item.salePrice.toFixed(2)}</Text>
+                      )}
+                      <Text style={styles.recentChevron}>›</Text>
+                    </Pressable>
+                  ),
+                )}
+              </View>
+            </View>
+          ))}
         </>
       )}
 
       {/* Check-in success modal */}
-      {checkInResult && (
-        <CheckInModal
-          result={checkInResult}
-          onClose={() => setCheckInResult(null)}
-        />
-      )}
-
-      {/* Too far modal */}
-      {tooFarInfo && (
-        <TooFarModal
-          miles={tooFarInfo.miles}
-          warehouse={tooFarInfo.warehouse}
-          onClose={() => setTooFarInfo(null)}
-        />
-      )}
-
       {/* Empty state */}
       {!loading && data && data.receiptCount === 0 && (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyIcon}>🧾</Text>
+          <FloatView><Text style={styles.emptyIcon}>🧾</Text></FloatView>
           <Text style={styles.emptyTitle}>No receipts yet</Text>
           <Text style={styles.emptySubtitle}>
             Scan your first Costco receipt to start tracking your spending and unlock price alerts.
           </Text>
           <Pressable
             style={({ pressed }) => [styles.emptyBtn, pressed && styles.emptyBtnPressed]}
-            onPress={() => router.push('/receipt-camera')}
+            onPress={() => router.push({ pathname: '/(tabs)/scan', params: { mode: 'receipt' } })}
           >
             <Text style={styles.emptyBtnText}>Scan Receipt</Text>
           </Pressable>
@@ -478,14 +517,18 @@ export default function HomeScreen() {
   );
 }
 
+type Styles = ReturnType<typeof makeStyles>;
+
 function PriceAlertCard({
   alert,
   onDismiss,
   onPress,
+  styles,
 }: {
   alert: PriceAlert;
   onDismiss: () => void;
   onPress: () => void;
+  styles: Styles;
 }) {
   const name = alert.description.length > 50
     ? alert.description.slice(0, 47) + '…'
@@ -529,181 +572,33 @@ function PriceAlertCard({
   );
 }
 
-const TIER_LABEL: Record<string, string> = {
-  KirklandCadet: 'Kirkland Cadet',
-  WholesaleWanderer: 'Wholesale Wanderer',
-  BulkBuyer: 'Bulk Buyer',
-  GoldStarGuru: 'Gold Star Guru',
-  ExecutiveExplorer: 'Executive Explorer',
-};
-
-const TIER_EMOJI: Record<string, string> = {
-  KirklandCadet: '🛒', WholesaleWanderer: '🗺', BulkBuyer: '📦',
-  GoldStarGuru: '🌟', ExecutiveExplorer: '👑',
-};
-
-function TooFarModal({ miles, warehouse, onClose }: { miles: string; warehouse: string; onClose: () => void }) {
-  const scaleAnim = useRef(new Animated.Value(0.85)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 8 }),
-      Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-    ]).start();
-  }, []);
-
-  return (
-    <Modal transparent animationType="none" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <Animated.View
-          style={[styles.modalSheet, { transform: [{ scale: scaleAnim }], opacity: opacityAnim }]}
-        >
-          <Text style={styles.modalStar}>🗺</Text>
-
-          <Text style={styles.modalTitle}>Still in Aisle Zero</Text>
-
-          <View style={styles.tooFarDistanceRow}>
-            <Text style={styles.tooFarMiles}>{miles} mi</Text>
-            <Text style={styles.tooFarLabel}>FROM YOUR NEAREST COSTCO</Text>
-          </View>
-
-          <Text style={styles.tooFarWarehouse}>{warehouse}</Text>
-
-          <Text style={styles.modalSubtext}>
-            You're not quite in range yet. Head over to the warehouse and check in once you're inside — your star is waiting!
-          </Text>
-
-          <Pressable
-            style={({ pressed }) => [styles.modalDoneBtn, pressed && styles.modalDoneBtnPressed]}
-            onPress={onClose}
-          >
-            <Text style={styles.modalDoneBtnText}>Got it</Text>
-          </Pressable>
-        </Animated.View>
-      </Pressable>
-    </Modal>
-  );
-}
-
-function CheckInModal({ result, onClose }: { result: CheckInResult; onClose: () => void }) {
-  const scaleAnim = useRef(new Animated.Value(0.85)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-  const starAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 8 }),
-      Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-    ]).start();
-
-    if (!result.already_checked_in) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(starAnim, { toValue: 1.2, duration: 600, useNativeDriver: true }),
-          Animated.timing(starAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-        ]),
-        { iterations: 3 },
-      ).start();
-    }
-  }, []);
-
-  const isAlreadyIn = result.already_checked_in;
-  const tierColor = result.tier_upgraded ? Colors.goldStarAccent : Colors.executiveNavy;
-
-  return (
-    <Modal transparent animationType="none" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <Animated.View
-          style={[styles.modalSheet, { transform: [{ scale: scaleAnim }], opacity: opacityAnim }]}
-        >
-          {/* Star animation */}
-          <Animated.Text style={[styles.modalStar, { transform: [{ scale: starAnim }] }]}>
-            {isAlreadyIn ? '✅' : '⭐'}
-          </Animated.Text>
-
-          <Text style={styles.modalTitle}>
-            {isAlreadyIn ? 'Already Checked In' : 'Checked In!'}
-          </Text>
-
-          <Text style={styles.modalWarehouse}>{result.warehouse.name}</Text>
-          <Text style={styles.modalCity}>{result.warehouse.city} · {result.warehouse.tier}</Text>
-
-          {isAlreadyIn ? (
-            <Text style={styles.modalSubtext}>
-              You already earned your star here today. Come back tomorrow!
-            </Text>
-          ) : (
-            <View style={styles.modalStatsRow}>
-              <View style={styles.modalStat}>
-                <Text style={styles.modalStatValue}>+1</Text>
-                <Text style={styles.modalStatLabel}>STAR EARNED</Text>
-              </View>
-              <View style={styles.modalStatDivider} />
-              <View style={styles.modalStat}>
-                <Text style={styles.modalStatValue}>{result.total_stars}</Text>
-                <Text style={styles.modalStatLabel}>TOTAL STARS</Text>
-              </View>
-            </View>
-          )}
-
-          {/* Tier upgrade banner */}
-          {result.tier_upgraded && (
-            <View style={[styles.tierUpgradeBanner, { borderColor: tierColor }]}>
-              <Text style={styles.tierUpgradeEmoji}>{TIER_EMOJI[result.fan_tier] ?? '🎉'}</Text>
-              <View>
-                <Text style={styles.tierUpgradeTitle}>Tier Upgrade!</Text>
-                <Text style={[styles.tierUpgradeName, { color: tierColor }]}>
-                  {TIER_LABEL[result.fan_tier] ?? result.fan_tier}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* New badges */}
-          {result.new_badges?.length > 0 && (
-            <View style={styles.newBadgesSection}>
-              <Text style={styles.newBadgesLabel}>NEW BADGES EARNED</Text>
-              <View style={styles.newBadgesList}>
-                {result.new_badges.map((b) => (
-                  <View key={b.trigger_key} style={styles.newBadgeChip}>
-                    <Text style={styles.newBadgeIcon}>{b.icon ?? '🏅'}</Text>
-                    <Text style={styles.newBadgeName}>{b.name}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-
-          <Pressable
-            style={({ pressed }) => [styles.modalDoneBtn, pressed && styles.modalDoneBtnPressed]}
-            onPress={onClose}
-          >
-            <Text style={styles.modalDoneBtnText}>Done</Text>
-          </Pressable>
-        </Animated.View>
-      </Pressable>
-    </Modal>
-  );
-}
-
 function StatCard({
   label,
   value,
   icon,
   accent,
   accentBg,
+  styles,
 }: {
   label: string;
   value: string;
   icon: string;
   accent: string;
   accentBg: string;
+  styles: Styles;
 }) {
   return (
     <View style={styles.statCard}>
       <View style={[styles.statIconWrap, { backgroundColor: accentBg }]}>
-        <Text style={styles.statIcon}>{icon}</Text>
+        {icon === '💳' ? (
+          <ShimmerIcon><Text style={styles.statIcon}>{icon}</Text></ShimmerIcon>
+        ) : icon === '🏷' ? (
+          <TagSwing><Text style={styles.statIcon}>{icon}</Text></TagSwing>
+        ) : icon === '🧾' ? (
+          <ScanLineIcon color={accent}><Text style={styles.statIcon}>{icon}</Text></ScanLineIcon>
+        ) : (
+          <Text style={styles.statIcon}>{icon}</Text>
+        )}
       </View>
       <Text style={[styles.statValue, { color: accent }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
@@ -711,7 +606,7 @@ function StatCard({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   scroll: { paddingHorizontal: spacing.lg },
 
@@ -853,7 +748,6 @@ const styles = StyleSheet.create({
     ...shadow.sm,
   },
   actionCardPressed: { opacity: 0.88, transform: [{ scale: 0.97 }] },
-  actionCardMuted: { opacity: 0.5 },
   actionIconWrap: {
     width: 40,
     height: 40,
@@ -879,6 +773,37 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.xs,
   },
   seeAllText: { fontSize: fontSize.sm, fontWeight: '600', color: Colors.costcoRed },
+
+  chipRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md, paddingLeft: spacing.xs },
+  chip: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+  },
+  chipActive: { backgroundColor: Colors.costcoRedSolid, borderColor: Colors.costcoRedSolid },
+  chipText: { fontSize: fontSize.xs, fontWeight: '700', color: Colors.gray[600] },
+  chipTextActive: { color: Colors.white },
+
+  activityGroup: { marginBottom: spacing.sm },
+  activityEmptyText: {
+    fontSize: fontSize.sm,
+    color: Colors.gray[400],
+    paddingLeft: spacing.xs,
+    marginBottom: spacing.xl,
+  },
+  dayDivider: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    color: Colors.gray[400],
+    letterSpacing: letterSpacing.caps,
+    textTransform: 'uppercase',
+    marginBottom: spacing.sm,
+    paddingLeft: spacing.xs,
+  },
+
   recentList: { gap: spacing.sm, marginBottom: spacing.xl },
   recentCard: {
     flexDirection: 'row',
@@ -890,15 +815,15 @@ const styles = StyleSheet.create({
     ...shadow.sm,
   },
   recentCardPressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
-  recentIconWrap: {
+  recentIcon: { fontSize: 20 },
+  activityThumb: {
     width: 40,
     height: 40,
     borderRadius: radius.lg,
-    backgroundColor: Colors.gray[100],
     alignItems: 'center',
     justifyContent: 'center',
   },
-  recentIcon: { fontSize: 20 },
+  activityThumbImage: { width: 32, height: 32 },
   recentBody: { flex: 1 },
   recentWarehouse: { fontSize: fontSize.md, fontWeight: '700', color: Colors.gray[900], marginBottom: 2 },
   recentMeta: { fontSize: fontSize.xs, color: Colors.gray[400] },
@@ -909,152 +834,6 @@ const styles = StyleSheet.create({
     letterSpacing: letterSpacing.tight,
   },
   recentChevron: { fontSize: 18, color: Colors.gray[300] },
-
-  // Check-in modal
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing['2xl'],
-  },
-  modalSheet: {
-    width: '100%',
-    backgroundColor: Colors.surface,
-    borderRadius: radius['3xl'],
-    padding: spacing['3xl'],
-    alignItems: 'center',
-    gap: spacing.lg,
-    ...shadow.md,
-  },
-  modalStar: { fontSize: 64, marginBottom: spacing.xs },
-  modalTitle: {
-    fontSize: fontSize['3xl'],
-    fontWeight: '800',
-    color: Colors.gray[900],
-    letterSpacing: letterSpacing.tight,
-  },
-  modalWarehouse: {
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: Colors.gray[800],
-    textAlign: 'center',
-  },
-  modalCity: { fontSize: fontSize.sm, color: Colors.gray[400] },
-  modalSubtext: {
-    fontSize: fontSize.sm,
-    color: Colors.gray[400],
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  modalStatsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-    borderRadius: radius.xl,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing['2xl'],
-    gap: spacing.xl,
-    marginVertical: spacing.xs,
-  },
-  modalStat: { alignItems: 'center', flex: 1 },
-  modalStatValue: {
-    fontSize: fontSize['3xl'],
-    fontWeight: '800',
-    color: Colors.gray[900],
-    letterSpacing: letterSpacing.tight,
-  },
-  modalStatLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-    marginTop: 2,
-  },
-  modalStatDivider: { width: 1, height: 40, backgroundColor: Colors.border },
-
-  // Too far modal
-  tooFarDistanceRow: {
-    backgroundColor: Colors.costcoRedSubtle,
-    borderRadius: radius.xl,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing['3xl'],
-    alignItems: 'center',
-    width: '100%',
-  },
-  tooFarMiles: {
-    fontSize: fontSize['4xl'],
-    fontWeight: '800',
-    color: Colors.costcoRed,
-    letterSpacing: letterSpacing.tight,
-  },
-  tooFarLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.costcoRed,
-    letterSpacing: letterSpacing.caps,
-    marginTop: 2,
-    opacity: 0.7,
-  },
-  tooFarWarehouse: {
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: Colors.gray[800],
-    textAlign: 'center',
-  },
-  tierUpgradeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    borderWidth: 1.5,
-    borderRadius: radius.xl,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    width: '100%',
-  },
-  tierUpgradeEmoji: { fontSize: 28 },
-  tierUpgradeTitle: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-  },
-  tierUpgradeName: { fontSize: fontSize.lg, fontWeight: '800', letterSpacing: letterSpacing.tight },
-  newBadgesSection: { width: '100%', gap: spacing.sm },
-  newBadgesLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-  },
-  newBadgesList: { gap: spacing.xs },
-  newBadgeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: Colors.goldStarLight + '30',
-    borderRadius: radius.lg,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-  },
-  newBadgeIcon: { fontSize: 18 },
-  newBadgeName: { fontSize: fontSize.sm, fontWeight: '700', color: Colors.gray[800] },
-  modalDoneBtn: {
-    backgroundColor: Colors.costcoRed,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.lg,
-    width: '100%',
-    alignItems: 'center',
-    marginTop: spacing.xs,
-    ...shadow.sm,
-  },
-  modalDoneBtnPressed: { backgroundColor: Colors.costcoRedDark },
-  modalDoneBtnText: {
-    color: Colors.white,
-    fontSize: fontSize.md,
-    fontWeight: '700',
-    letterSpacing: letterSpacing.wide,
-  },
 
   // Empty state
   emptyCard: {
@@ -1081,7 +860,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing['2xl'],
   },
   emptyBtn: {
-    backgroundColor: Colors.costcoRed,
+    backgroundColor: Colors.costcoRedSolid,
     borderRadius: radius.lg,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing['3xl'],
@@ -1093,43 +872,5 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: '700',
     letterSpacing: letterSpacing.wide,
-  },
-
-  // Recently viewed products
-  recentLookups: { marginBottom: spacing['2xl'] },
-  lookupScroll: { gap: spacing.md, paddingLeft: spacing.xs, paddingRight: spacing.lg },
-  lookupCard: {
-    width: 120,
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.md,
-    alignItems: 'center',
-    gap: spacing.xs,
-    ...shadow.sm,
-  },
-  lookupCardPressed: { opacity: 0.88, transform: [{ scale: 0.97 }] },
-  lookupImageWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.lg,
-    backgroundColor: Colors.gray[50],
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  },
-  lookupImage: { width: 64, height: 64 },
-  lookupImageFallback: { fontSize: 36 },
-  lookupName: {
-    fontSize: fontSize.xs,
-    fontWeight: '600',
-    color: Colors.gray[800],
-    textAlign: 'center',
-    lineHeight: 15,
-  },
-  lookupPrice: {
-    fontSize: fontSize.sm,
-    fontWeight: '800',
-    color: Colors.executiveNavy,
-    letterSpacing: letterSpacing.tight,
   },
 });
