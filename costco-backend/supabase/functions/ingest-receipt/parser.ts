@@ -13,8 +13,11 @@ export type ParsedReceipt = {
 export type ParsedItem = {
   sku: string;
   description: string;
+  /** Per-unit price. Line total is `unitPrice * quantity - discountAmount`. */
   unitPrice: number;
   discountAmount: number;
+  /** >1 when the same SKU was printed on multiple lines — see mergeBySku. */
+  quantity: number;
 };
 
 export function parseReceiptText(text: string): ParsedReceipt {
@@ -31,7 +34,13 @@ export function parseReceiptText(text: string): ParsedReceipt {
     tax: extractTax(lines),
     grandTotal: extractGrandTotal(lines),
     expectedItemCount,
-    itemCountMismatch: expectedItemCount !== null && items.length !== expectedItemCount,
+    // Compare total UNITS, not row count — the receipt's "TOTAL NUMBER OF
+    // ITEMS SOLD" counts each unit, while mergeBySku collapses repeat SKUs
+    // into one row with quantity > 1. Using items.length here would report a
+    // false mismatch on every receipt containing a multi-buy.
+    itemCountMismatch:
+      expectedItemCount !== null &&
+      items.reduce((n, i) => n + i.quantity, 0) !== expectedItemCount,
   };
 }
 
@@ -205,43 +214,32 @@ function extractItems(lines: string[]): ParsedItem[] {
   // Instant-savings line: "2.30-" or "3.00-A" (trailing tax code variant)
   const savingsLine     = /^(\d{1,3}\.\d{2})-\s*[A-Z]?\s*$/;
 
-  type SkuEntry = { sku: string; description: string; inlinePrice: number | null; discountAmount: number };
+  type SkuEntry = { sku: string; description: string; price: number | null; discountAmount: number };
   const skuEntries: SkuEntry[] = [];
-  const prices: number[] = [];
-  // savingsMap[priceIndex] = discount that applies to that price
-  const savingsMap = new Map<number, number>();
+  // Indices of skuEntries still waiting for a standalone price, oldest first.
+  const pending: number[] = [];
+  // Index of the entry that most recently received a price — a savings line
+  // always applies to that one.
+  let lastPricedIdx: number | null = null;
 
   // Lines that should never appear in the item section but might if OCR misreads
   // the SUBTOTAL boundary — skip them defensively.
   const aggregateLinePattern = /^(SUB[\s-]?TOTAL|TAX\b|\*{2,}|CHANGE\b|APPROVED|VISA|AMOUNT:|INSTANT\s+SAVINGS|TOTAL\s+NUMBER)/i;
 
-  // CRV redemption barcodes (e.g. "0600000000 CA REDEMP V") are filtered by
-  // couponPattern, but their associated price line (e.g. "0.30") must also be
-  // skipped, otherwise it consumes a zip slot and misaligns all subsequent prices.
-  // We detect CRV by the "REDEMP" text and set a one-shot skip flag for the
-  // next standalone price line.
-  let skipNextPrice = false;
-
   for (const line of itemLines) {
     if (!line || aggregateLinePattern.test(line)) continue;
 
-    if (couponPattern.test(line)) {
-      if (/REDEMP/i.test(line)) skipNextPrice = true;
-      continue;
-    }
+    // Coupon / CRV barcode lines carry no item data — skip the line itself.
+    // (Deliberately no "skip the next price" flag here; see the greedy
+    // assignment note below for why that approach was wrong.)
+    if (couponPattern.test(line)) continue;
 
-    // Savings/instant-discount line.
-    // Case A: a standalone price was already collected → attach to it via savingsMap.
-    // Case B: no standalone price yet (inline-price item came before this savings line)
-    //         → attach directly to the last skuEntry that has an inlinePrice.
+    // Savings/instant-discount line — attach to whichever item most recently
+    // received a price, covering both the inline-price and standalone-price
+    // cases with one rule.
     const sav = line.match(savingsLine);
     if (sav) {
-      const amount = parseFloat(sav[1]);
-      if (prices.length > 0) {
-        savingsMap.set(prices.length - 1, amount);
-      } else if (skuEntries.length > 0 && skuEntries[skuEntries.length - 1].inlinePrice !== null) {
-        skuEntries[skuEntries.length - 1].discountAmount = amount;
-      }
+      if (lastPricedIdx !== null) skuEntries[lastPricedIdx].discountAmount = parseFloat(sav[1]);
       continue;
     }
 
@@ -251,48 +249,86 @@ function extractItems(lines: string[]): ParsedItem[] {
       const sku   = withPrice[1].replace(/^([A-Z])(?=[0-9])/, '');
       const desc  = withPrice[2].replace(/\s+[A-Z]$/, '').trim();
       const price = parseFloat(withPrice[3]);
-      if (price > 0) skuEntries.push({ sku, description: desc || `Item ${sku}`, inlinePrice: price, discountAmount: 0 });
+      if (price > 0) {
+        skuEntries.push({ sku, description: desc || `Item ${sku}`, price, discountAmount: 0 });
+        lastPricedIdx = skuEntries.length - 1;
+      }
       continue;
     }
 
-    // SKU without inline price
+    // SKU without inline price — queue it as awaiting the next standalone price.
     const only = line.match(skuOnly);
     if (only) {
       const sku  = only[1].replace(/^([A-Z])(?=[0-9])/, '');
       const desc = (only[2] ?? '').replace(/\s+[A-Z]$/, '').trim();
-      skuEntries.push({ sku, description: desc || `Item ${sku}`, inlinePrice: null, discountAmount: 0 });
+      skuEntries.push({ sku, description: desc || `Item ${sku}`, price: null, discountAmount: 0 });
+      pending.push(skuEntries.length - 1);
       continue;
     }
 
-    // Standalone price line — CRV amounts are skipped via the one-shot flag set
-    // when their barcode line was encountered above.
+    // Standalone price — assign to the oldest still-unpriced SKU. If nothing
+    // is waiting, this price doesn't belong to an item (CRV deposit, stray
+    // aggregate) and is discarded.
     const px = line.match(standalonePrice);
     if (px) {
-      if (skipNextPrice) { skipNextPrice = false; continue; }
       const price = parseFloat(px[1]);
-      if (price > 0) prices.push(price);
+      if (price > 0 && pending.length > 0) {
+        const idx = pending.shift()!;
+        skuEntries[idx].price = price;
+        lastPricedIdx = idx;
+      }
     }
   }
 
-  // ── Pass 2: zip SKU entries with prices ───────────────────────────────────
-  // Cap prices to the number of SKU entries: any extra prices (e.g. subtotal
-  // amount that slipped through) will never be zipped with an item.
-  const cappedPrices = prices.slice(0, skuEntries.length);
+  // ── Pass 2: emit ──────────────────────────────────────────────────────────
+  // Prices were already matched to their SKU during the single greedy pass
+  // above, so this just drops any entry that never received one (a SKU-like
+  // line with no corresponding price — usually an OCR artifact).
+  const priced = skuEntries
+    .filter((e): e is SkuEntry & { price: number } => e.price !== null)
+    .map((e) => ({
+      sku: e.sku,
+      description: e.description,
+      unitPrice: e.price,
+      discountAmount: e.discountAmount,
+      quantity: 1,
+    }));
 
-  const items: ParsedItem[] = [];
-  let priceIdx = 0;
+  return mergeBySku(priced);
+}
 
-  for (const entry of skuEntries) {
-    if (entry.inlinePrice !== null) {
-      items.push({ sku: entry.sku, description: entry.description, unitPrice: entry.inlinePrice, discountAmount: entry.discountAmount });
+/**
+ * Costco prints each unit of a multi-buy on its own line rather than using a
+ * "2 @ 12.99" format, so buying two of something yields two identical rows.
+ * SKU is the canonical product identifier — descriptions are OCR-noisy and
+ * the *same* product can read differently on two lines (a real receipt had
+ * SKU 1518783 as both "CUCNT WIN" and "KS COCNT TR"). So lines are merged on
+ * SKU, never on description.
+ *
+ * Grouping is on SKU **and** unit price together. Same SKU at the same price
+ * is unambiguously the same product bought N times → merge, summing quantity
+ * and discounts. Same SKU at *different* prices is left as separate rows,
+ * because collapsing those would force us to invent a single unit price and
+ * would silently misstate the line total.
+ */
+function mergeBySku(items: ParsedItem[]): ParsedItem[] {
+  const merged = new Map<string, ParsedItem>();
+
+  for (const item of items) {
+    // Price is part of the key, not just the SKU — see doc comment above.
+    const key = `${item.sku}|${item.unitPrice.toFixed(2)}`;
+    const existing = merged.get(key);
+
+    if (existing) {
+      existing.quantity += item.quantity;
+      // Discounts are per-line, so they add up across the merged lines.
+      existing.discountAmount += item.discountAmount;
     } else {
-      if (priceIdx >= cappedPrices.length) continue;
-      const price    = cappedPrices[priceIdx];
-      const discount = savingsMap.get(priceIdx) ?? 0;
-      priceIdx++;
-      items.push({ sku: entry.sku, description: entry.description, unitPrice: price, discountAmount: discount });
+      // First occurrence wins the description — arbitrary but stable, and
+      // no more trustworthy than any later OCR read of the same product.
+      merged.set(key, { ...item });
     }
   }
 
-  return items;
+  return [...merged.values()];
 }

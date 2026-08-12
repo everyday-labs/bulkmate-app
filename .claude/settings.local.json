@@ -133,7 +133,10 @@
       "Bash(security find-identity *)",
       "Bash(lsof -ti:8090)",
       "Bash(lsof -ti:8091)",
-      "Bash(echo \"typecheck exit: $?\")"
+      "Bash(echo \"typecheck exit: $?\")",
+      "Bash(cp .xcode.env.local .xcode.env.local.bak)",
+      "Bash(cat)",
+      "Bash(/opt/homebrew/bin/node --version)"
     ]
   }
 }

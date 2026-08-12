@@ -1,3 +1,13 @@
 .DS_Store
 *.log
 *.pdf
+
+# Apple signing / auth private keys — never commit these.
+# AuthKey_*.p8 is the Sign in with Apple key used to mint the Supabase
+# client-secret JWT (see costco-backend/scripts/generate-apple-client-secret.mjs).
+# Apple lets you download it exactly once, and anyone holding it can issue
+# tokens for this Team ID.
+*.p8
+AuthKey_*.p8
+*.mobileprovision
+*.p12
