@@ -67,9 +67,9 @@ export default function RegisterScreen() {
         {/* ── Brand mark ── */}
         <View style={styles.brandSection}>
           <View style={styles.logoMark}>
-            <Text style={styles.logoMarkText}>C</Text>
+            <Text style={styles.logoMarkText}>B</Text>
           </View>
-          <Text style={styles.wordmark}>COSTCO</Text>
+          <Text style={styles.wordmark}>BULKMATE</Text>
           <Text style={styles.tagline}>Start tracking your savings</Text>
         </View>
 
