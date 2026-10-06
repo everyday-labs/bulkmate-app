@@ -69,6 +69,22 @@ export default function LoginScreen() {
         posthog?.capture('sign_in_failed', { sign_in_method: 'apple', error: error.message });
         Alert.alert('Apple sign-in failed', error.message);
       } else {
+        // Apple only returns the name on the user's first-ever Apple sign-in,
+        // and never puts it in the ID token, so the signup trigger can't see
+        // it. Save it now; `is first_name null` keeps a name the user already
+        // set from being overwritten.
+        const { givenName, familyName } = credential.fullName ?? {};
+        if (givenName || familyName) {
+          await supabase
+            .from('profiles')
+            .update({
+              first_name: givenName ?? null,
+              last_name: familyName ?? null,
+              display_name: [givenName, familyName].filter(Boolean).join(' '),
+            })
+            .eq('id', data.user.id)
+            .is('first_name', null);
+        }
         posthog?.identify(
           data.user.id,
           data.user.email ? { email: data.user.email } : undefined,
