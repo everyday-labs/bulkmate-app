@@ -6,6 +6,7 @@ import * as Notifications from 'expo-notifications';
 import NetInfo from '@react-native-community/netinfo';
 import { PostHogErrorBoundary, PostHogProvider } from 'posthog-react-native';
 import { posthog } from '../lib/posthog';
+import { signOutOfGoogle } from '../lib/googleSignIn';
 import { useAuth } from '../hooks/useAuth';
 import { drainQueue } from '../lib/receiptUpload';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
@@ -46,6 +47,7 @@ function RootLayoutInner() {
     if (!user) {
       if (identifiedUserIdRef.current !== null) {
         posthog?.reset();
+        signOutOfGoogle();
         identifiedUserIdRef.current = null;
       }
       return;
@@ -72,9 +74,11 @@ function RootLayoutInner() {
   useEffect(() => {
     if (loading) return;
     const inAuthGroup = segments[0] === '(auth)';
+    // Verifying a reset code signs the user in; let them finish setting the new password.
+    const resettingPassword = inAuthGroup && (segments as string[])[1] === 'forgot-password';
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/login');
-    } else if (session && inAuthGroup) {
+    } else if (session && inAuthGroup && !resettingPassword) {
       router.replace('/(tabs)');
     }
   }, [session, loading, segments, router]);
