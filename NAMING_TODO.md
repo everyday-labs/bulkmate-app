@@ -117,7 +117,7 @@ Use it in emails, website, and store listing.
 - [x] **PostHog** organization → "Everyday Labs", project → "Bulkmate" (2026-10-07).
 - [x] **Expo / EAS** project display name → "Bulkmate" (slug stays `costco-app`). Checked
       2026-10-07: comes from `app.json` `expo.name`, already "Bulkmate"; nothing to change.
-- [ ] **RapidAPI** app name → "Bulkmate".
+- [x] **RapidAPI** app name → "Bulkmate" (2026-10-07).
 - [x] **Open Food Facts** User-Agent `Bulkmate/1.0 (Everyday Labs; hello@everyday-labs.org)` —
       contact switched + `barcode-lookup` redeployed 2026-10-07.
 - [ ] **USDA FoodData Central** API key registration — app/org name.
