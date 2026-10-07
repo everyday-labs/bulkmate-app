@@ -201,6 +201,12 @@ truth regardless of whether the push arrived.
 
 ## Brevo (email + SMS)
 
+> **v1 ships email only (decided 2026-10-06).** The SMS path below is built but paused: the
+> `weekly-price-texts` cron job is unscheduled, the `weekly-price-texts` and `phone-verification`
+> functions are not deployed, and the app hides the toggle behind `SMS_ALERTS_ENABLED` in
+> `costco-mobile/lib/features.ts`. US texting needs a registered sender number and paid credits.
+> Re-enabling steps are in `migrations/20261007000002_pause_sms_for_v1.sql`.
+
 **What it's for:** Price-drop alerts outside the app:
 - **Email, immediately** — `price-match-check` sends one email per user per run
   ("You could get $X back on N items" + a *View in Bulkmate* button) for drops

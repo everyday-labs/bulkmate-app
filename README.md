@@ -9,7 +9,7 @@ An open-source, gamified warehouse-club companion app for iOS and Android, by **
 ## What it does
 
 - **Receipt OCR** — Scan a physical Costco receipt with your camera. The app parses every line item and stores it automatically.
-- **Sliding-window price matching** — If a price drops within 30 days of your purchase, you get a push notification with the refund amount.
+- **Sliding-window price matching** — If a price drops within 30 days of your purchase, you get a push notification and an email with the refund amount. Each drop notifies once (again only if the price falls further), and email can be turned off in Profile → Preferences or with the one-click unsubscribe link.
 - **Geo-fenced check-ins** — Check in when you're physically at a warehouse and earn stars toward your fan tier.
 - **Badge engine** — Unlock badges for milestones: first visit, five check-ins, rare warehouses, and more.
 - **Spend analytics** — Monthly spend chart, top items by cost, in-store savings vs. price-match savings breakdown.
@@ -18,12 +18,13 @@ An open-source, gamified warehouse-club companion app for iOS and Android, by **
 - **Check-in on receipt scan** — Scanning a receipt is proof you were at the warehouse, so it earns the same star as a GPS check-in, dated to the receipt's transaction date rather than the day you uploaded it. Scanning twice from one trip is a silent no-op, not a double award.
 - **Manual warehouse picker** — When the parser can't match a receipt's header to a known warehouse, a searchable picker lets you choose it by name, city, or ZIP. It's never required: the receipt is already saved, and "Can't find my warehouse" keeps it that way.
 - **Account deletion** — Delete your account and everything in it from inside the app: every receipt and scanned image, all items, price alerts, check-ins, stars, and badges.
+- **Sign in your way** — Email + password (confirmed with an 8-digit emailed code), Sign in with Apple, or Google. Forgot your password? Reset it in-app with an emailed code. Google and Apple sign-ups get their name filled in automatically; everyone else sees an optional, dismissible "What should we call you?" card on Home.
 
 ## Why these features exist
 
 Costco already has a real, generous price-adjustment policy — most members just don't track prices closely enough to use it. Every feature here traces back to a specific, well-known pain point of shopping at a warehouse club:
 
-- **Price-match window** — Costco will refund the difference if a price drops within 30 days, but that means remembering what you paid, when, and checking back manually. The sliding-window matcher does that watching for you and only interrupts you with a push when there's an actual refund on the table.
+- **Price-match window** — Costco will refund the difference if a price drops within 30 days, but that means remembering what you paid, when, and checking back manually. The sliding-window matcher does that watching for you and only interrupts you (push + email) when there's an actual refund on the table.
 - **Receipt tracking** — Costco receipts are long, itemized by SKU rather than plain product names, and easy to lose. OCR ingestion turns a photo into structured data once, instead of a spreadsheet you have to maintain by hand.
 - **Ingredient transparency** — Costco (like most retailers) doesn't surface NOVA processing scores, Nutri-Score, or additive detail on the product page or in-app — the kind of ingredient transparency apps like Yuka have made a mainstream expectation elsewhere. Open Food Facts already has strong Kirkland Signature/Costco-brand coverage (confirmed via direct lookups before this was built), so it's used as real, structured data rather than a rough keyword guess.
 - **"Which warehouse did I visit, and when"** — genuinely easy to lose track of across a family or multiple regular locations; geo-fenced check-ins turn that into an automatic, verifiable log instead of a guess.
@@ -60,8 +61,10 @@ Most reads (receipts, badges, profile) go straight from the app to Supabase via 
 | Mobile (iOS / Android) | React Native + Expo (Expo Router) |
 | Backend | Supabase Edge Functions (Deno / TypeScript) |
 | Database | PostgreSQL via Supabase, no ORM (raw SQL migrations) |
-| Auth | Supabase Auth (email/password + Sign in with Apple), enforced via Row Level Security |
+| Auth | Supabase Auth (email/password with emailed codes, Sign in with Apple, Google Sign-In), enforced via Row Level Security |
 | Push notifications | Expo Push API |
+| Email | Brevo (auth codes via SMTP relay; price-drop alerts via API), sent from `noreply@everyday-labs.org` |
+| Website | [everyday-labs.org/bulkmate](https://everyday-labs.org/bulkmate/) — GitHub Pages, repo `everyday-labs/everyday-labs.github.io` (product pages, privacy policy, support, feedback form, universal links) |
 | Analytics, error tracking & session replay | PostHog |
 
 ## External APIs
@@ -75,7 +78,8 @@ No official Costco API exists, so pricing, ingredient, and OCR data are sourced 
 | **Open Food Facts** | Primary ingredient classification — real NOVA processing group, Nutri-Score (A–E), detected additive E-codes, and high/low nutrient-level flags for the good/watch/avoid ingredient breakdown | `barcode-lookup` | None (descriptive User-Agent required) | Free |
 | **USDA FoodData Central** | Fallback ingredient source when Open Food Facts has no match for a UPC — raw ingredient text only, classified with a weaker keyword heuristic | `barcode-lookup` | API key (query param) | Free |
 | **Expo Push API** | Delivers the "price drop" push notification when a price-match alert fires | `price-match-check` | None (per-device push token) | Free |
-| **PostHog** | Usage analytics, funnels, session replay (masked), and error tracking — mobile client events plus every Edge Function's caught exceptions, all in one project | Mobile app-wide + all 5 Edge Functions | Project token | Free tier |
+| **Brevo** | Price-drop alert emails (SMS is built but paused for v1) | `price-match-check` | API key (header) | Free up to 300 emails/day |
+| **PostHog** | Usage analytics, funnels, session replay (masked), and error tracking — mobile client events plus every Edge Function's caught exceptions, all in one project | Mobile app-wide + every Edge Function | Project token | Free tier |
 
 Every client except Google Vision is built to **never throw** — a failure degrades gracefully (null/empty result, no ingredients card, no crash) rather than taking down the rest of the request. Vision is the one intentional exception: OCR is the entire input to the receipt pipeline, not an enrichment, so there's nothing sensible to fall back to.
 
