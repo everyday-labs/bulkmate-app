@@ -2,7 +2,7 @@
 
 *(Renamed from "Costco Companion" before beta distribution — see the README's naming note.)*
 
-A gamified, open-source Costco membership companion app (iOS/Android, mobile-only for v1). It turns the boring parts of being a Costco member — tracking receipts, catching price drops, remembering which warehouse you visited — into something closer to a collection game. Not affiliated with Costco.
+A gamified, open-source Costco membership companion app (iOS/Android, mobile-only for v1), published by **Everyday Labs**. It turns the boring parts of being a Costco member — tracking receipts, catching price drops, remembering which warehouse you visited — into something closer to a collection game. Not affiliated with Costco.
 
 ---
 

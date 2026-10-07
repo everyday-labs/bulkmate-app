@@ -1,8 +1,8 @@
 # Bulkmate — Privacy Policy
 
-**Last updated: 12 August 2026**
+**Last updated: 6 October 2026**
 
-Bulkmate is an independent app that helps you track Costco receipts, catch price-match
+Bulkmate is an independent app by **Everyday Labs** that helps you track Costco receipts, catch price-match
 windows, and earn rewards for warehouse visits. It is not affiliated with, endorsed by, or
 sponsored by Costco Wholesale Corporation.
 
@@ -11,7 +11,8 @@ It is written to be specific rather than reassuring — if something is stored, 
 
 ## Who is responsible
 
-Bulkmate is a solo, open-source side project. For any privacy question or request, contact
+Bulkmate is published by **Everyday Labs**, an independent studio, which is responsible for
+the data described in this policy. For any privacy question or request, contact
 **balajic0623@gmail.com**.
 
 ## What is collected
@@ -19,8 +20,12 @@ Bulkmate is a solo, open-source side project. For any privacy question or reques
 ### Account details
 - **Email address** — required to create an account. If you use Sign in with Apple and choose
   *Hide My Email*, only Apple's private relay address is received; your real address is not.
-- **First name, last name, phone number, display name** — optional, only if you enter them on
-  the Edit Profile screen. Nothing is pre-filled or imported.
+- **Name** — if you sign in with Google or Apple, the name on that account is saved as your
+  first and last name (Apple only shares it on your first sign-in, and only if you allow it).
+  You can change or clear it at any time on the Edit Profile screen. Email sign-ups start
+  with no name.
+- **Phone number** — optional, only if you enter it on the Edit Profile screen. Nothing in the
+  app uses it yet.
 
 ### Receipts
 - **The receipt photo you take**, stored as an image file.
@@ -56,6 +61,8 @@ Bulkmate does not sell your data. It is processed by these services:
 | Service | What it receives | Why |
 |---|---|---|
 | **Supabase** | All account, receipt, check-in and profile data | Database, authentication, and file storage — this is where the app's data lives |
+| **Google Sign-In / Sign in with Apple** | Only if you choose them: they confirm your identity and share your email and name with the app | Signing in without a password |
+| **Google (Gmail)** | Your email address and a one-time code | Delivering sign-up confirmation and password reset emails |
 | **Google Cloud Vision** | Your receipt images | Optical character recognition, to read items and prices off the photo |
 | **PostHog** | Usage events, error reports, masked session replays | Understanding how the app is used and diagnosing failures |
 | **Expo Push / Apple APNs** | Your push token and notification contents | Delivering push notifications |

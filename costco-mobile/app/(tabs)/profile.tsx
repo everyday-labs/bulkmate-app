@@ -524,16 +524,16 @@ export default function ProfileScreen() {
         <View style={styles.aboutCard}>
           <View style={styles.aboutBuiltBy}>
             <View style={styles.aboutAvatar}>
-              <TinkerIllustration size={48} />
+              <MakerIllustration size={48} />
             </View>
             <View style={styles.aboutBuiltByText}>
-              <Text style={styles.aboutName}>Tinker</Text>
-              <Text style={styles.aboutRole}>Builder · Tech Enthusiast · Dota Noob</Text>
+              <Text style={styles.aboutName}>Everyday Labs</Text>
+              <Text style={styles.aboutRole}>Independent · Non-commercial · Open source</Text>
             </View>
           </View>
 
           <Text style={styles.aboutMission}>
-            I build side projects in my spare time to solve personal pain points and share them with the world. This app started because I kept missing Costco price-match windows and losing receipts — so I built something about it.
+            Everyday Labs builds small, useful apps for everyday problems and shares them openly. Bulkmate exists because receipts get lost and Costco price-match windows get missed.
           </Text>
 
           <View style={styles.aboutDivider} />
@@ -545,11 +545,11 @@ export default function ProfileScreen() {
           </View>
 
           <Text style={styles.aboutDisclaimer}>
-            Bulkmate is an independent app and is not affiliated with, endorsed by, or sponsored by Costco Wholesale Corporation. “Costco” and “Kirkland Signature” are trademarks of Costco Wholesale Corporation, used here only to describe the receipts and warehouses this app works with. Provided as-is — no warranties, no liability. Prices shown are crowdsourced and may not be accurate.
+            Bulkmate is an independent app by Everyday Labs and is not affiliated with, endorsed by, or sponsored by Costco Wholesale Corporation. “Costco” and “Kirkland Signature” are trademarks of Costco Wholesale Corporation, used here only to describe the receipts and warehouses this app works with. Provided as-is — no warranties, no liability. Prices shown are crowdsourced and may not be accurate.
           </Text>
         </View>
 
-        <Text style={styles.version}>Bulkmate · v1.0.0 · MIT License</Text>
+        <Text style={styles.version}>Bulkmate · v1.0.0 · © 2026 Everyday Labs · MIT License</Text>
       </View>
     </ScrollView>
   );
@@ -581,9 +581,9 @@ function MemberBadgeIllustration({ size = 48 }: { size?: number }) {
   );
 }
 
-// Minimal flat illustration for the "About" card — a person tinkering with a
-// gear/robotic part, standing in for an actual photo of "Tinker".
-function TinkerIllustration({ size = 48 }: { size?: number }) {
+// Minimal flat illustration for the "About" card — a person working on a
+// gear/robotic part, standing in for an Everyday Labs logo until one exists.
+function MakerIllustration({ size = 48 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 48 48">
       {/* head + shoulders */}
