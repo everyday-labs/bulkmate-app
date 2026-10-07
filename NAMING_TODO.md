@@ -27,7 +27,7 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
       uses "Start tracking your savings").
 - [ ] **Push notification copy** (`price-match-check/index.ts:376`) — title is "Price Drop — You may
       be owed $X". iOS already shows "Bulkmate" as the app name above it; confirm wording.
-- [ ] **CLAUDE.md Release build commands** still reference `costcomobile.xcworkspace` / scheme
+- [x] **CLAUDE.md Release build commands** still reference `costcomobile.xcworkspace` / scheme
       `costcomobile` / `costcomobile.app` — the iOS project is now `Bulkmate.xcworkspace` / scheme
       `Bulkmate`. Fix the commands.
 - [ ] `costco-backend/scripts/generate-apple-client-secret.mjs` example comment uses the old client
@@ -47,7 +47,7 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 
 ## 2. Emails (Supabase → Authentication → Emails)
 
-- [ ] **SMTP sender name** = `Bulkmate` (set) — or "Bulkmate by Everyday Labs"? Pick per the pattern.
+- [x] **SMTP sender name** = `Bulkmate` (set) — or "Bulkmate by Everyday Labs"? Pick per the pattern.
 - [x] **SMTP port** — was `453` (typo), fixed to `465` 2026-10-06; sign-up test passed (HTTP 200, email sent).
 - [x] **Confirm sign up** template — repo version has the Everyday Labs footer; re-paste
       `costco-backend/supabase/templates/confirm-signup.html`. Subject → `Your Bulkmate code: {{ .Token }}`.
@@ -91,6 +91,10 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 
 ## 5. Other services
 
+- [x] **Claude artifacts** — all 11 Bulkmate artifacts renamed from "Costco Companion" and updated
+      2026-10-06. Note: the 5 walkthrough artifacts are shared by link with a **pinned version**;
+      move the share pin to the latest version in each one's Share menu or viewers keep the old copy.
+
 - [ ] **Supabase** project name (dashboard) — "Bulkmate".
 - [ ] **PostHog** organization → "Everyday Labs", project → "Bulkmate".
 - [ ] **Expo / EAS** project display name → "Bulkmate" (slug stays `costco-app`).
@@ -101,12 +105,12 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 
 ## 6. Web presence (after the site exists)
 
-- [ ] GitHub org `everyday-labs` — display name, description, avatar, website link.
-- [ ] Site repo `everyday-labs/everyday-labs.github.io` — home, `/bulkmate`, `/bulkmate/privacy`,
-      `/bulkmate/support`.
+- [x] GitHub org `everyday-labs` — display name, description (avatar + website link still open).
+- [x] Site repo `everyday-labs/everyday-labs.github.io` — home, `/bulkmate` (5 product pages from the
+      Claude walkthrough), `/bulkmate/privacy`, `/bulkmate/support`, `/bulkmate/feedback` (2026-10-06).
 - [ ] Transfer `balajic0623/costco-app` → `everyday-labs/` (maybe rename to `bulkmate`);
       `git remote set-url origin …` locally.
-- [ ] Domain (`everyday-labs.org` looked available on 2026-10-06) → DNS, HTTPS, verified domain,
+- [x] Domain `everyday-labs.org` bought 2026-10-06 → DNS, HTTPS, verified domain done. Still open:
       `hello@` forwarding → then switch SMTP/contact email to it and update every place above that
       lists hello@everyday-labs.org.
 - [ ] Link the website from: README, Profile → About card, App Store listing, Google consent screen,

@@ -19,6 +19,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { requestAndSavePushToken } from '../../lib/notifications';
 import { posthog } from '../../lib/posthog';
+import { SMS_ALERTS_ENABLED } from '../../lib/features';
 import { useTheme, type ThemeMode } from '../../contexts/ThemeContext';
 import type { ColorScheme } from '../../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../../constants/theme';
@@ -490,31 +491,35 @@ export default function ProfileScreen() {
             />
           </View>
 
-          <View style={styles.rowSeparator} />
+          {SMS_ALERTS_ENABLED && (
+            <>
+              <View style={styles.rowSeparator} />
 
-          <View style={styles.settingsRow}>
-            <View style={styles.rowIconWrap}>
-              <Text style={styles.rowIcon}>💬</Text>
-            </View>
-            <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>Weekly Texts</Text>
-              <Text style={styles.rowSubtitle} numberOfLines={2}>
-                {profile?.phone_verified_at && profile.phone_number
-                  ? `Fridays 3 PM PT to ${profile.phone_number}`
-                  : 'Fridays 3 PM PT · verify your number to turn on'}
-              </Text>
-            </View>
-            <Switch
-              value={profile?.sms_alerts_enabled ?? false}
-              onValueChange={(on) => {
-                // Texts need a verified number; the server enforces this too.
-                if (on && !profile?.phone_verified_at) router.push('/verify-phone');
-                else updateAlertPref({ sms_alerts_enabled: on });
-              }}
-              disabled={!profile}
-              trackColor={{ true: Colors.costcoRedSolid, false: Colors.gray[300] }}
-            />
-          </View>
+              <View style={styles.settingsRow}>
+                <View style={styles.rowIconWrap}>
+                  <Text style={styles.rowIcon}>💬</Text>
+                </View>
+                <View style={styles.rowContent}>
+                  <Text style={styles.rowTitle}>Weekly Texts</Text>
+                  <Text style={styles.rowSubtitle} numberOfLines={2}>
+                    {profile?.phone_verified_at && profile.phone_number
+                      ? `Fridays 3 PM PT to ${profile.phone_number}`
+                      : 'Fridays 3 PM PT · verify your number to turn on'}
+                  </Text>
+                </View>
+                <Switch
+                  value={profile?.sms_alerts_enabled ?? false}
+                  onValueChange={(on) => {
+                    // Texts need a verified number; the server enforces this too.
+                    if (on && !profile?.phone_verified_at) router.push('/verify-phone');
+                    else updateAlertPref({ sms_alerts_enabled: on });
+                  }}
+                  disabled={!profile}
+                  trackColor={{ true: Colors.costcoRedSolid, false: Colors.gray[300] }}
+                />
+              </View>
+            </>
+          )}
 
           <View style={styles.rowSeparator} />
 
