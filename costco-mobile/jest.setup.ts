@@ -1,9 +1,13 @@
 // Global test setup: replaces native modules and network clients with
 // in-memory fakes so screens can render in Node. Per-test data goes through
 // test-utils/supabaseMock.ts and test-utils/routerMock.tsx.
-import { act } from '@testing-library/react-native';
+import { act, configure } from '@testing-library/react-native';
 import { resetSupabaseMock } from './test-utils/supabaseMock';
 import { resetRouterMock } from './test-utils/routerMock';
+
+// waitFor/findBy wait up to 5s (default 1s): CI runners are much slower than
+// a laptop, and debounced/timed UI (search, prompts) needs the headroom.
+configure({ asyncUtilTimeout: 5000 });
 
 process.env.EXPO_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
 process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY = 'anon-key';

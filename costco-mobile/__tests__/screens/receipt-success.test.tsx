@@ -236,7 +236,7 @@ describe('ReceiptSuccessScreen', () => {
       seed();
       mockTable('profiles', { data: null, error: null });
       await renderWithProviders(<ReceiptSuccessScreen />);
-      fireEvent.press(await screen.findByText('Enable Notifications', {}, { timeout: 4000 }));
+      fireEvent.press(await screen.findByText('Enable Notifications'));
       await waitFor(() => expect(Notifications.getExpoPushTokenAsync).toHaveBeenCalled());
       expect(await AsyncStorage.getItem('push_permission_prompted')).toBe('true');
       await waitFor(() =>
@@ -247,7 +247,7 @@ describe('ReceiptSuccessScreen', () => {
     it('can be dismissed', async () => {
       seed();
       await renderWithProviders(<ReceiptSuccessScreen />);
-      fireEvent.press(await screen.findByText('Not Now', {}, { timeout: 4000 }));
+      fireEvent.press(await screen.findByText('Not Now'));
       await waitFor(() => expect(screen.queryByText('Stay in the loop')).toBeNull());
       expect(await AsyncStorage.getItem('push_permission_prompted')).toBe('true');
       expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
