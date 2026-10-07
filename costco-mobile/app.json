@@ -14,7 +14,10 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationAlwaysUsageDescription": "This app uses your location to confirm you're at a warehouse when you check in.",
         "NSHumanReadableCopyright": "© 2026 Everyday Labs"
-      }
+      },
+      "associatedDomains": [
+        "applinks:everyday-labs.org"
+      ]
     },
     "android": {
       "adaptiveIcon": {
