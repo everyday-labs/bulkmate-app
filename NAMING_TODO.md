@@ -54,16 +54,24 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
       `costco-backend/supabase/templates/confirm-signup.html`. Subject → `Your Bulkmate code: {{ .Token }}`.
 - [x] **Reset password** template — re-paste `templates/reset-password.html`; subject
       `Your Bulkmate password reset code`.
-- [ ] **Other templates still on Supabase defaults** — Magic Link, Change Email Address, Invite User,
-      Reauthentication. Unused today, but they'd go out with generic text and a broken link. Brand
-      them the same way, or confirm they can't be triggered.
+- [ ] **Other templates still on Supabase defaults** — unused by the app, but three can still be
+      triggered (Magic Link by anyone with the anon key; Change Email + Reauthentication by any
+      signed-in user via the API; Invite is service-role only). Branded code-based versions written
+      2026-10-07 — **paste into the dashboard** (template body + subject):
+  - [ ] Magic Link ← `templates/magic-link.html`, subject `Your Bulkmate sign-in code: {{ .Token }}`
+  - [ ] Change Email Address ← `templates/change-email.html`, subject `Confirm your new Bulkmate email`
+  - [ ] Invite User ← `templates/invite.html`, subject `You're invited to Bulkmate`
+  - [ ] Reauthentication ← `templates/reauthentication.html`, subject `Your Bulkmate confirmation code`
 - [x] **Site URL** — set to `bulkmate://` 2026-10-06 (could point at everyday-labs.org instead).
 - [ ] **Gmail account display name** for balajic0623@gmail.com — shows in some clients next to the
       address. Set it to match (Gmail → Settings → Accounts → "Send mail as").
-- [ ] **Sign in with Apple private relay** — users who pick "Hide My Email" get emails at
+- [x] **Sign in with Apple private relay** — users who pick "Hide My Email" get emails at
       `@privaterelay.appleid.com`, and Apple **drops** mail from senders not registered in
       Apple Developer → Certificates, IDs & Profiles → Services → *Sign in with Apple for Email
-      Communication*. Register `balajic0623@gmail.com` (or the future domain) there.
+      Communication*. Domain `everyday-labs.org` registered 2026-10-07, SPF green (needs
+      `include:spf.brevo.com` in the SPF record — keep it if SPF is ever edited).
+  - [ ] Test: Apple sign-in with Hide My Email → send a Brevo test email to that user's relay
+        address (Supabase → Authentication → Users) → confirm it arrives.
 - [ ] Send yourself one of each email and check sender, subject, body, footer on phone + desktop.
 
 ## 3. Apple
@@ -114,7 +122,7 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 - [x] Domain `everyday-labs.org` bought 2026-10-06 → DNS, HTTPS, verified domain done. Still open:
       `hello@` forwarding → then switch the contact email to it and update every place above that
       lists balajic0623@gmail.com.
-- [x] **Brevo sending domain** — DKIM (`brevo1/brevo2._domainkey` CNAMEs) + DMARC
+- [x] **Brevo sending domain** — SPF (`v=spf1 include:_spf.mx.cloudflare.net include:spf.brevo.com ~all`, 2026-10-07) + DKIM (`brevo1/brevo2._domainkey` CNAMEs) + DMARC
       (`_dmarc` TXT `v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com`) live 2026-10-06; test
       email received. Later: move to `p=quarantine` after ~2 weeks of clean Brevo DMARC reports —
       but not if Gmail will send as `hello@everyday-labs.org` (no domain DKIM → would fail).
