@@ -30,7 +30,7 @@ There is **no monorepo and no NestJS/AWS Lambda backend** — that was the origi
 | Database | PostgreSQL via Supabase, no ORM (raw SQL migrations + `@supabase/supabase-js`) |
 | Auth | Supabase Auth — email/password (8-digit emailed confirmation + reset codes), Sign in with Apple, Google Sign-In (`@react-native-google-signin/google-signin`, native ID token → `signInWithIdToken`); RLS enforces per-user data access |
 | Push notifications | Expo Push API |
-| Email | Brevo — Supabase Auth sends codes through Brevo's SMTP relay; `price-match-check` sends price-drop emails through Brevo's API; sender `noreply@everyday-labs.org` (domain authenticated with DKIM) |
+| Email | Brevo — Supabase Auth sends codes through Brevo's SMTP relay; `price-match-check` sends price-drop emails through Brevo's API; sender `noreply@everyday-labs.org` (domain authenticated with DKIM + DMARC `p=none`) |
 | Website | `everyday-labs.org` — GitHub Pages, repo `everyday-labs/everyday-labs.github.io` (local `~/Desktop/everyday-labs.github.io`): Bulkmate product pages, privacy policy, support, feedback form, universal-link file |
 | OCR | Google Cloud Vision (`DOCUMENT_TEXT_DETECTION`), called server-side from the `ingest-receipt` function |
 | Pricing/barcode data | RapidAPI `costco-live-data.p.rapidapi.com` |

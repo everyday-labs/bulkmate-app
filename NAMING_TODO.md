@@ -10,7 +10,8 @@ one, consistently. Work through it top to bottom; tick items as you go.
 | **Bulkmate** | The app itself — anything the user sees as "the product" | Home screen icon name, email sender name, push notifications, App Store app name |
 | **Everyday Labs** | The publisher — legal, copyright, "who is responsible" | `© 2026 Everyday Labs`, privacy policy, terms, App Store copyright, GitHub org, website |
 | ~~Tinker~~ | **Retired from public copy (2026-10-06).** All public text is third person, as Everyday Labs | — |
-| **hello@everyday-labs.org** | The one public contact address (until a domain email exists) | Privacy policy, support page, SMTP sender, store listings, OAuth consent screen |
+| **noreply@everyday-labs.org** | Sender address for all outgoing email (send-only, Brevo, DKIM + DMARC) | Supabase Auth SMTP sender, price-drop emails (`_shared/brevo.ts`) |
+| **hello@everyday-labs.org** | The one public contact address (until `hello@` forwarding exists) | Privacy policy, support page, store listings, OAuth consent screen |
 
 **Never rename** (would break things): bundle ID `com.twonk0609.bulkmate`, Expo `slug: costco-app`,
 EAS owner `twonk0609s-team`, ASC app id `6800910077`. These are invisible to users.
@@ -111,7 +112,11 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 - [ ] Transfer `balajic0623/costco-app` → `everyday-labs/` (maybe rename to `bulkmate`);
       `git remote set-url origin …` locally.
 - [x] Domain `everyday-labs.org` bought 2026-10-06 → DNS, HTTPS, verified domain done. Still open:
-      `hello@` forwarding → then switch SMTP/contact email to it and update every place above that
+      `hello@` forwarding → then switch the contact email to it and update every place above that
       lists hello@everyday-labs.org.
+- [x] **Brevo sending domain** — DKIM (`brevo1/brevo2._domainkey` CNAMEs) + DMARC
+      (`_dmarc` TXT `v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com`) live 2026-10-06; test
+      email received. Later: move to `p=quarantine` after ~2 weeks of clean Brevo DMARC reports —
+      but not if Gmail will send as `hello@everyday-labs.org` (no domain DKIM → would fail).
 - [ ] Link the website from: README, Profile → About card, App Store listing, Google consent screen,
       privacy policy, email template footers.
