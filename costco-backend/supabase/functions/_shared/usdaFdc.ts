@@ -55,6 +55,8 @@ export async function fetchProductByUpc(upc: string, apiKey: string): Promise<Fd
     }
 
     const json = await res.json();
+    // Untyped external JSON; fields are validated where they're read below.
+    // deno-lint-ignore no-explicit-any
     const foods: any[] = json?.foods ?? [];
     if (!foods.length) return null;
 

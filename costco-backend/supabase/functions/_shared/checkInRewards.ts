@@ -1,6 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-type SupabaseClient = ReturnType<typeof createClient>;
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const FAN_TIERS = [
   { min: 21, name: 'ExecutiveExplorer' },
@@ -47,11 +45,15 @@ export async function evaluateBadges(
 
   const totalCheckIns = totalCheckInsRes.count ?? 0;
   const distinctWarehouses = new Set(
-    (distinctWarehousesRes.data ?? []).map((r: any) => r.warehouse_id),
+    (distinctWarehousesRes.data ?? []).map((r: { warehouse_id: string }) => r.warehouse_id),
   ).size;
 
   const alreadyEarned = new Set(
-    (existingBadgesRes.data ?? []).map((r: any) => r.badges?.trigger_key).filter(Boolean),
+    (existingBadgesRes.data ?? [])
+      // badges is a many-to-one join: an object at runtime, though the untyped
+      // client infers an array from the select string.
+      .map((r: { badges: unknown }) => (r.badges as { trigger_key?: string } | null)?.trigger_key)
+      .filter(Boolean),
   );
 
   const badgeDefs: { id: string; trigger_key: string; name: string; icon: string | null }[] =

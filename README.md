@@ -117,6 +117,20 @@ Scan the QR code in the **Expo Go** app on your phone to run it instantly.
 
 You'll need a Supabase project with the migrations in `costco-backend/supabase/migrations/` applied, and the Edge Functions in `costco-backend/supabase/functions/` deployed.
 
+### Tests
+
+```bash
+# Mobile (costco-mobile/)
+npx tsc --noEmit
+npm test                     # Jest unit tests
+npm run check:contrast       # WCAG contrast check of the color palette
+
+# Edge Functions (costco-backend/supabase/functions/) — needs Deno 2, or prefix with `npx`
+deno check . && deno lint && deno test --allow-env
+```
+
+CI runs all of these on every pull request (`.github/workflows/ci.yml`). Device-only behaviour (camera, GPS, push, sign-in) is covered by the manual checklist in `TEST_PLAN.md`.
+
 ```bash
 # Backend — the Supabase CLI works; deploys do not need the dashboard
 supabase db push                    # apply migrations to the linked project

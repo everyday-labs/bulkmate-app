@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { fetchFromRapidApi } from '../_shared/rapidApi.ts';
 import { sendExpoPushNotifications, type ExpoPushMessage } from '../_shared/expoPush.ts';
@@ -20,6 +20,18 @@ type ItemToCheck = {
   description: string;
   net_paid: number; // unit_price - discount_amount
 };
+
+// A receipt_items row as selected below. In sweep mode `receipts` is a
+// many-to-one join — an object at runtime, though the untyped client infers
+// an array from the select string.
+type ReceiptItemRow = {
+  id: string;
+  sku: string;
+  description: string | null;
+  unit_price: number;
+  discount_amount: number | null;
+};
+type SweepItemRow = ReceiptItemRow & { receipt_id: string; receipts: unknown };
 
 type PriceResult = {
   current_price: number;   // best price to compare against (lowest of API + ledger)
@@ -48,7 +60,7 @@ const PRICE_CACHE_TTL_HOURS = 72;
 // ---------------------------------------------------------------------------
 
 async function fetchFromOCRLedger(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   sku: string,
 ): Promise<number | null> {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -64,7 +76,9 @@ async function fetchFromOCRLedger(
   if (!data || data.length < 3) return null; // need at least 3 data points to be meaningful
 
   const netPrices = data
-    .map((r: any) => Number(r.unit_price) - Number(r.discount_amount ?? 0))
+    .map((r: { unit_price: number; discount_amount: number | null }) =>
+      Number(r.unit_price) - Number(r.discount_amount ?? 0)
+    )
     .sort((a: number, b: number) => a - b);
 
   const mid = Math.floor(netPrices.length / 2);
@@ -86,7 +100,7 @@ async function fetchFromOCRLedger(
 // ---------------------------------------------------------------------------
 
 async function resolvePrice(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   sku: string,
   apiKey: string,
 ): Promise<PriceResult | null> {
@@ -205,7 +219,7 @@ async function resolvePrice(
 // ---------------------------------------------------------------------------
 
 async function updateReceiptLedger(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   sku: string,
   netPaid: number,
 ) {
@@ -269,10 +283,10 @@ serve(async (req) => {
 
       if (error) throw error;
       items = (data ?? [])
-        .map((r: any) => ({
+        .map((r: SweepItemRow) => ({
           receipt_item_id: r.id,
           receipt_id: r.receipt_id,
-          user_id: r.receipts?.user_id,
+          user_id: (r.receipts as { user_id?: string } | null)?.user_id ?? '',
           sku: r.sku,
           description: r.description ?? r.sku,
           net_paid: Number(r.unit_price) - Number(r.discount_amount ?? 0),
@@ -286,7 +300,7 @@ serve(async (req) => {
         .eq('receipt_id', receipt_id);
 
       if (error) throw error;
-      items = (data ?? []).map((r: any) => ({
+      items = (data ?? []).map((r: ReceiptItemRow) => ({
         receipt_item_id: r.id,
         receipt_id,
         user_id,
@@ -308,7 +322,7 @@ serve(async (req) => {
     type NotifyPrefs = { pushToken: string | null; emailAlerts: boolean };
     const prefsCache = new Map<string, NotifyPrefs>();
 
-    async function getNotifyPrefs(uid: string): Promise<NotifyPrefs> {
+    const getNotifyPrefs = async (uid: string): Promise<NotifyPrefs> => {
       if (prefsCache.has(uid)) return prefsCache.get(uid)!;
       const { data } = await supabase
         .from('profiles')
@@ -321,7 +335,7 @@ serve(async (req) => {
       };
       prefsCache.set(uid, prefs);
       return prefs;
-    }
+    };
 
     let alertsCreated = 0;
     let noDataCount = 0;
