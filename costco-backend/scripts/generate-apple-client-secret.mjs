@@ -20,7 +20,7 @@
 //     --key ~/Downloads/AuthKey_ABC123XYZ.p8 \
 //     --key-id ABC123XYZ \
 //     --team-id XX3T25NCVV \
-//     --client-id com.twonk0609.costco-app
+//     --client-id com.twonk0609.bulkmate
 
 import { readFileSync } from 'node:fs';
 import { createSign, createPrivateKey } from 'node:crypto';
