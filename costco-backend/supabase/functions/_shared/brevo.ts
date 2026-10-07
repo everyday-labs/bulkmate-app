@@ -40,7 +40,7 @@ export async function sendBrevoEmail(email: BrevoEmail): Promise<boolean> {
   try {
     const res = await fetch(`${API}/smtp/email`, {
       method: 'POST',
-      headers: { 'api-key': key, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      headers: { 'api-key': key, 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
         sender: {
           email: Deno.env.get('BREVO_SENDER_EMAIL') ?? 'noreply@everyday-labs.org',
@@ -74,7 +74,11 @@ export async function sendBrevoEmail(email: BrevoEmail): Promise<boolean> {
  * one non-GSM character switches the whole message to UCS-2, which drops the
  * single-SMS limit from 160 to 70 characters.
  */
-export async function sendBrevoSms(recipient: string, content: string, tag: string): Promise<boolean> {
+export async function sendBrevoSms(
+  recipient: string,
+  content: string,
+  tag: string,
+): Promise<boolean> {
   const key = apiKey();
   if (!key) {
     console.warn('Brevo: BREVO_API_KEY not set, skipping SMS');
@@ -83,7 +87,7 @@ export async function sendBrevoSms(recipient: string, content: string, tag: stri
   try {
     const res = await fetch(`${API}/transactionalSMS/send`, {
       method: 'POST',
-      headers: { 'api-key': key, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      headers: { 'api-key': key, 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
         // Alphanumeric senders (max 11 chars) aren't allowed in every country
         // (e.g. the US needs a registered number) — set BREVO_SMS_SENDER to

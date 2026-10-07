@@ -5,12 +5,14 @@ const appJson = require('./app.json');
 // prebuild without one.
 const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 const googlePlugins = googleIosClientId
-  ? [[
-      '@react-native-google-signin/google-signin',
-      {
-        iosUrlScheme: `com.googleusercontent.apps.${googleIosClientId.replace('.apps.googleusercontent.com', '')}`,
-      },
-    ]]
+  ? [
+      [
+        '@react-native-google-signin/google-signin',
+        {
+          iosUrlScheme: `com.googleusercontent.apps.${googleIosClientId.replace('.apps.googleusercontent.com', '')}`,
+        },
+      ],
+    ]
   : [];
 
 module.exports = {

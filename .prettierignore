@@ -1,0 +1,19 @@
+# Generated / vendored
+node_modules/
+package-lock.json
+costco-mobile/ios/
+costco-mobile/android/
+costco-mobile/.expo/
+costco-mobile/dist/
+coverage/
+**/coverage/
+playwright-report/
+test-results/
+
+# Pasted verbatim into the Supabase dashboard — keep byte-identical
+costco-backend/supabase/templates/
+
+# Prose: Prettier would re-align every Markdown table
+*.md
+
+*.pdf

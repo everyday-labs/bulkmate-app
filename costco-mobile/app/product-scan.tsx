@@ -61,12 +61,14 @@ export default function ProductScanScreen() {
     setError(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const res = await fetch(`${SUPABASE_URL}/functions/v1/barcode-lookup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
+          Authorization: `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({ sku: data }),
       });
@@ -129,9 +131,7 @@ export default function ProductScanScreen() {
           <View style={[styles.corner, styles.cornerBL]} />
           <View style={[styles.corner, styles.cornerBR]} />
         </View>
-        <Text style={styles.frameHint}>
-          Align barcode or shelf tag number within the frame
-        </Text>
+        <Text style={styles.frameHint}>Align barcode or shelf tag number within the frame</Text>
       </View>
 
       {/* Status overlay */}
@@ -147,7 +147,10 @@ export default function ProductScanScreen() {
           <Text style={styles.errorText}>{error}</Text>
           <Pressable
             style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]}
-            onPress={() => { setError(null); hasScanned.current = false; }}
+            onPress={() => {
+              setError(null);
+              hasScanned.current = false;
+            }}
           >
             <Text style={styles.retryText}>Try Again</Text>
           </Pressable>
@@ -170,169 +173,175 @@ const FRAME_SIZE = 260;
 const CORNER_SIZE = 24;
 const CORNER_THICKNESS = 3;
 
-const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.black },
+const makeStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.black },
 
-  // Permission screen
-  permissionContainer: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    alignItems: 'center',
-    paddingHorizontal: spacing['2xl'],
-  },
-  permissionIcon: { fontSize: 56, marginBottom: spacing.xl },
-  permissionTitle: {
-    fontSize: fontSize['2xl'],
-    fontWeight: '800',
-    color: Colors.gray[900],
-    letterSpacing: letterSpacing.tight,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
-  permissionSubtitle: {
-    fontSize: fontSize.md,
-    color: Colors.gray[400],
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: spacing['2xl'],
-  },
-  permissionBtn: {
-    backgroundColor: Colors.costcoRedSolid,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing['3xl'],
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  permissionBtnPressed: { backgroundColor: Colors.costcoRedDark },
-  permissionBtnText: { color: Colors.white, fontSize: fontSize.md, fontWeight: '700', letterSpacing: letterSpacing.wide },
-  cancelLink: { paddingVertical: spacing.md },
-  cancelLinkText: { color: Colors.gray[400], fontSize: fontSize.md },
+    // Permission screen
+    permissionContainer: {
+      flex: 1,
+      backgroundColor: Colors.background,
+      alignItems: 'center',
+      paddingHorizontal: spacing['2xl'],
+    },
+    permissionIcon: { fontSize: 56, marginBottom: spacing.xl },
+    permissionTitle: {
+      fontSize: fontSize['2xl'],
+      fontWeight: '800',
+      color: Colors.gray[900],
+      letterSpacing: letterSpacing.tight,
+      marginBottom: spacing.sm,
+      textAlign: 'center',
+    },
+    permissionSubtitle: {
+      fontSize: fontSize.md,
+      color: Colors.gray[400],
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: spacing['2xl'],
+    },
+    permissionBtn: {
+      backgroundColor: Colors.costcoRedSolid,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing['3xl'],
+      width: '100%',
+      alignItems: 'center',
+      marginBottom: spacing.md,
+    },
+    permissionBtnPressed: { backgroundColor: Colors.costcoRedDark },
+    permissionBtnText: {
+      color: Colors.white,
+      fontSize: fontSize.md,
+      fontWeight: '700',
+      letterSpacing: letterSpacing.wide,
+    },
+    cancelLink: { paddingVertical: spacing.md },
+    cancelLinkText: { color: Colors.gray[400], fontSize: fontSize.md },
 
-  // Top bar
-  topBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: spacing.lg,
-    paddingHorizontal: spacing.xl,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  backBtn: { width: 60 },
-  backText: { color: Colors.white, fontSize: fontSize.xl, fontWeight: '500' },
-  topTitle: { color: Colors.white, fontSize: fontSize.lg, fontWeight: '700' },
+    // Top bar
+    topBar: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingBottom: spacing.lg,
+      paddingHorizontal: spacing.xl,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    backBtn: { width: 60 },
+    backText: { color: Colors.white, fontSize: fontSize.xl, fontWeight: '500' },
+    topTitle: { color: Colors.white, fontSize: fontSize.lg, fontWeight: '700' },
 
-  // Scan frame
-  frameWrapper: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  frame: {
-    width: FRAME_SIZE,
-    height: FRAME_SIZE,
-    position: 'relative',
-    marginBottom: spacing.xl,
-  },
-  corner: {
-    position: 'absolute',
-    width: CORNER_SIZE,
-    height: CORNER_SIZE,
-  },
-  cornerTL: {
-    top: 0,
-    left: 0,
-    borderTopWidth: CORNER_THICKNESS,
-    borderLeftWidth: CORNER_THICKNESS,
-    borderColor: Colors.white,
-    borderTopLeftRadius: radius.sm,
-  },
-  cornerTR: {
-    top: 0,
-    right: 0,
-    borderTopWidth: CORNER_THICKNESS,
-    borderRightWidth: CORNER_THICKNESS,
-    borderColor: Colors.white,
-    borderTopRightRadius: radius.sm,
-  },
-  cornerBL: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: CORNER_THICKNESS,
-    borderLeftWidth: CORNER_THICKNESS,
-    borderColor: Colors.white,
-    borderBottomLeftRadius: radius.sm,
-  },
-  cornerBR: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: CORNER_THICKNESS,
-    borderRightWidth: CORNER_THICKNESS,
-    borderColor: Colors.white,
-    borderBottomRightRadius: radius.sm,
-  },
-  frameHint: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: fontSize.sm,
-    textAlign: 'center',
-    letterSpacing: letterSpacing.normal,
-    paddingHorizontal: spacing['2xl'],
-  },
+    // Scan frame
+    frameWrapper: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    frame: {
+      width: FRAME_SIZE,
+      height: FRAME_SIZE,
+      position: 'relative',
+      marginBottom: spacing.xl,
+    },
+    corner: {
+      position: 'absolute',
+      width: CORNER_SIZE,
+      height: CORNER_SIZE,
+    },
+    cornerTL: {
+      top: 0,
+      left: 0,
+      borderTopWidth: CORNER_THICKNESS,
+      borderLeftWidth: CORNER_THICKNESS,
+      borderColor: Colors.white,
+      borderTopLeftRadius: radius.sm,
+    },
+    cornerTR: {
+      top: 0,
+      right: 0,
+      borderTopWidth: CORNER_THICKNESS,
+      borderRightWidth: CORNER_THICKNESS,
+      borderColor: Colors.white,
+      borderTopRightRadius: radius.sm,
+    },
+    cornerBL: {
+      bottom: 0,
+      left: 0,
+      borderBottomWidth: CORNER_THICKNESS,
+      borderLeftWidth: CORNER_THICKNESS,
+      borderColor: Colors.white,
+      borderBottomLeftRadius: radius.sm,
+    },
+    cornerBR: {
+      bottom: 0,
+      right: 0,
+      borderBottomWidth: CORNER_THICKNESS,
+      borderRightWidth: CORNER_THICKNESS,
+      borderColor: Colors.white,
+      borderBottomRightRadius: radius.sm,
+    },
+    frameHint: {
+      color: 'rgba(255,255,255,0.75)',
+      fontSize: fontSize.sm,
+      textAlign: 'center',
+      letterSpacing: letterSpacing.normal,
+      paddingHorizontal: spacing['2xl'],
+    },
 
-  // Scanning overlay
-  statusOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.lg,
-  },
-  statusText: {
-    color: Colors.white,
-    fontSize: fontSize.lg,
-    fontWeight: '600',
-  },
+    // Scanning overlay
+    statusOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.lg,
+    },
+    statusText: {
+      color: Colors.white,
+      fontSize: fontSize.lg,
+      fontWeight: '600',
+    },
 
-  // Error banner
-  errorBanner: {
-    position: 'absolute',
-    left: spacing.lg,
-    right: spacing.lg,
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  errorText: {
-    fontSize: fontSize.sm,
-    color: Colors.gray[700],
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  retryBtn: {
-    backgroundColor: Colors.costcoRedSolid,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xl,
-  },
-  retryText: { color: Colors.white, fontSize: fontSize.sm, fontWeight: '700' },
+    // Error banner
+    errorBanner: {
+      position: 'absolute',
+      left: spacing.lg,
+      right: spacing.lg,
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      padding: spacing.lg,
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    errorText: {
+      fontSize: fontSize.sm,
+      color: Colors.gray[700],
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    retryBtn: {
+      backgroundColor: Colors.costcoRedSolid,
+      borderRadius: radius.md,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.xl,
+    },
+    retryText: { color: Colors.white, fontSize: fontSize.sm, fontWeight: '700' },
 
-  // Bottom hint
-  bottomHint: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  bottomHintText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: fontSize.xs,
-    letterSpacing: letterSpacing.wide,
-  },
-});
+    // Bottom hint
+    bottomHint: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+    },
+    bottomHintText: {
+      color: 'rgba(255,255,255,0.6)',
+      fontSize: fontSize.xs,
+      letterSpacing: letterSpacing.wide,
+    },
+  });

@@ -82,15 +82,15 @@ export function Sparkle({
     opacity.value = withDelay(
       delay,
       withRepeat(
-        withSequence(
-          withTiming(1, { duration: 650 }),
-          withTiming(0, { duration: 650 }),
-        ),
+        withSequence(withTiming(1, { duration: 650 }), withTiming(0, { duration: 650 })),
         -1,
         false,
       ),
     );
-    rotate.value = withDelay(delay, withRepeat(withTiming(180, { duration: 1300, easing: Easing.linear }), -1, false));
+    rotate.value = withDelay(
+      delay,
+      withRepeat(withTiming(180, { duration: 1300, easing: Easing.linear }), -1, false),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -101,7 +101,9 @@ export function Sparkle({
 
   return (
     <Animated.View style={[styles.sparkle, { width: size, height: size }, animatedStyle, style]}>
-      <View style={[styles.sparkleArm, { backgroundColor: color, width: size, height: size * 0.22 }]} />
+      <View
+        style={[styles.sparkleArm, { backgroundColor: color, width: size, height: size * 0.22 }]}
+      />
       <View
         style={[
           styles.sparkleArm,
@@ -129,7 +131,9 @@ export function Shimmer({
 
   useEffect(() => {
     const anim = withTiming(width * 2, { duration: 1400, easing: Easing.linear });
-    translateX.value = loop ? withRepeat(withSequence(anim, withTiming(-width * 2, { duration: 0 })), -1, false) : anim;
+    translateX.value = loop
+      ? withRepeat(withSequence(anim, withTiming(-width * 2, { duration: 0 })), -1, false)
+      : anim;
   }, [translateX, width, loop]);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -191,7 +195,13 @@ export function StampBounceIn({
 // ── Bell "ding-dong" (idle swing, pauses between rings) ──────────────────────
 // A quick side-to-side rotate that settles, then holds still for a beat
 // before ringing again — reads as a bell being nudged, not a spinning icon.
-export function BellRing({ style, children }: { style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
+export function BellRing({
+  style,
+  children,
+}: {
+  style?: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+}) {
   const rotate = useSharedValue(0);
 
   useEffect(() => {
@@ -213,7 +223,9 @@ export function BellRing({ style, children }: { style?: StyleProp<ViewStyle>; ch
     transform: [{ rotate: `${rotate.value}deg` }],
   }));
 
-  return <Animated.View style={[styles.bellOrigin, style, animatedStyle]}>{children}</Animated.View>;
+  return (
+    <Animated.View style={[styles.bellOrigin, style, animatedStyle]}>{children}</Animated.View>
+  );
 }
 
 // ── Receipt "scan" sweep (thin line passing over the icon on a loop) ────────
@@ -318,7 +330,13 @@ export function BarcodeSweep({
 }
 
 // ── Gentle pendulum swing (hanging price-tag motif) ──────────────────────────
-export function TagSwing({ style, children }: { style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
+export function TagSwing({
+  style,
+  children,
+}: {
+  style?: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+}) {
   const rotate = useSharedValue(-7);
 
   useEffect(() => {
@@ -333,12 +351,20 @@ export function TagSwing({ style, children }: { style?: StyleProp<ViewStyle>; ch
     transform: [{ rotate: `${rotate.value}deg` }],
   }));
 
-  return <Animated.View style={[styles.bellOrigin, style, animatedStyle]}>{children}</Animated.View>;
+  return (
+    <Animated.View style={[styles.bellOrigin, style, animatedStyle]}>{children}</Animated.View>
+  );
 }
 
 // ── Soft twinkle (scale + brightness pulse) ──────────────────────────────────
 // For star glyphs that should read as alive without a full Sparkle overlay.
-export function Twinkle({ style, children }: { style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
+export function Twinkle({
+  style,
+  children,
+}: {
+  style?: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+}) {
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
 
@@ -372,7 +398,13 @@ export function Twinkle({ style, children }: { style?: StyleProp<ViewStyle>; chi
 }
 
 // ── Shimmer, pre-wrapped around an icon (clips + positions for you) ─────────
-export function ShimmerIcon({ style, children }: { style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
+export function ShimmerIcon({
+  style,
+  children,
+}: {
+  style?: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+}) {
   return (
     <View style={[styles.shimmerIconWrap, style]}>
       {children}
@@ -382,7 +414,13 @@ export function ShimmerIcon({ style, children }: { style?: StyleProp<ViewStyle>;
 }
 
 // ── Cart "roll" (small back-and-forth trundle, like being pushed) ───────────
-export function CartRoll({ style, children }: { style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
+export function CartRoll({
+  style,
+  children,
+}: {
+  style?: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+}) {
   const translateX = useSharedValue(0);
   const rotate = useSharedValue(0);
 
@@ -417,7 +455,13 @@ export function CartRoll({ style, children }: { style?: StyleProp<ViewStyle>; ch
 }
 
 // ── Folder "riffle" (quick squash, like pages being flipped through) ────────
-export function FolderFlip({ style, children }: { style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
+export function FolderFlip({
+  style,
+  children,
+}: {
+  style?: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+}) {
   const scaleY = useSharedValue(1);
   const rotate = useSharedValue(0);
 

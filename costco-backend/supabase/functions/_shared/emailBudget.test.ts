@@ -10,12 +10,15 @@ import {
 Deno.test('countEmailsSent: one email per user + timestamp, however many alerts', () => {
   const t1 = '2026-10-07T08:00:01.000Z';
   const t2 = '2026-10-07T15:30:00.000Z';
-  assertEquals(countEmailsSent([
-    { user_id: 'a', emailed_at: t1 },
-    { user_id: 'a', emailed_at: t1 }, // same email, second alert
-    { user_id: 'a', emailed_at: t2 }, // later run
-    { user_id: 'b', emailed_at: t1 },
-  ]), 3);
+  assertEquals(
+    countEmailsSent([
+      { user_id: 'a', emailed_at: t1 },
+      { user_id: 'a', emailed_at: t1 }, // same email, second alert
+      { user_id: 'a', emailed_at: t2 }, // later run
+      { user_id: 'b', emailed_at: t1 },
+    ]),
+    3,
+  );
   assertEquals(countEmailsSent([]), 0);
 });
 

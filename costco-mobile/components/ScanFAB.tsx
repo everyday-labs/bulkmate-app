@@ -33,7 +33,13 @@ export function ScanFAB() {
     Animated.parallel([
       Animated.spring(rotateAnim, { toValue, useNativeDriver: true, tension: 90, friction: 8 }),
       ...actionAnims.map((anim, i) =>
-        Animated.spring(anim, { toValue, useNativeDriver: true, tension: 90, friction: 8, delay: open ? 0 : i * 60 }),
+        Animated.spring(anim, {
+          toValue,
+          useNativeDriver: true,
+          tension: 90,
+          friction: 8,
+          delay: open ? 0 : i * 60,
+        }),
       ),
       Animated.timing(backdropAnim, { toValue, useNativeDriver: true, duration: 180 }),
     ]).start();
@@ -43,7 +49,9 @@ export function ScanFAB() {
   function navigate(mode: ScanMode) {
     Animated.parallel([
       Animated.timing(rotateAnim, { toValue: 0, duration: 120, useNativeDriver: true }),
-      ...actionAnims.map((anim) => Animated.timing(anim, { toValue: 0, duration: 120, useNativeDriver: true })),
+      ...actionAnims.map((anim) =>
+        Animated.timing(anim, { toValue: 0, duration: 120, useNativeDriver: true }),
+      ),
       Animated.timing(backdropAnim, { toValue: 0, duration: 120, useNativeDriver: true }),
     ]).start(() => {
       setOpen(false);
@@ -68,12 +76,13 @@ export function ScanFAB() {
       </Animated.View>
 
       <View style={[styles.container, { bottom }]} pointerEvents="box-none">
-
         {ACTIONS.map((action, i) => {
           const anim = actionAnims[i];
           const actionStyle = {
             opacity: anim,
-            transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+            transform: [
+              { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
+            ],
             pointerEvents: open ? ('auto' as const) : ('none' as const),
           };
           return (
@@ -99,65 +108,61 @@ export function ScanFAB() {
           onPress={toggle}
         >
           <Animated.View style={{ transform: [{ rotate }] }}>
-            <Ionicons
-              name={open ? 'close' : 'scan'}
-              size={26}
-              color={Colors.white}
-            />
+            <Ionicons name={open ? 'close' : 'scan'} size={26} color={Colors.white} />
           </Animated.View>
         </Pressable>
-
       </View>
     </>
   );
 }
 
-const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
-  container: {
-    position: 'absolute',
-    right: spacing['2xl'],
-    alignItems: 'flex-end',
-    gap: spacing.md,
-  },
+const makeStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    container: {
+      position: 'absolute',
+      right: spacing['2xl'],
+      alignItems: 'flex-end',
+      gap: spacing.md,
+    },
 
-  // Speed-dial options
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  optionLabel: {
-    backgroundColor: Colors.darkSolid,
-    color: Colors.white,
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-  },
-  optionBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.pill,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadow.md,
-  },
-  optionBtnPressed: { opacity: 0.8, transform: [{ scale: 0.95 }] },
-  optionIcon: { fontSize: 22 },
+    // Speed-dial options
+    optionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    optionLabel: {
+      backgroundColor: Colors.darkSolid,
+      color: Colors.white,
+      fontSize: fontSize.sm,
+      fontWeight: '700',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: radius.lg,
+      overflow: 'hidden',
+    },
+    optionBtn: {
+      width: 48,
+      height: 48,
+      borderRadius: radius.pill,
+      backgroundColor: Colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...shadow.md,
+    },
+    optionBtnPressed: { opacity: 0.8, transform: [{ scale: 0.95 }] },
+    optionIcon: { fontSize: 22 },
 
-  // Main FAB
-  fab: {
-    width: 60,
-    height: 60,
-    borderRadius: radius.pill,
-    backgroundColor: Colors.costcoRedSolid,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadow.lg,
-  },
-  fabOpen: { backgroundColor: Colors.darkSolid },
-  fabPressed: { opacity: 0.9, transform: [{ scale: 0.96 }] },
-});
+    // Main FAB
+    fab: {
+      width: 60,
+      height: 60,
+      borderRadius: radius.pill,
+      backgroundColor: Colors.costcoRedSolid,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...shadow.lg,
+    },
+    fabOpen: { backgroundColor: Colors.darkSolid },
+    fabPressed: { opacity: 0.9, transform: [{ scale: 0.96 }] },
+  });

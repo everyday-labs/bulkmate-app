@@ -68,7 +68,9 @@ export default function ReceiptCameraScreen() {
         });
         setScanState('success');
         setTimeout(() => {
-          router.replace(`/receipt-success?receiptId=${result.receiptId}&duplicate=${result.duplicate}`);
+          router.replace(
+            `/receipt-success?receiptId=${result.receiptId}&duplicate=${result.duplicate}`,
+          );
         }, SUCCESS_HOLD_MS);
       } else {
         await enqueue(destUri);
@@ -136,67 +138,68 @@ export default function ReceiptCameraScreen() {
   );
 }
 
-const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.black },
-  permissionContainer: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing['2xl'],
-  },
-  permissionText: {
-    fontSize: fontSize.lg,
-    color: Colors.gray[700],
-    textAlign: 'center',
-    marginBottom: spacing['2xl'],
-  },
-  permissionButton: {
-    backgroundColor: Colors.costcoRedSolid,
-    borderRadius: radius.md,
-    paddingVertical: 14,
-    paddingHorizontal: spacing['3xl'],
-  },
-  permissionButtonText: { color: Colors.white, fontSize: fontSize.lg, fontWeight: '600' },
-  topBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingBottom: spacing.xl,
-    paddingHorizontal: spacing['2xl'],
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center',
-  },
-  hint: {
-    color: Colors.white,
-    fontSize: fontSize.md,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  controls: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing['3xl'],
-  },
-  cancelButton: { width: 64, alignItems: 'center' },
-  cancelText: { color: Colors.white, fontSize: fontSize.lg },
-  captureButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  captureInner: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.white,
-  },
-});
+const makeStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.black },
+    permissionContainer: {
+      flex: 1,
+      backgroundColor: Colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: spacing['2xl'],
+    },
+    permissionText: {
+      fontSize: fontSize.lg,
+      color: Colors.gray[700],
+      textAlign: 'center',
+      marginBottom: spacing['2xl'],
+    },
+    permissionButton: {
+      backgroundColor: Colors.costcoRedSolid,
+      borderRadius: radius.md,
+      paddingVertical: 14,
+      paddingHorizontal: spacing['3xl'],
+    },
+    permissionButtonText: { color: Colors.white, fontSize: fontSize.lg, fontWeight: '600' },
+    topBar: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      paddingBottom: spacing.xl,
+      paddingHorizontal: spacing['2xl'],
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      alignItems: 'center',
+    },
+    hint: {
+      color: Colors.white,
+      fontSize: fontSize.md,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    controls: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing['3xl'],
+    },
+    cancelButton: { width: 64, alignItems: 'center' },
+    cancelText: { color: Colors.white, fontSize: fontSize.lg },
+    captureButton: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: 'rgba(255,255,255,0.3)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    captureInner: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: Colors.white,
+    },
+  });

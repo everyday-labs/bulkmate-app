@@ -71,7 +71,10 @@ export default function ForgotPasswordScreen() {
     setLoading(false);
     if (error) {
       posthog?.capture('password_reset_failed', { stage: 'verify_code', error: error.message });
-      Alert.alert('Code not accepted', 'That code is invalid or has expired. Request a new one and try again.');
+      Alert.alert(
+        'Code not accepted',
+        'That code is invalid or has expired. Request a new one and try again.',
+      );
       return;
     }
     setStep('password');
@@ -99,7 +102,9 @@ export default function ForgotPasswordScreen() {
     router.replace('/(tabs)');
   }
 
-  const heading = { email: 'Reset password', code: 'Check your email', password: 'New password' }[step];
+  const heading = { email: 'Reset password', code: 'Check your email', password: 'New password' }[
+    step
+  ];
   const action = { email: sendCode, code: verifyCode, password: savePassword }[step];
   const actionLabel = { email: 'Send Code', code: 'Verify Code', password: 'Save Password' }[step];
 
@@ -111,7 +116,10 @@ export default function ForgotPasswordScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          { paddingTop: insets.top + spacing['3xl'], paddingBottom: insets.bottom + spacing['3xl'] },
+          {
+            paddingTop: insets.top + spacing['3xl'],
+            paddingBottom: insets.bottom + spacing['3xl'],
+          },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -148,13 +156,17 @@ export default function ForgotPasswordScreen() {
           {step === 'code' && (
             <>
               <Text style={styles.body}>
-                If an account exists for <Text style={styles.bodyStrong}>{email.trim()}</Text>, an 8-digit
-                code is on its way. It expires in 1 hour.
+                If an account exists for <Text style={styles.bodyStrong}>{email.trim()}</Text>, an
+                8-digit code is on its way. It expires in 1 hour.
               </Text>
               <View style={styles.field}>
                 <Text style={styles.fieldLabel}>CODE</Text>
                 <TextInput
-                  style={[styles.input, styles.codeInput, focused === 'code' && styles.inputFocused]}
+                  style={[
+                    styles.input,
+                    styles.codeInput,
+                    focused === 'code' && styles.inputFocused,
+                  ]}
                   placeholder="12345678"
                   placeholderTextColor={Colors.gray[400]}
                   value={code}
@@ -218,10 +230,11 @@ export default function ForgotPasswordScreen() {
             onPress={action}
             disabled={loading}
           >
-            {loading
-              ? <ActivityIndicator color={Colors.white} />
-              : <Text style={styles.primaryBtnText}>{actionLabel}</Text>
-            }
+            {loading ? (
+              <ActivityIndicator color={Colors.white} />
+            ) : (
+              <Text style={styles.primaryBtnText}>{actionLabel}</Text>
+            )}
           </Pressable>
 
           {step === 'code' && (
@@ -256,80 +269,81 @@ export default function ForgotPasswordScreen() {
   );
 }
 
-const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.background },
-  scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing['2xl'] },
+const makeStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: Colors.background },
+    scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing['2xl'] },
 
-  // Card
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: radius['3xl'],
-    padding: spacing['2xl'],
-    ...shadow.md,
-  },
-  cardHeading: {
-    fontSize: fontSize['3xl'],
-    fontWeight: '700',
-    color: Colors.gray[900],
-    marginBottom: spacing.md,
-    letterSpacing: letterSpacing.tight,
-  },
-  body: {
-    fontSize: fontSize.sm,
-    color: Colors.gray[500],
-    lineHeight: fontSize.sm * 1.5,
-    marginBottom: spacing.xl,
-  },
-  bodyStrong: { color: Colors.gray[900], fontWeight: '700' },
+    // Card
+    card: {
+      backgroundColor: Colors.surface,
+      borderRadius: radius['3xl'],
+      padding: spacing['2xl'],
+      ...shadow.md,
+    },
+    cardHeading: {
+      fontSize: fontSize['3xl'],
+      fontWeight: '700',
+      color: Colors.gray[900],
+      marginBottom: spacing.md,
+      letterSpacing: letterSpacing.tight,
+    },
+    body: {
+      fontSize: fontSize.sm,
+      color: Colors.gray[500],
+      lineHeight: fontSize.sm * 1.5,
+      marginBottom: spacing.xl,
+    },
+    bodyStrong: { color: Colors.gray[900], fontWeight: '700' },
 
-  // Fields
-  field: { marginBottom: spacing.lg },
-  fieldLabel: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-    textTransform: 'uppercase',
-    marginBottom: spacing.xs - 2,
-  },
-  input: {
-    backgroundColor: Colors.gray[100],
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    fontSize: fontSize.md,
-    color: Colors.gray[900],
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  inputFocused: {
-    backgroundColor: Colors.surface,
-    borderColor: Colors.executiveNavy,
-  },
-  codeInput: {
-    fontSize: fontSize['2xl'],
-    letterSpacing: 8,
-    textAlign: 'center',
-  },
+    // Fields
+    field: { marginBottom: spacing.lg },
+    fieldLabel: {
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+      color: Colors.gray[400],
+      letterSpacing: letterSpacing.caps,
+      textTransform: 'uppercase',
+      marginBottom: spacing.xs - 2,
+    },
+    input: {
+      backgroundColor: Colors.gray[100],
+      borderRadius: radius.lg,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      fontSize: fontSize.md,
+      color: Colors.gray[900],
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+    },
+    inputFocused: {
+      backgroundColor: Colors.surface,
+      borderColor: Colors.executiveNavy,
+    },
+    codeInput: {
+      fontSize: fontSize['2xl'],
+      letterSpacing: 8,
+      textAlign: 'center',
+    },
 
-  // Buttons
-  primaryBtn: {
-    backgroundColor: Colors.costcoRedSolid,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
-    ...shadow.sm,
-  },
-  primaryBtnPressed: { backgroundColor: Colors.costcoRedDark, opacity: 0.95 },
-  primaryBtnText: {
-    color: Colors.white,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    letterSpacing: letterSpacing.wide,
-  },
-  secondaryLink: { marginBottom: spacing.md },
-  switchText: { textAlign: 'center', fontSize: fontSize.sm, color: Colors.gray[500] },
-  switchLink: { color: Colors.executiveNavy, fontWeight: '700' },
-});
+    // Buttons
+    primaryBtn: {
+      backgroundColor: Colors.costcoRedSolid,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.lg,
+      alignItems: 'center',
+      marginTop: spacing.md,
+      marginBottom: spacing.lg,
+      ...shadow.sm,
+    },
+    primaryBtnPressed: { backgroundColor: Colors.costcoRedDark, opacity: 0.95 },
+    primaryBtnText: {
+      color: Colors.white,
+      fontSize: fontSize.lg,
+      fontWeight: '700',
+      letterSpacing: letterSpacing.wide,
+    },
+    secondaryLink: { marginBottom: spacing.md },
+    switchText: { textAlign: 'center', fontSize: fontSize.sm, color: Colors.gray[500] },
+    switchLink: { color: Colors.executiveNavy, fontWeight: '700' },
+  });
