@@ -81,7 +81,8 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 - [ ] **Seller / developer name**: comes from the Developer Program enrollment. Individual
       enrollment shows your legal name; "Everyday Labs" needs an organization enrollment (legal
       entity + D-U-N-S). Decide whether that matters to you — it's fine to ship as an individual.
-- [ ] **Privacy Policy URL** + **Support URL** → website pages once live.
+- [ ] **Privacy Policy URL** + **Support URL** → `https://everyday-labs.org/bulkmate/privacy/` and
+      `https://everyday-labs.org/bulkmate/support/` (both live 2026-10-07).
 - [ ] **App Review contact info** — name/email consistent with the above.
 - [ ] Apple Developer → Identifiers: App ID description for `com.twonk0609.bulkmate` reads "Bulkmate";
       old `com.twonk0609.costco-app` App ID / Services ID — rename description or remove if unused.
@@ -125,7 +126,8 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 - [x] Domain `everyday-labs.org` bought 2026-10-06 → DNS, HTTPS, verified domain done.
       `hello@` forwarding (Cloudflare Email Routing) verified 2026-10-07; contact email switched to it
       in PRIVACY.md (both copies), site `_config.yml` + feedback page, OFF User-Agent. Still to
-      change by hand: App Store Connect contact/review info, Google consent screen support email.
+      change by hand: App Store Connect contact/review info, Google consent screen *developer*
+      contact (the *user support* email must stay the Gmail account — see section 4).
 - [x] **Brevo sending domain** — SPF (`v=spf1 include:_spf.mx.cloudflare.net include:spf.brevo.com ~all`, 2026-10-07) + DKIM (`brevo1/brevo2._domainkey` CNAMEs) + DMARC
       (`_dmarc` TXT `v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com`) live 2026-10-06; test
       email received. Later: move to `p=quarantine` after ~2 weeks of clean Brevo DMARC reports —
