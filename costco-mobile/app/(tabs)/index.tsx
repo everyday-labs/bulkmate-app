@@ -19,7 +19,14 @@ import { useThemeColors } from '../../contexts/ThemeContext';
 import type { ColorScheme } from '../../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../../constants/theme';
 import { placeholderNameFor } from '../../lib/placeholderName';
-import { FloatView, ScanLineIcon, PinPulse, ShimmerIcon, TagSwing, FolderFlip } from '../../components/Motion';
+import {
+  FloatView,
+  ScanLineIcon,
+  PinPulse,
+  ShimmerIcon,
+  TagSwing,
+  FolderFlip,
+} from '../../components/Motion';
 
 type DashboardData = {
   totalSpend: number;
@@ -100,9 +107,15 @@ export default function HomeScreen() {
     if (!session?.user.id) return;
     let cancelled = false;
     AsyncStorage.getItem(nameNudgeKey)
-      .then((v) => { if (!cancelled) setNameNudgeDismissed(v === 'true'); })
-      .catch(() => { if (!cancelled) setNameNudgeDismissed(false); });
-    return () => { cancelled = true; };
+      .then((v) => {
+        if (!cancelled) setNameNudgeDismissed(v === 'true');
+      })
+      .catch(() => {
+        if (!cancelled) setNameNudgeDismissed(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [nameNudgeKey, session?.user.id]);
 
   function dismissNameNudge() {
@@ -127,7 +140,14 @@ export default function HomeScreen() {
     else setLoading(true);
 
     try {
-      const [{ data: profileRow }, { data: allReceiptTotals }, { data: receipts }, { data: items }, { data: alertRows }, { data: lookupRows }] = await Promise.all([
+      const [
+        { data: profileRow },
+        { data: allReceiptTotals },
+        { data: receipts },
+        { data: items },
+        { data: alertRows },
+        { data: lookupRows },
+      ] = await Promise.all([
         supabase
           .from('profiles')
           .select('first_name')
@@ -149,12 +169,12 @@ export default function HomeScreen() {
           .limit(50),
         // No .eq('user_id') here — receipt_items has no user_id column; it's
         // scoped through its parent receipt, so RLS is the only filter.
-        supabase
-          .from('receipt_items')
-          .select('unit_price, discount_amount'),
+        supabase.from('receipt_items').select('unit_price, discount_amount'),
         supabase
           .from('price_alerts')
-          .select('id, sku, paid_price, current_price, delta, receipt_items(description, receipt_id)')
+          .select(
+            'id, sku, paid_price, current_price, delta, receipt_items(description, receipt_id)',
+          )
           .eq('user_id', session?.user.id ?? '')
           .is('dismissed_at', null)
           .order('delta', { ascending: false })
@@ -237,7 +257,8 @@ export default function HomeScreen() {
         .slice(0, 10);
       setActivity(merged);
 
-      const profileFirstName = (profileRow as { first_name: string | null } | null)?.first_name ?? null;
+      const profileFirstName =
+        (profileRow as { first_name: string | null } | null)?.first_name ?? null;
       setFirstName(profileFirstName);
       setNameMissing(profileRow != null && !profileFirstName?.trim());
     } catch {
@@ -269,7 +290,9 @@ export default function HomeScreen() {
   function dayLabelFor(iso: string) {
     const date = activityDate(iso);
     const dayMs = 24 * 60 * 60 * 1000;
-    const dayDiff = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(date).setHours(0, 0, 0, 0)) / dayMs);
+    const dayDiff = Math.floor(
+      (new Date().setHours(0, 0, 0, 0) - new Date(date).setHours(0, 0, 0, 0)) / dayMs,
+    );
 
     if (dayDiff <= 0) return 'Today';
     if (dayDiff === 1) return 'Yesterday';
@@ -283,7 +306,9 @@ export default function HomeScreen() {
 
   // Filter, then group consecutive same-day rows under one divider — the
   // list is already sorted newest-first, so a single pass groups correctly.
-  const filteredActivity = activity.filter((item) => activityFilter === 'all' || item.kind === activityFilter);
+  const filteredActivity = activity.filter(
+    (item) => activityFilter === 'all' || item.kind === activityFilter,
+  );
   const activityGroups: { label: string; items: ActivityItem[] }[] = [];
   for (const item of filteredActivity) {
     const label = dayLabelFor(item.timestamp);
@@ -437,7 +462,9 @@ export default function HomeScreen() {
           onPress={() => router.push('/history')}
         >
           <View style={[styles.actionIconWrap, { backgroundColor: Colors.executiveNavySubtle }]}>
-            <FolderFlip><Text style={styles.actionIcon}>🗂</Text></FolderFlip>
+            <FolderFlip>
+              <Text style={styles.actionIcon}>🗂</Text>
+            </FolderFlip>
           </View>
           <Text style={styles.actionTitle}>History</Text>
           <Text style={styles.actionSub}>Receipts, scans & visits</Text>
@@ -502,10 +529,18 @@ export default function HomeScreen() {
                   item.kind === 'receipt' ? (
                     <Pressable
                       key={`receipt-${item.id}`}
-                      style={({ pressed }) => [styles.recentCard, pressed && styles.recentCardPressed]}
+                      style={({ pressed }) => [
+                        styles.recentCard,
+                        pressed && styles.recentCardPressed,
+                      ]}
                       onPress={() => router.push(`/receipt-success?receiptId=${item.id}`)}
                     >
-                      <View style={[styles.activityThumb, { backgroundColor: Colors.executiveNavySubtle }]}>
+                      <View
+                        style={[
+                          styles.activityThumb,
+                          { backgroundColor: Colors.executiveNavySubtle },
+                        ]}
+                      >
                         <Text style={styles.recentIcon}>🧾</Text>
                       </View>
                       <View style={styles.recentBody}>
@@ -513,7 +548,8 @@ export default function HomeScreen() {
                           {item.warehouseName ?? 'Costco Warehouse'}
                         </Text>
                         <Text style={styles.recentMeta}>
-                          Receipt{'  ·  '}{item.itemCount} {item.itemCount === 1 ? 'item' : 'items'}
+                          Receipt{'  ·  '}
+                          {item.itemCount} {item.itemCount === 1 ? 'item' : 'items'}
                         </Text>
                       </View>
                       {item.totalAmount != null && (
@@ -524,12 +560,21 @@ export default function HomeScreen() {
                   ) : (
                     <Pressable
                       key={`viewed-${item.sku}`}
-                      style={({ pressed }) => [styles.recentCard, pressed && styles.recentCardPressed]}
+                      style={({ pressed }) => [
+                        styles.recentCard,
+                        pressed && styles.recentCardPressed,
+                      ]}
                       onPress={() => router.push(`/product/${item.sku}`)}
                     >
-                      <View style={[styles.activityThumb, { backgroundColor: Colors.goldStarSubtle }]}>
+                      <View
+                        style={[styles.activityThumb, { backgroundColor: Colors.goldStarSubtle }]}
+                      >
                         {item.imageUrl ? (
-                          <Image source={{ uri: item.imageUrl }} style={styles.activityThumbImage} resizeMode="contain" />
+                          <Image
+                            source={{ uri: item.imageUrl }}
+                            style={styles.activityThumbImage}
+                            resizeMode="contain"
+                          />
                         ) : (
                           <Text style={styles.recentIcon}>📦</Text>
                         )}
@@ -539,7 +584,8 @@ export default function HomeScreen() {
                           {item.name ?? item.sku}
                         </Text>
                         <Text style={styles.recentMeta}>
-                          Viewed{'  ·  '}{timeOfDayFor(item.timestamp)}
+                          Viewed{'  ·  '}
+                          {timeOfDayFor(item.timestamp)}
                         </Text>
                       </View>
                       {item.salePrice != null && (
@@ -559,7 +605,9 @@ export default function HomeScreen() {
       {/* Empty state */}
       {!loading && data && data.receiptCount === 0 && (
         <View style={styles.emptyCard}>
-          <FloatView><Text style={styles.emptyIcon}>🧾</Text></FloatView>
+          <FloatView>
+            <Text style={styles.emptyIcon}>🧾</Text>
+          </FloatView>
           <Text style={styles.emptyTitle}>No receipts yet</Text>
           <Text style={styles.emptySubtitle}>
             Scan your first Costco receipt to start tracking your spending and unlock price alerts.
@@ -589,9 +637,8 @@ function PriceAlertCard({
   onPress: () => void;
   styles: Styles;
 }) {
-  const name = alert.description.length > 50
-    ? alert.description.slice(0, 47) + '…'
-    : alert.description;
+  const name =
+    alert.description.length > 50 ? alert.description.slice(0, 47) + '…' : alert.description;
 
   return (
     <Pressable
@@ -606,7 +653,9 @@ function PriceAlertCard({
       </View>
 
       <View style={styles.alertBody}>
-        <Text style={styles.alertName} numberOfLines={2}>{name}</Text>
+        <Text style={styles.alertName} numberOfLines={2}>
+          {name}
+        </Text>
         <Text style={styles.alertPrices}>
           Paid <Text style={styles.alertPricePaid}>${alert.paid_price.toFixed(2)}</Text>
           {'  →  '}
@@ -622,7 +671,10 @@ function PriceAlertCard({
       {/* Dismiss button */}
       <Pressable
         style={({ pressed }) => [styles.alertDismiss, pressed && { opacity: 0.5 }]}
-        onPress={(e) => { e.stopPropagation(); onDismiss(); }}
+        onPress={(e) => {
+          e.stopPropagation();
+          onDismiss();
+        }}
         hitSlop={8}
       >
         <Text style={styles.alertDismissText}>✕</Text>
@@ -650,11 +702,17 @@ function StatCard({
     <View style={styles.statCard}>
       <View style={[styles.statIconWrap, { backgroundColor: accentBg }]}>
         {icon === '💳' ? (
-          <ShimmerIcon><Text style={styles.statIcon}>{icon}</Text></ShimmerIcon>
+          <ShimmerIcon>
+            <Text style={styles.statIcon}>{icon}</Text>
+          </ShimmerIcon>
         ) : icon === '🏷' ? (
-          <TagSwing><Text style={styles.statIcon}>{icon}</Text></TagSwing>
+          <TagSwing>
+            <Text style={styles.statIcon}>{icon}</Text>
+          </TagSwing>
         ) : icon === '🧾' ? (
-          <ScanLineIcon color={accent}><Text style={styles.statIcon}>{icon}</Text></ScanLineIcon>
+          <ScanLineIcon color={accent}>
+            <Text style={styles.statIcon}>{icon}</Text>
+          </ScanLineIcon>
         ) : (
           <Text style={styles.statIcon}>{icon}</Text>
         )}
@@ -665,299 +723,310 @@ function StatCard({
   );
 }
 
-const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingHorizontal: spacing.lg },
+const makeStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: Colors.background },
+    scroll: { paddingHorizontal: spacing.lg },
 
-  // Greeting
-  greetingSection: { marginBottom: spacing['2xl'] },
-  greetingLine: {
-    fontSize: fontSize.lg,
-    color: Colors.gray[400],
-    fontWeight: '500',
-    letterSpacing: letterSpacing.normal,
-  },
-  greetingName: {
-    fontSize: fontSize['4xl'],
-    fontWeight: '800',
-    color: Colors.gray[900],
-    letterSpacing: letterSpacing.tight,
-    marginTop: 2,
-  },
+    // Greeting
+    greetingSection: { marginBottom: spacing['2xl'] },
+    greetingLine: {
+      fontSize: fontSize.lg,
+      color: Colors.gray[400],
+      fontWeight: '500',
+      letterSpacing: letterSpacing.normal,
+    },
+    greetingName: {
+      fontSize: fontSize['4xl'],
+      fontWeight: '800',
+      color: Colors.gray[900],
+      letterSpacing: letterSpacing.tight,
+      marginTop: 2,
+    },
 
-  // Name nudge
-  nudgeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    gap: spacing.md,
-    padding: spacing.lg,
-    marginTop: -spacing.md,
-    marginBottom: spacing['2xl'],
-    ...shadow.sm,
-  },
-  nudgeIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.lg,
-    backgroundColor: Colors.goldStarSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nudgeTitle: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: Colors.gray[800],
-    marginBottom: 3,
-  },
-  nudgeSub: { fontSize: fontSize.xs, color: Colors.gray[500], lineHeight: 16 },
+    // Name nudge
+    nudgeCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      gap: spacing.md,
+      padding: spacing.lg,
+      marginTop: -spacing.md,
+      marginBottom: spacing['2xl'],
+      ...shadow.sm,
+    },
+    nudgeIconWrap: {
+      width: 38,
+      height: 38,
+      borderRadius: radius.lg,
+      backgroundColor: Colors.goldStarSubtle,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    nudgeTitle: {
+      fontSize: fontSize.sm,
+      fontWeight: '700',
+      color: Colors.gray[800],
+      marginBottom: 3,
+    },
+    nudgeSub: { fontSize: fontSize.xs, color: Colors.gray[500], lineHeight: 16 },
 
-  // Price alerts
-  alertsSection: { marginBottom: spacing['2xl'] },
-  alertsList: { gap: spacing.sm },
-  alertCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    overflow: 'hidden',
-    gap: spacing.md,
-    paddingVertical: spacing.lg,
-    paddingRight: spacing.lg,
-    ...shadow.sm,
-  },
-  alertCardPressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
-  alertAccent: {
-    width: 4,
-    alignSelf: 'stretch',
-    backgroundColor: Colors.savings,
-  },
-  alertIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.lg,
-    backgroundColor: Colors.savingsBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  alertIcon: { fontSize: 18 },
-  alertBody: { flex: 1 },
-  alertName: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: Colors.gray[800],
-    marginBottom: 3,
-    lineHeight: 18,
-  },
-  alertPrices: { fontSize: fontSize.xs, color: Colors.gray[400] },
-  alertPricePaid: { color: Colors.gray[500], textDecorationLine: 'line-through' },
-  alertPriceNow: { color: Colors.savings, fontWeight: '600' },
-  alertRight: { alignItems: 'flex-end' },
-  alertDelta: {
-    fontSize: fontSize.lg,
-    fontWeight: '800',
-    color: Colors.savings,
-    letterSpacing: letterSpacing.tight,
-  },
-  alertRefund: {
-    fontSize: fontSize.xs,
-    color: Colors.savings,
-    fontWeight: '600',
-    letterSpacing: letterSpacing.wide,
-  },
-  alertDismiss: {
-    paddingLeft: spacing.sm,
-  },
-  alertDismissText: {
-    fontSize: 14,
-    color: Colors.gray[300],
-    fontWeight: '600',
-  },
+    // Price alerts
+    alertsSection: { marginBottom: spacing['2xl'] },
+    alertsList: { gap: spacing.sm },
+    alertCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      overflow: 'hidden',
+      gap: spacing.md,
+      paddingVertical: spacing.lg,
+      paddingRight: spacing.lg,
+      ...shadow.sm,
+    },
+    alertCardPressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
+    alertAccent: {
+      width: 4,
+      alignSelf: 'stretch',
+      backgroundColor: Colors.savings,
+    },
+    alertIconWrap: {
+      width: 38,
+      height: 38,
+      borderRadius: radius.lg,
+      backgroundColor: Colors.savingsBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    alertIcon: { fontSize: 18 },
+    alertBody: { flex: 1 },
+    alertName: {
+      fontSize: fontSize.sm,
+      fontWeight: '700',
+      color: Colors.gray[800],
+      marginBottom: 3,
+      lineHeight: 18,
+    },
+    alertPrices: { fontSize: fontSize.xs, color: Colors.gray[400] },
+    alertPricePaid: { color: Colors.gray[500], textDecorationLine: 'line-through' },
+    alertPriceNow: { color: Colors.savings, fontWeight: '600' },
+    alertRight: { alignItems: 'flex-end' },
+    alertDelta: {
+      fontSize: fontSize.lg,
+      fontWeight: '800',
+      color: Colors.savings,
+      letterSpacing: letterSpacing.tight,
+    },
+    alertRefund: {
+      fontSize: fontSize.xs,
+      color: Colors.savings,
+      fontWeight: '600',
+      letterSpacing: letterSpacing.wide,
+    },
+    alertDismiss: {
+      paddingLeft: spacing.sm,
+    },
+    alertDismissText: {
+      fontSize: 14,
+      color: Colors.gray[300],
+      fontWeight: '600',
+    },
 
-  // Loading
-  loadingRow: { height: 100, alignItems: 'center', justifyContent: 'center' },
+    // Loading
+    loadingRow: { height: 100, alignItems: 'center', justifyContent: 'center' },
 
-  // Stat cards
-  statsRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing['2xl'],
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.md,
-    alignItems: 'flex-start',
-    ...shadow.sm,
-  },
-  statIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  statIcon: { fontSize: 18 },
-  statValue: {
-    fontSize: fontSize.lg,
-    fontWeight: '800',
-    letterSpacing: letterSpacing.tight,
-    marginBottom: 2,
-  },
-  statLabel: { fontSize: fontSize.xs, color: Colors.gray[400], fontWeight: '600' },
+    // Stat cards
+    statsRow: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      marginBottom: spacing['2xl'],
+    },
+    statCard: {
+      flex: 1,
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      padding: spacing.md,
+      alignItems: 'flex-start',
+      ...shadow.sm,
+    },
+    statIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: radius.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.sm,
+    },
+    statIcon: { fontSize: 18 },
+    statValue: {
+      fontSize: fontSize.lg,
+      fontWeight: '800',
+      letterSpacing: letterSpacing.tight,
+      marginBottom: 2,
+    },
+    statLabel: { fontSize: fontSize.xs, color: Colors.gray[400], fontWeight: '600' },
 
-  // Section labels
-  sectionLabel: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-    textTransform: 'uppercase',
-    marginBottom: spacing.md,
-    paddingLeft: spacing.xs,
-  },
+    // Section labels
+    sectionLabel: {
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+      color: Colors.gray[400],
+      letterSpacing: letterSpacing.caps,
+      textTransform: 'uppercase',
+      marginBottom: spacing.md,
+      paddingLeft: spacing.xs,
+    },
 
-  // Quick actions
-  actionsRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing['2xl'],
-  },
-  actionCard: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.md,
-    alignItems: 'flex-start',
-    ...shadow.sm,
-  },
-  actionCardPressed: { opacity: 0.88, transform: [{ scale: 0.97 }] },
-  actionIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  actionIcon: { fontSize: 20 },
-  actionTitle: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: Colors.gray[800],
-    marginBottom: 2,
-  },
-  actionSub: { fontSize: fontSize.xs, color: Colors.gray[400] },
-  // Recent receipts
-  recentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-    paddingLeft: spacing.xs,
-  },
-  seeAllText: { fontSize: fontSize.sm, fontWeight: '600', color: Colors.costcoRed },
+    // Quick actions
+    actionsRow: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      marginBottom: spacing['2xl'],
+    },
+    actionCard: {
+      flex: 1,
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      padding: spacing.md,
+      alignItems: 'flex-start',
+      ...shadow.sm,
+    },
+    actionCardPressed: { opacity: 0.88, transform: [{ scale: 0.97 }] },
+    actionIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: radius.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.sm,
+    },
+    actionIcon: { fontSize: 20 },
+    actionTitle: {
+      fontSize: fontSize.sm,
+      fontWeight: '700',
+      color: Colors.gray[800],
+      marginBottom: 2,
+    },
+    actionSub: { fontSize: fontSize.xs, color: Colors.gray[400] },
+    // Recent receipts
+    recentHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.md,
+      paddingLeft: spacing.xs,
+    },
+    seeAllText: { fontSize: fontSize.sm, fontWeight: '600', color: Colors.costcoRed },
 
-  chipRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md, paddingLeft: spacing.xs },
-  chip: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-  },
-  chipActive: { backgroundColor: Colors.costcoRedSolid, borderColor: Colors.costcoRedSolid },
-  chipText: { fontSize: fontSize.xs, fontWeight: '700', color: Colors.gray[600] },
-  chipTextActive: { color: Colors.white },
+    chipRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginBottom: spacing.md,
+      paddingLeft: spacing.xs,
+    },
+    chip: {
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: Colors.border,
+      backgroundColor: Colors.surface,
+    },
+    chipActive: { backgroundColor: Colors.costcoRedSolid, borderColor: Colors.costcoRedSolid },
+    chipText: { fontSize: fontSize.xs, fontWeight: '700', color: Colors.gray[600] },
+    chipTextActive: { color: Colors.white },
 
-  activityGroup: { marginBottom: spacing.sm },
-  activityEmptyText: {
-    fontSize: fontSize.sm,
-    color: Colors.gray[400],
-    paddingLeft: spacing.xs,
-    marginBottom: spacing.xl,
-  },
-  dayDivider: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-    textTransform: 'uppercase',
-    marginBottom: spacing.sm,
-    paddingLeft: spacing.xs,
-  },
+    activityGroup: { marginBottom: spacing.sm },
+    activityEmptyText: {
+      fontSize: fontSize.sm,
+      color: Colors.gray[400],
+      paddingLeft: spacing.xs,
+      marginBottom: spacing.xl,
+    },
+    dayDivider: {
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+      color: Colors.gray[400],
+      letterSpacing: letterSpacing.caps,
+      textTransform: 'uppercase',
+      marginBottom: spacing.sm,
+      paddingLeft: spacing.xs,
+    },
 
-  recentList: { gap: spacing.sm, marginBottom: spacing.xl },
-  recentCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    gap: spacing.md,
-    ...shadow.sm,
-  },
-  recentCardPressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
-  recentIcon: { fontSize: 20 },
-  activityThumb: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activityThumbImage: { width: 32, height: 32 },
-  recentBody: { flex: 1 },
-  recentWarehouse: { fontSize: fontSize.md, fontWeight: '700', color: Colors.gray[900], marginBottom: 2 },
-  recentMeta: { fontSize: fontSize.xs, color: Colors.gray[400] },
-  recentTotal: {
-    fontSize: fontSize.md,
-    fontWeight: '700',
-    color: Colors.executiveNavy,
-    letterSpacing: letterSpacing.tight,
-  },
-  recentChevron: { fontSize: 18, color: Colors.gray[300] },
+    recentList: { gap: spacing.sm, marginBottom: spacing.xl },
+    recentCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      padding: spacing.lg,
+      gap: spacing.md,
+      ...shadow.sm,
+    },
+    recentCardPressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
+    recentIcon: { fontSize: 20 },
+    activityThumb: {
+      width: 40,
+      height: 40,
+      borderRadius: radius.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    activityThumbImage: { width: 32, height: 32 },
+    recentBody: { flex: 1 },
+    recentWarehouse: {
+      fontSize: fontSize.md,
+      fontWeight: '700',
+      color: Colors.gray[900],
+      marginBottom: 2,
+    },
+    recentMeta: { fontSize: fontSize.xs, color: Colors.gray[400] },
+    recentTotal: {
+      fontSize: fontSize.md,
+      fontWeight: '700',
+      color: Colors.executiveNavy,
+      letterSpacing: letterSpacing.tight,
+    },
+    recentChevron: { fontSize: 18, color: Colors.gray[300] },
 
-  // Empty state
-  emptyCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: radius['2xl'],
-    padding: spacing['3xl'],
-    alignItems: 'center',
-    ...shadow.md,
-    marginTop: spacing.lg,
-  },
-  emptyIcon: { fontSize: 52, marginBottom: spacing.xl },
-  emptyTitle: {
-    fontSize: fontSize['2xl'],
-    fontWeight: '800',
-    color: Colors.gray[800],
-    marginBottom: spacing.sm,
-    letterSpacing: letterSpacing.tight,
-  },
-  emptySubtitle: {
-    fontSize: fontSize.md,
-    color: Colors.gray[400],
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: spacing['2xl'],
-  },
-  emptyBtn: {
-    backgroundColor: Colors.costcoRedSolid,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing['3xl'],
-    ...shadow.sm,
-  },
-  emptyBtnPressed: { backgroundColor: Colors.costcoRedDark },
-  emptyBtnText: {
-    color: Colors.white,
-    fontSize: fontSize.md,
-    fontWeight: '700',
-    letterSpacing: letterSpacing.wide,
-  },
-});
+    // Empty state
+    emptyCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: radius['2xl'],
+      padding: spacing['3xl'],
+      alignItems: 'center',
+      ...shadow.md,
+      marginTop: spacing.lg,
+    },
+    emptyIcon: { fontSize: 52, marginBottom: spacing.xl },
+    emptyTitle: {
+      fontSize: fontSize['2xl'],
+      fontWeight: '800',
+      color: Colors.gray[800],
+      marginBottom: spacing.sm,
+      letterSpacing: letterSpacing.tight,
+    },
+    emptySubtitle: {
+      fontSize: fontSize.md,
+      color: Colors.gray[400],
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: spacing['2xl'],
+    },
+    emptyBtn: {
+      backgroundColor: Colors.costcoRedSolid,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing['3xl'],
+      ...shadow.sm,
+    },
+    emptyBtnPressed: { backgroundColor: Colors.costcoRedDark },
+    emptyBtnText: {
+      color: Colors.white,
+      fontSize: fontSize.md,
+      fontWeight: '700',
+      letterSpacing: letterSpacing.wide,
+    },
+  });

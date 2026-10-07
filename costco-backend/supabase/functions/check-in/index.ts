@@ -69,7 +69,12 @@ async function receiptCheckIn(
       warehouse.tier as string,
     );
     return json({
-      warehouse: { id: warehouse.id, name: warehouse.name, city: warehouse.city, tier: warehouse.tier },
+      warehouse: {
+        id: warehouse.id,
+        name: warehouse.name,
+        city: warehouse.city,
+        tier: warehouse.tier,
+      },
       ...award,
     });
   } catch (e) {
@@ -77,7 +82,12 @@ async function receiptCheckIn(
     // reward is not worth failing the request over.
     console.warn('receipt check-in award failed:', e instanceof Error ? e.message : String(e));
     return json({
-      warehouse: { id: warehouse.id, name: warehouse.name, city: warehouse.city, tier: warehouse.tier },
+      warehouse: {
+        id: warehouse.id,
+        name: warehouse.name,
+        city: warehouse.city,
+        tier: warehouse.tier,
+      },
       already_checked_in: true,
       total_stars: 0,
       fan_tier: 'KirklandCadet',
@@ -110,18 +120,19 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', ''),
-    );
+    const {
+      data: { user },
+      error: authErr,
+    } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     userId = user?.id;
     if (authErr || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 },
-      );
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
     }
 
-    const payload = await req.json() as {
+    const payload = (await req.json()) as {
       latitude?: number;
       longitude?: number;
       receipt_id?: string;
@@ -139,10 +150,10 @@ serve(async (req) => {
 
     const { latitude, longitude } = payload as { latitude: number; longitude: number };
     if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-      return new Response(
-        JSON.stringify({ error: 'latitude and longitude are required' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 },
-      );
+      return new Response(JSON.stringify({ error: 'latitude and longitude are required' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
     }
 
     // 1. Load all warehouses
@@ -151,26 +162,29 @@ serve(async (req) => {
       .select('id, warehouse_code, name, city, latitude, longitude, tier');
 
     if (!warehouses?.length) {
-      return new Response(
-        JSON.stringify({ error: 'No warehouses found' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 },
-      );
+      return new Response(JSON.stringify({ error: 'No warehouses found' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      });
     }
 
     // 2. Find nearest warehouse
-    let nearest: typeof warehouses[number] | null = null;
+    let nearest: (typeof warehouses)[number] | null = null;
     let nearestDist = Infinity;
     for (const wh of warehouses) {
       if (wh.latitude == null || wh.longitude == null) continue;
       const d = haversineMetres(latitude, longitude, Number(wh.latitude), Number(wh.longitude));
-      if (d < nearestDist) { nearestDist = d; nearest = wh; }
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearest = wh;
+      }
     }
 
     if (!nearest) {
-      return new Response(
-        JSON.stringify({ error: 'No warehouse coordinates found' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 },
-      );
+      return new Response(JSON.stringify({ error: 'No warehouse coordinates found' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      });
     }
 
     // 3. Distance gate
@@ -202,13 +216,19 @@ serve(async (req) => {
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       console.error('check-in insert error:', message);
-      return new Response(
-        JSON.stringify({ error: message }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 },
-      );
+      return new Response(JSON.stringify({ error: message }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      });
     }
 
-    const { already_checked_in: alreadyCheckedIn, total_stars, fan_tier, tier_upgraded, new_badges } = award;
+    const {
+      already_checked_in: alreadyCheckedIn,
+      total_stars,
+      fan_tier,
+      tier_upgraded,
+      new_badges,
+    } = award;
 
     return new Response(
       JSON.stringify({
@@ -228,14 +248,13 @@ serve(async (req) => {
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
-
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unexpected error';
     console.error('check-in error:', message);
     await capturePostHogException(err, { functionName: 'check-in' }, userId);
-    return new Response(
-      JSON.stringify({ error: message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 },
-    );
+    return new Response(JSON.stringify({ error: message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
   }
 });

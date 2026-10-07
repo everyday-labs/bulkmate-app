@@ -47,7 +47,13 @@ async function matchWarehouseByReceiptHeader(
   // receipt, which would otherwise shrink the effective header window
   // below the intended 12 real lines and could push the postal code/city
   // just outside it.
-  const headerText = rawText.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 12).join(' ').toUpperCase();
+  const headerText = rawText
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, 12)
+    .join(' ')
+    .toUpperCase();
 
   const { data: candidates } = await supabase
     .from('warehouses')
@@ -55,7 +61,12 @@ async function matchWarehouseByReceiptHeader(
     .like('warehouse_code', 'GP-%');
 
   if (!candidates?.length) return null;
-  const rows = candidates as { id: string; warehouse_code: string; city: string | null; postal_code: string | null }[];
+  const rows = candidates as {
+    id: string;
+    warehouse_code: string;
+    city: string | null;
+    postal_code: string | null;
+  }[];
 
   // Step 1 — city must appear in the header. This is the required signal.
   const byCity = rows.filter((w) => w.city && headerText.includes(w.city.toUpperCase()));
@@ -69,7 +80,8 @@ async function matchWarehouseByReceiptHeader(
   // are skipped entirely — they're too collision-prone to trust even here.
   const byPostalCode = byCity.filter((w) => {
     if (!w.postal_code || w.postal_code.replace(/\s/g, '').length < 4) return false;
-    const escaped = w.postal_code.toUpperCase()
+    const escaped = w.postal_code
+      .toUpperCase()
       .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       .replace(/\s+/g, '\\s*');
     return new RegExp(`\\b${escaped}\\b`).test(headerText);
@@ -98,7 +110,14 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const visionKey = Deno.env.get('GOOGLE_CLOUD_VISION_API_KEY');
-    console.log('2. Env check — SUPABASE_URL:', !!supabaseUrl, '| SERVICE_KEY:', !!serviceKey, '| VISION_KEY:', !!visionKey);
+    console.log(
+      '2. Env check — SUPABASE_URL:',
+      !!supabaseUrl,
+      '| SERVICE_KEY:',
+      !!serviceKey,
+      '| VISION_KEY:',
+      !!visionKey,
+    );
 
     const supabase = createClient(supabaseUrl!, serviceKey!);
 
@@ -138,11 +157,30 @@ serve(async (req) => {
 
     // 4. Parse
     const parsed = parseReceiptText(rawText);
-    console.log('8. Parsed — warehouse:', parsed.warehouseCode, '| date:', parsed.transactionDate, '| tc#:', parsed.transactionNumber ?? 'n/a', '| items:', parsed.items.length, '| expected:', parsed.expectedItemCount ?? 'unknown', '| subtotal:', parsed.subtotal ?? 'not found', '| tax:', parsed.tax ?? 'not found', '| total:', parsed.grandTotal ?? 'not found');
+    console.log(
+      '8. Parsed — warehouse:',
+      parsed.warehouseCode,
+      '| date:',
+      parsed.transactionDate,
+      '| tc#:',
+      parsed.transactionNumber ?? 'n/a',
+      '| items:',
+      parsed.items.length,
+      '| expected:',
+      parsed.expectedItemCount ?? 'unknown',
+      '| subtotal:',
+      parsed.subtotal ?? 'not found',
+      '| tax:',
+      parsed.tax ?? 'not found',
+      '| total:',
+      parsed.grandTotal ?? 'not found',
+    );
     console.log('8b. Items detail:', JSON.stringify(parsed.items));
     if (parsed.itemCountMismatch) {
       const parsedUnits = parsed.items.reduce((n, i) => n + i.quantity, 0);
-      console.warn(`ITEM COUNT MISMATCH: parsed ${parsedUnits} units across ${parsed.items.length} rows, but receipt says ${parsed.expectedItemCount}. OCR text may need parser update.`);
+      console.warn(
+        `ITEM COUNT MISMATCH: parsed ${parsedUnits} units across ${parsed.items.length} rows, but receipt says ${parsed.expectedItemCount}. OCR text may need parser update.`,
+      );
     }
 
     if (!parsed.transactionDate) {
@@ -169,7 +207,9 @@ serve(async (req) => {
         const headerMatch = await matchWarehouseByReceiptHeader(supabase, rawText);
         if (headerMatch) {
           warehouseId = headerMatch.id;
-          console.log(`10. Header fallback match: warehouse ${headerMatch.id} (was ${headerMatch.warehouse_code}) — backfilling real code ${parsed.warehouseCode}`);
+          console.log(
+            `10. Header fallback match: warehouse ${headerMatch.id} (was ${headerMatch.warehouse_code}) — backfilling real code ${parsed.warehouseCode}`,
+          );
 
           const { error: codeUpdateError } = await supabase
             .from('warehouses')
@@ -202,7 +242,7 @@ serve(async (req) => {
     }
 
     if (!duplicateReceiptId && parsed.transactionDate && parsed.subtotal != null) {
-      const tolerance = 0.10;
+      const tolerance = 0.1;
       const { data: existing } = await supabase
         .from('receipts')
         .select('id')
@@ -215,7 +255,11 @@ serve(async (req) => {
     }
 
     if (duplicateReceiptId) {
-      console.log('9a. Duplicate detected — existing receipt:', duplicateReceiptId, '— removing orphan image');
+      console.log(
+        '9a. Duplicate detected — existing receipt:',
+        duplicateReceiptId,
+        '— removing orphan image',
+      );
       await supabase.storage.from('receipts').remove([imagePath]);
       return new Response(
         JSON.stringify({ receiptId: duplicateReceiptId, itemCount: 0, duplicate: true }),
@@ -231,8 +275,9 @@ serve(async (req) => {
         user_id: userId,
         warehouse_id: warehouseId,
         transaction_date: parsed.transactionDate,
-        total_amount: parsed.subtotal
-          ?? parsed.items.reduce((sum, i) => sum + i.unitPrice - i.discountAmount, 0),
+        total_amount:
+          parsed.subtotal ??
+          parsed.items.reduce((sum, i) => sum + i.unitPrice - i.discountAmount, 0),
         tax_amount: parsed.tax,
         transaction_number: parsed.transactionNumber,
         image_path: imagePath,
@@ -242,7 +287,12 @@ serve(async (req) => {
       .single();
 
     if (receiptError) {
-      console.error('Receipt insert error:', receiptError.message, receiptError.details, receiptError.hint);
+      console.error(
+        'Receipt insert error:',
+        receiptError.message,
+        receiptError.details,
+        receiptError.hint,
+      );
       return errorResponse(receiptError.message, 500);
     }
     console.log('10. Receipt inserted:', receipt.id);
@@ -251,7 +301,10 @@ serve(async (req) => {
     for (const item of parsed.items) {
       const { data: product, error: productError } = await supabase
         .from('products')
-        .upsert({ sku: item.sku, name: item.description }, { onConflict: 'sku', ignoreDuplicates: false })
+        .upsert(
+          { sku: item.sku, name: item.description },
+          { onConflict: 'sku', ignoreDuplicates: false },
+        )
         .select('id')
         .single();
 
@@ -273,7 +326,9 @@ serve(async (req) => {
     console.log('11. Done — inserted', parsed.items.length, 'items');
     const computedTotal = parsed.items.reduce((sum, i) => sum + i.unitPrice - i.discountAmount, 0);
     if (parsed.subtotal !== null && Math.abs(computedTotal - parsed.subtotal) > 0.02) {
-      console.warn(`PRICE SUM MISMATCH: computed ${computedTotal.toFixed(2)} vs receipt subtotal ${parsed.subtotal}. Likely OCR digit drop — stored subtotal from receipt.`);
+      console.warn(
+        `PRICE SUM MISMATCH: computed ${computedTotal.toFixed(2)} vs receipt subtotal ${parsed.subtotal}. Likely OCR digit drop — stored subtotal from receipt.`,
+      );
     }
 
     // 8. Trigger price match check in the background — fire-and-forget so it
@@ -284,7 +339,13 @@ serve(async (req) => {
     // days later. The one-per-warehouse-per-day unique index makes a repeat
     // (second receipt from the same trip, or a GPS check-in already logged
     // that day) a silent no-op rather than a double award.
-    let checkIn: { warehouseName: string; totalStars: number; fanTier: string; tierUpgraded: boolean; newBadges: unknown[] } | null = null;
+    let checkIn: {
+      warehouseName: string;
+      totalStars: number;
+      fanTier: string;
+      tierUpgraded: boolean;
+      newBadges: unknown[];
+    } | null = null;
     if (warehouseId) {
       try {
         const { data: wh } = await supabase
@@ -314,7 +375,10 @@ serve(async (req) => {
         }
       } catch (err) {
         // A failed check-in must never cost the user their receipt.
-        console.warn('12. check-in award failed (non-blocking):', err instanceof Error ? err.message : String(err));
+        console.warn(
+          '12. check-in award failed (non-blocking):',
+          err instanceof Error ? err.message : String(err),
+        );
       }
     }
 
@@ -323,15 +387,17 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${serviceKey}`,
+        Authorization: `Bearer ${serviceKey}`,
       },
       body: JSON.stringify({ receipt_id: receipt.id, user_id: userId }),
-    }).then(async (res) => {
-      const text = await res.text();
-      console.log('12. price-match-check result:', text);
-    }).catch((err) => {
-      console.warn('12. price-match-check fire failed (non-blocking):', err?.message);
-    });
+    })
+      .then(async (res) => {
+        const text = await res.text();
+        console.log('12. price-match-check result:', text);
+      })
+      .catch((err) => {
+        console.warn('12. price-match-check fire failed (non-blocking):', err?.message);
+      });
 
     return new Response(
       JSON.stringify({
@@ -358,8 +424,8 @@ serve(async (req) => {
 });
 
 function errorResponse(message: string, status: number) {
-  return new Response(
-    JSON.stringify({ error: message }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status },
-  );
+  return new Response(JSON.stringify({ error: message }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status,
+  });
 }

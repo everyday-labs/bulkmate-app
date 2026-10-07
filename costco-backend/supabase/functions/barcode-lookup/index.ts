@@ -85,7 +85,13 @@ async function fetchOCRHistory(supabase: SupabaseClient, sku: string) {
   const avg_price = netPrices.reduce((s, v) => s + v, 0) / netPrices.length;
   const last_seen = data[0].transaction_date;
 
-  return { count: data.length, min_price, max_price, avg_price: Math.round(avg_price * 100) / 100, last_seen };
+  return {
+    count: data.length,
+    min_price,
+    max_price,
+    avg_price: Math.round(avg_price * 100) / 100,
+    last_seen,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +184,8 @@ async function resolveIngredients(
       // old shape and fall through to refetch instead, which also
       // self-heals the row into the current format on the next write below.
       const stored = cached.ingredients_json;
-      const isCurrentFormat = stored != null && !Array.isArray(stored) && Array.isArray(stored.items);
+      const isCurrentFormat =
+        stored != null && !Array.isArray(stored) && Array.isArray(stored.items);
 
       if (isCurrentFormat) {
         const items = stored.items as ClassifiedIngredient[];
@@ -273,10 +280,12 @@ async function resolveIngredients(
   }
 
   // 4. Neither source had anything
-  await supabase.from('products').upsert(
-    { sku, ingredients_source: 'none', ingredients_updated_at: now },
-    { onConflict: 'sku' },
-  );
+  await supabase
+    .from('products')
+    .upsert(
+      { sku, ingredients_source: 'none', ingredients_updated_at: now },
+      { onConflict: 'sku' },
+    );
   return EMPTY_INGREDIENTS;
 }
 
@@ -295,12 +304,20 @@ async function resolveIngredients(
 async function recordLookup(
   supabase: SupabaseClient,
   req: Request,
-  product: { sku: string; name: string; brand: string | null; image_url: string | null; sale_price: number | null },
+  product: {
+    sku: string;
+    name: string;
+    brand: string | null;
+    image_url: string | null;
+    sale_price: number | null;
+  },
 ) {
   try {
     const token = req.headers.get('Authorization')?.replace('Bearer ', '');
     if (!token) return;
-    const { data: { user } } = await supabase.auth.getUser(token);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser(token);
     if (!user) return;
     await supabase.from('product_lookups').insert({
       user_id: user.id,
@@ -331,12 +348,12 @@ serve(async (req) => {
     const apiKey = Deno.env.get('RAPIDAPI_KEY') ?? '';
     const fdcApiKey = Deno.env.get('USDA_FDC_API_KEY') ?? '';
 
-    const { sku } = await req.json() as { sku: string };
+    const { sku } = (await req.json()) as { sku: string };
     if (!sku?.trim()) {
-      return new Response(
-        JSON.stringify({ error: 'sku is required' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 },
-      );
+      return new Response(JSON.stringify({ error: 'sku is required' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
     }
 
     cleanSku = sku.trim();
@@ -345,7 +362,9 @@ serve(async (req) => {
     const [{ data: cached }, ocrHistory] = await Promise.all([
       supabase
         .from('products')
-        .select('sku, name, brand, image_url, pdp_url, rating, api_sale_price, api_list_price, api_online_price, api_price_updated_at, ingredients_text, ingredients_json, ingredients_source, ingredients_updated_at, nova_group, nutriscore_grade')
+        .select(
+          'sku, name, brand, image_url, pdp_url, rating, api_sale_price, api_list_price, api_online_price, api_price_updated_at, ingredients_text, ingredients_json, ingredients_source, ingredients_updated_at, nova_group, nutriscore_grade',
+        )
         .eq('sku', cleanSku)
         .maybeSingle(),
       fetchOCRHistory(supabase, cleanSku),
@@ -403,10 +422,10 @@ serve(async (req) => {
     if (!apiResult) {
       const hasPartialData = ingredients.items.length > 0 || ocrHistory.count > 0;
       if (!hasPartialData) {
-        return new Response(
-          JSON.stringify({ error: 'Product not found' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 },
-        );
+        return new Response(JSON.stringify({ error: 'Product not found' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404,
+        });
       }
 
       const response: ProductResponse = {
@@ -427,7 +446,9 @@ serve(async (req) => {
         source: 'partial',
       };
 
-      console.log(`barcode-lookup: partial hit (no RapidAPI match) for ${cleanSku} in ${Date.now() - start}ms`);
+      console.log(
+        `barcode-lookup: partial hit (no RapidAPI match) for ${cleanSku} in ${Date.now() - start}ms`,
+      );
       recordLookup(supabase, req, response); // fire and forget
       return new Response(JSON.stringify(response), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -436,9 +457,10 @@ serve(async (req) => {
 
     // 4. Persist to cache
     const now = new Date().toISOString();
-    const savings_amount = apiResult.list_price != null && apiResult.sale_price != null
-      ? Math.max(0, apiResult.list_price - apiResult.sale_price)
-      : null;
+    const savings_amount =
+      apiResult.list_price != null && apiResult.sale_price != null
+        ? Math.max(0, apiResult.list_price - apiResult.sale_price)
+        : null;
 
     await supabase.from('products').upsert(
       {
@@ -471,14 +493,13 @@ serve(async (req) => {
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unexpected error';
     console.error('barcode-lookup error:', message);
     await capturePostHogException(err, { functionName: 'barcode-lookup', sku: cleanSku });
-    return new Response(
-      JSON.stringify({ error: message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 },
-    );
+    return new Response(JSON.stringify({ error: message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
   }
 });

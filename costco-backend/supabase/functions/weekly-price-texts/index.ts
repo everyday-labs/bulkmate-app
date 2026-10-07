@@ -19,7 +19,10 @@ import { capturePostHogException } from '../_shared/posthog.ts';
 
 function laHourAndWeekday(now: Date): { hour: number; weekday: string } {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles', hour: 'numeric', hour12: false, weekday: 'short',
+    timeZone: 'America/Los_Angeles',
+    hour: 'numeric',
+    hour12: false,
+    weekday: 'short',
   }).formatToParts(now);
   return {
     hour: Number(parts.find((p) => p.type === 'hour')?.value),
@@ -45,7 +48,8 @@ function isServiceRole(req: Request): boolean {
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
-    status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
 serve(async (req) => {
@@ -88,25 +92,41 @@ serve(async (req) => {
         .is('dismissed_at', null)
         .gte('created_at', since);
       if (alertsError) {
-        console.error(`weekly-price-texts: alerts query failed for ${profile.id}:`, alertsError.message);
+        console.error(
+          `weekly-price-texts: alerts query failed for ${profile.id}:`,
+          alertsError.message,
+        );
         continue;
       }
       if (!alerts || alerts.length === 0) continue;
       usersWithDrops++;
 
       const total = alerts.reduce((sum, a) => sum + Number(a.delta), 0);
-      const sent = await sendBrevoSms(profile.phone_number!, buildWeeklySms(alerts.length, total), 'weekly-price-drops');
+      const sent = await sendBrevoSms(
+        profile.phone_number!,
+        buildWeeklySms(alerts.length, total),
+        'weekly-price-drops',
+      );
       if (!sent) continue;
 
       textsSent++;
       await supabase
         .from('price_alerts')
         .update({ texted_at: new Date().toISOString() })
-        .in('id', alerts.map((a) => a.id));
+        .in(
+          'id',
+          alerts.map((a) => a.id),
+        );
     }
 
-    console.log(`weekly-price-texts: ${recipients?.length ?? 0} opted in, ${usersWithDrops} with drops, ${textsSent} sent`);
-    return json({ opted_in: recipients?.length ?? 0, users_with_drops: usersWithDrops, texts_sent: textsSent });
+    console.log(
+      `weekly-price-texts: ${recipients?.length ?? 0} opted in, ${usersWithDrops} with drops, ${textsSent} sent`,
+    );
+    return json({
+      opted_in: recipients?.length ?? 0,
+      users_with_drops: usersWithDrops,
+      texts_sent: textsSent,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unexpected error';
     console.error('weekly-price-texts error:', message);

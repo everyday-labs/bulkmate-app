@@ -59,10 +59,7 @@ export default function TabsLayout() {
             tabBarIcon: tabIcon('home', 'home-outline'),
           }}
         />
-        <Tabs.Screen
-          name="scan"
-          options={{ href: null }}
-        />
+        <Tabs.Screen name="scan" options={{ href: null }} />
         <Tabs.Screen
           name="analytics"
           options={{

@@ -39,10 +39,14 @@ type SortKey = (typeof SORT_OPTIONS)[number]['key'];
 function sortReceipts(rows: ReceiptRow[], sortBy: SortKey): ReceiptRow[] {
   const list = [...rows];
   switch (sortBy) {
-    case 'date_desc': return list.sort((a, b) => b.transaction_date.localeCompare(a.transaction_date));
-    case 'date_asc': return list.sort((a, b) => a.transaction_date.localeCompare(b.transaction_date));
-    case 'amount_desc': return list.sort((a, b) => (b.total_amount ?? 0) - (a.total_amount ?? 0));
-    case 'amount_asc': return list.sort((a, b) => (a.total_amount ?? 0) - (b.total_amount ?? 0));
+    case 'date_desc':
+      return list.sort((a, b) => b.transaction_date.localeCompare(a.transaction_date));
+    case 'date_asc':
+      return list.sort((a, b) => a.transaction_date.localeCompare(b.transaction_date));
+    case 'amount_desc':
+      return list.sort((a, b) => (b.total_amount ?? 0) - (a.total_amount ?? 0));
+    case 'amount_asc':
+      return list.sort((a, b) => (a.total_amount ?? 0) - (b.total_amount ?? 0));
   }
 }
 
@@ -78,11 +82,16 @@ type AmountKey = (typeof AMOUNT_OPTIONS)[number]['key'];
 function matchesAmount(amount: number | null, key: AmountKey): boolean {
   const amt = amount ?? 0;
   switch (key) {
-    case 'all': return true;
-    case 'under50': return amt < 50;
-    case '50to150': return amt >= 50 && amt < 150;
-    case '150to300': return amt >= 150 && amt < 300;
-    case '300plus': return amt >= 300;
+    case 'all':
+      return true;
+    case 'under50':
+      return amt < 50;
+    case '50to150':
+      return amt >= 50 && amt < 150;
+    case '150to300':
+      return amt >= 150 && amt < 300;
+    case '300plus':
+      return amt >= 300;
   }
 }
 
@@ -92,7 +101,10 @@ export default function ReceiptsScreen() {
   const insets = useSafeAreaInsets();
   const Colors = useThemeColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
-  const { month: monthParam, label: monthLabelParam } = useLocalSearchParams<{ month?: string; label?: string }>();
+  const { month: monthParam, label: monthLabelParam } = useLocalSearchParams<{
+    month?: string;
+    label?: string;
+  }>();
   const [allReceipts, setAllReceipts] = useState<ReceiptRow[]>([]);
   const [displayed, setDisplayed] = useState<ReceiptRow[]>([]);
   const [query, setQuery] = useState('');
@@ -107,7 +119,9 @@ export default function ReceiptsScreen() {
   const [dateRangeFilter, setDateRangeFilter] = useState<DateRangeKey>('all');
   const [amountFilter, setAmountFilter] = useState<AmountKey>('all');
   const [sortBy, setSortBy] = useState<SortKey>('date_desc');
-  const [openMenu, setOpenMenu] = useState<'sort' | 'warehouse' | 'dateRange' | 'amount' | null>(null);
+  const [openMenu, setOpenMenu] = useState<'sort' | 'warehouse' | 'dateRange' | 'amount' | null>(
+    null,
+  );
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Arriving via a fresh navigation with a new ?month= (e.g. tapping a
@@ -124,7 +138,9 @@ export default function ReceiptsScreen() {
 
   const warehouseOptions = useMemo(() => {
     const set = new Set<string>();
-    allReceipts.forEach((r) => { if (r.warehouse_name) set.add(r.warehouse_name); });
+    allReceipts.forEach((r) => {
+      if (r.warehouse_name) set.add(r.warehouse_name);
+    });
     return Array.from(set).sort();
   }, [allReceipts]);
 
@@ -133,11 +149,13 @@ export default function ReceiptsScreen() {
     if (warehouseFilter) list = list.filter((r) => r.warehouse_name === warehouseFilter);
     const cutoff = dateRangeCutoff(dateRangeFilter);
     if (cutoff) list = list.filter((r) => r.transaction_date >= cutoff);
-    if (amountFilter !== 'all') list = list.filter((r) => matchesAmount(r.total_amount, amountFilter));
+    if (amountFilter !== 'all')
+      list = list.filter((r) => matchesAmount(r.total_amount, amountFilter));
     return list;
   }, [monthFiltered, warehouseFilter, dateRangeFilter, amountFilter]);
 
-  const hasActiveFilters = !!monthFilter || !!warehouseFilter || dateRangeFilter !== 'all' || amountFilter !== 'all';
+  const hasActiveFilters =
+    !!monthFilter || !!warehouseFilter || dateRangeFilter !== 'all' || amountFilter !== 'all';
 
   // Keyed on the user id, not [] — load() filters by session.user.id, and on
   // a cold start this screen can focus before auth resolves. Without the
@@ -204,7 +222,9 @@ export default function ReceiptsScreen() {
     try {
       const { data, error: err } = await supabase
         .from('receipts')
-        .select('id, transaction_date, total_amount, warehouses(name, warehouse_code), receipt_items(id)')
+        .select(
+          'id, transaction_date, total_amount, warehouses(name, warehouse_code), receipt_items(id)',
+        )
         .eq('user_id', session?.user.id ?? '')
         .order('transaction_date', { ascending: false })
         .limit(100);
@@ -323,9 +343,17 @@ export default function ReceiptsScreen() {
             <Pressable
               key={opt.key}
               style={({ pressed }) => [styles.dropdownItem, pressed && { opacity: 0.7 }]}
-              onPress={() => { setSortBy(opt.key); setOpenMenu(null); }}
+              onPress={() => {
+                setSortBy(opt.key);
+                setOpenMenu(null);
+              }}
             >
-              <Text style={[styles.dropdownItemText, sortBy === opt.key && styles.dropdownItemTextActive]}>
+              <Text
+                style={[
+                  styles.dropdownItemText,
+                  sortBy === opt.key && styles.dropdownItemTextActive,
+                ]}
+              >
                 {opt.label}
               </Text>
               {sortBy === opt.key && <Text style={styles.dropdownCheck}>✓</Text>}
@@ -338,9 +366,14 @@ export default function ReceiptsScreen() {
         <View style={styles.dropdownMenu}>
           <Pressable
             style={({ pressed }) => [styles.dropdownItem, pressed && { opacity: 0.7 }]}
-            onPress={() => { setWarehouseFilter(null); setOpenMenu(null); }}
+            onPress={() => {
+              setWarehouseFilter(null);
+              setOpenMenu(null);
+            }}
           >
-            <Text style={[styles.dropdownItemText, !warehouseFilter && styles.dropdownItemTextActive]}>
+            <Text
+              style={[styles.dropdownItemText, !warehouseFilter && styles.dropdownItemTextActive]}
+            >
               All Warehouses
             </Text>
             {!warehouseFilter && <Text style={styles.dropdownCheck}>✓</Text>}
@@ -349,9 +382,18 @@ export default function ReceiptsScreen() {
             <Pressable
               key={w}
               style={({ pressed }) => [styles.dropdownItem, pressed && { opacity: 0.7 }]}
-              onPress={() => { setWarehouseFilter(w); setOpenMenu(null); }}
+              onPress={() => {
+                setWarehouseFilter(w);
+                setOpenMenu(null);
+              }}
             >
-              <Text style={[styles.dropdownItemText, warehouseFilter === w && styles.dropdownItemTextActive]} numberOfLines={1}>
+              <Text
+                style={[
+                  styles.dropdownItemText,
+                  warehouseFilter === w && styles.dropdownItemTextActive,
+                ]}
+                numberOfLines={1}
+              >
                 {w}
               </Text>
               {warehouseFilter === w && <Text style={styles.dropdownCheck}>✓</Text>}
@@ -366,9 +408,17 @@ export default function ReceiptsScreen() {
             <Pressable
               key={opt.key}
               style={({ pressed }) => [styles.dropdownItem, pressed && { opacity: 0.7 }]}
-              onPress={() => { setDateRangeFilter(opt.key); setOpenMenu(null); }}
+              onPress={() => {
+                setDateRangeFilter(opt.key);
+                setOpenMenu(null);
+              }}
             >
-              <Text style={[styles.dropdownItemText, dateRangeFilter === opt.key && styles.dropdownItemTextActive]}>
+              <Text
+                style={[
+                  styles.dropdownItemText,
+                  dateRangeFilter === opt.key && styles.dropdownItemTextActive,
+                ]}
+              >
                 {opt.label}
               </Text>
               {dateRangeFilter === opt.key && <Text style={styles.dropdownCheck}>✓</Text>}
@@ -383,9 +433,17 @@ export default function ReceiptsScreen() {
             <Pressable
               key={opt.key}
               style={({ pressed }) => [styles.dropdownItem, pressed && { opacity: 0.7 }]}
-              onPress={() => { setAmountFilter(opt.key); setOpenMenu(null); }}
+              onPress={() => {
+                setAmountFilter(opt.key);
+                setOpenMenu(null);
+              }}
             >
-              <Text style={[styles.dropdownItemText, amountFilter === opt.key && styles.dropdownItemTextActive]}>
+              <Text
+                style={[
+                  styles.dropdownItemText,
+                  amountFilter === opt.key && styles.dropdownItemTextActive,
+                ]}
+              >
                 {opt.label}
               </Text>
               {amountFilter === opt.key && <Text style={styles.dropdownCheck}>✓</Text>}
@@ -411,7 +469,9 @@ export default function ReceiptsScreen() {
           )}
           {warehouseFilter && (
             <View style={styles.filterChip}>
-              <Text style={styles.filterChipText} numberOfLines={1}>{warehouseFilter}</Text>
+              <Text style={styles.filterChipText} numberOfLines={1}>
+                {warehouseFilter}
+              </Text>
               <Pressable onPress={() => setWarehouseFilter(null)} hitSlop={8}>
                 <Text style={styles.filterChipClose}>✕</Text>
               </Pressable>
@@ -454,7 +514,9 @@ export default function ReceiptsScreen() {
         <FlatList
           data={sortedDisplayed}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={sortedDisplayed.length === 0 ? styles.emptyContainer : styles.listContent}
+          contentContainerStyle={
+            sortedDisplayed.length === 0 ? styles.emptyContainer : styles.listContent
+          }
           refreshControl={
             !isSearching ? (
               <RefreshControl
@@ -476,7 +538,10 @@ export default function ReceiptsScreen() {
             isSearching ? (
               <NoResults query={query.trim()} styles={styles} />
             ) : hasActiveFilters ? (
-              <MonthEmptyState label={monthFilter?.label ?? warehouseFilter ?? 'your filters'} styles={styles} />
+              <MonthEmptyState
+                label={monthFilter?.label ?? warehouseFilter ?? 'your filters'}
+                styles={styles}
+              />
             ) : (
               <EmptyState styles={styles} />
             )
@@ -489,9 +554,19 @@ export default function ReceiptsScreen() {
 
 type Styles = ReturnType<typeof makeStyles>;
 
-function ReceiptCard({ receipt, onPress, styles }: { receipt: ReceiptRow; onPress: () => void; styles: Styles }) {
+function ReceiptCard({
+  receipt,
+  onPress,
+  styles,
+}: {
+  receipt: ReceiptRow;
+  onPress: () => void;
+  styles: Styles;
+}) {
   const date = new Date(receipt.transaction_date + 'T00:00:00').toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
   });
   const warehouse = receipt.warehouse_name ?? 'Costco Warehouse';
   const code = receipt.warehouse_code ? `#${receipt.warehouse_code}` : null;
@@ -506,11 +581,14 @@ function ReceiptCard({ receipt, onPress, styles }: { receipt: ReceiptRow; onPres
       </View>
       <View style={styles.cardBody}>
         <View style={styles.cardTopRow}>
-          <Text style={styles.cardWarehouse} numberOfLines={1}>{warehouse}</Text>
+          <Text style={styles.cardWarehouse} numberOfLines={1}>
+            {warehouse}
+          </Text>
           {code && <Text style={styles.cardCode}>{code}</Text>}
         </View>
         <Text style={styles.cardMeta}>
-          {date}{'  ·  '}
+          {date}
+          {'  ·  '}
           <Text style={styles.cardItemCount}>
             {receipt.item_count} {receipt.item_count === 1 ? 'item' : 'items'}
           </Text>
@@ -529,7 +607,9 @@ function ReceiptCard({ receipt, onPress, styles }: { receipt: ReceiptRow; onPres
 function EmptyState({ styles }: { styles: Styles }) {
   return (
     <View style={styles.emptyInner}>
-      <FloatView><Text style={styles.emptyIcon}>🧾</Text></FloatView>
+      <FloatView>
+        <Text style={styles.emptyIcon}>🧾</Text>
+      </FloatView>
       <Text style={styles.emptyTitle}>No receipts yet</Text>
       <Text style={styles.emptySubtitle}>
         Scan your first Costco receipt to start tracking your spending.
@@ -541,9 +621,13 @@ function EmptyState({ styles }: { styles: Styles }) {
 function MonthEmptyState({ label, styles }: { label: string; styles: Styles }) {
   return (
     <View style={styles.emptyInner}>
-      <FloatView><Text style={styles.emptyIcon}>🗓</Text></FloatView>
+      <FloatView>
+        <Text style={styles.emptyIcon}>🗓</Text>
+      </FloatView>
       <Text style={styles.emptyTitle}>No matching receipts</Text>
-      <Text style={styles.emptySubtitle}>Nothing found for "{label}". Try clearing the filter to see all receipts.</Text>
+      <Text style={styles.emptySubtitle}>
+        Nothing found for "{label}". Try clearing the filter to see all receipts.
+      </Text>
     </View>
   );
 }
@@ -551,7 +635,9 @@ function MonthEmptyState({ label, styles }: { label: string; styles: Styles }) {
 function NoResults({ query, styles }: { query: string; styles: Styles }) {
   return (
     <View style={styles.emptyInner}>
-      <FloatView><Text style={styles.emptyIcon}>🔍</Text></FloatView>
+      <FloatView>
+        <Text style={styles.emptyIcon}>🔍</Text>
+      </FloatView>
       <Text style={styles.emptyTitle}>No results</Text>
       <Text style={styles.emptySubtitle}>
         Nothing found for "{query}".{'\n'}Try a different item name, SKU, or warehouse.
@@ -560,196 +646,212 @@ function NoResults({ query, styles }: { query: string; styles: Styles }) {
   );
 }
 
-const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['2xl'] },
+const makeStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.background },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['2xl'] },
 
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.xl,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  backButton: { width: 60 },
-  backText: { fontSize: fontSize.xl, color: Colors.costcoRed, fontWeight: '500' },
-  title: { fontSize: fontSize.xl, fontWeight: '700', color: Colors.gray[900], letterSpacing: letterSpacing.tight },
+    // Header
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingBottom: spacing.md,
+      paddingHorizontal: spacing.xl,
+      backgroundColor: Colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    backButton: { width: 60 },
+    backText: { fontSize: fontSize.xl, color: Colors.costcoRed, fontWeight: '500' },
+    title: {
+      fontSize: fontSize.xl,
+      fontWeight: '700',
+      color: Colors.gray[900],
+      letterSpacing: letterSpacing.tight,
+    },
 
-  // Search
-  searchRow: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md - 2,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.gray[100],
-    borderRadius: radius.xl,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 1,
-    gap: spacing.sm,
-  },
-  searchIcon: { fontSize: 14 },
-  searchInput: { flex: 1, fontSize: fontSize.md, color: Colors.gray[900], padding: 0 },
+    // Search
+    searchRow: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md - 2,
+      backgroundColor: Colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    searchBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: Colors.gray[100],
+      borderRadius: radius.xl,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + 1,
+      gap: spacing.sm,
+    },
+    searchIcon: { fontSize: 14 },
+    searchInput: { flex: 1, fontSize: fontSize.md, color: Colors.gray[900], padding: 0 },
 
-  // Sort + filter controls
-  controlsRow: {
-    flexGrow: 0,
-    maxHeight: 52,
-    backgroundColor: Colors.surface,
-  },
-  controlsRowContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xs,
-  },
-  controlPill: {
-    backgroundColor: Colors.gray[100],
-    borderRadius: radius.pill,
-    paddingVertical: spacing.xs + 1,
-    paddingHorizontal: spacing.md,
-  },
-  controlPillText: { fontSize: fontSize.xs, fontWeight: '700', color: Colors.gray[700] },
-  dropdownMenu: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.xs,
-    backgroundColor: Colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-    ...shadow.sm,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  dropdownItemText: { fontSize: fontSize.sm, color: Colors.gray[700], flexShrink: 1 },
-  dropdownItemTextActive: { color: Colors.costcoRed, fontWeight: '700' },
-  dropdownCheck: { fontSize: fontSize.sm, color: Colors.costcoRed, fontWeight: '700' },
+    // Sort + filter controls
+    controlsRow: {
+      flexGrow: 0,
+      maxHeight: 52,
+      backgroundColor: Colors.surface,
+    },
+    controlsRowContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.xs,
+    },
+    controlPill: {
+      backgroundColor: Colors.gray[100],
+      borderRadius: radius.pill,
+      paddingVertical: spacing.xs + 1,
+      paddingHorizontal: spacing.md,
+    },
+    controlPillText: { fontSize: fontSize.xs, fontWeight: '700', color: Colors.gray[700] },
+    dropdownMenu: {
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.xs,
+      backgroundColor: Colors.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: Colors.border,
+      overflow: 'hidden',
+      ...shadow.sm,
+    },
+    dropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    dropdownItemText: { fontSize: fontSize.sm, color: Colors.gray[700], flexShrink: 1 },
+    dropdownItemTextActive: { color: Colors.costcoRed, fontWeight: '700' },
+    dropdownCheck: { fontSize: fontSize.sm, color: Colors.costcoRed, fontWeight: '700' },
 
-  // Active filter chips (dismissible)
-  filterChipRow: {
-    flexGrow: 0,
-    maxHeight: 60,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  filterChipRowContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: Colors.executiveNavySubtle,
-    borderRadius: radius.pill,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-  },
-  filterChipText: { fontSize: fontSize.sm, fontWeight: '700', color: Colors.executiveNavy },
-  filterChipClose: { fontSize: 12, fontWeight: '700', color: Colors.executiveNavy },
+    // Active filter chips (dismissible)
+    filterChipRow: {
+      flexGrow: 0,
+      maxHeight: 60,
+      backgroundColor: Colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    filterChipRowContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.sm,
+    },
+    filterChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: Colors.executiveNavySubtle,
+      borderRadius: radius.pill,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+    },
+    filterChipText: { fontSize: fontSize.sm, fontWeight: '700', color: Colors.executiveNavy },
+    filterChipClose: { fontSize: 12, fontWeight: '700', color: Colors.executiveNavy },
 
-  // List
-  listContent: { paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, gap: 2 },
-  emptyContainer: { flex: 1 },
+    // List
+    listContent: { paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, gap: 2 },
+    emptyContainer: { flex: 1 },
 
-  // Receipt card
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    gap: spacing.md,
-    ...shadow.sm,
-    marginVertical: 3,
-  },
-  cardPressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
-  cardIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.lg,
-    backgroundColor: Colors.gray[100],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardIconText: { fontSize: 22 },
-  cardBody: { flex: 1 },
-  cardTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 3 },
-  cardWarehouse: {
-    fontSize: fontSize.md,
-    fontWeight: '700',
-    color: Colors.gray[900],
-    flexShrink: 1,
-  },
-  cardCode: {
-    fontSize: fontSize.xs,
-    fontWeight: '600',
-    color: Colors.gray[400],
-    backgroundColor: Colors.gray[100],
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-  },
-  cardMeta: { fontSize: fontSize.sm, color: Colors.gray[400] },
-  cardItemCount: { color: Colors.gray[400] },
-  cardRight: { alignItems: 'flex-end', gap: spacing.xs },
-  cardTotal: {
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: Colors.executiveNavy,
-    letterSpacing: letterSpacing.tight,
-  },
-  chevron: { fontSize: 18, color: Colors.gray[300] },
-  separator: { height: 0 },
+    // Receipt card
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing.lg,
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      gap: spacing.md,
+      ...shadow.sm,
+      marginVertical: 3,
+    },
+    cardPressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
+    cardIconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: radius.lg,
+      backgroundColor: Colors.gray[100],
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cardIconText: { fontSize: 22 },
+    cardBody: { flex: 1 },
+    cardTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 3 },
+    cardWarehouse: {
+      fontSize: fontSize.md,
+      fontWeight: '700',
+      color: Colors.gray[900],
+      flexShrink: 1,
+    },
+    cardCode: {
+      fontSize: fontSize.xs,
+      fontWeight: '600',
+      color: Colors.gray[400],
+      backgroundColor: Colors.gray[100],
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: radius.sm,
+    },
+    cardMeta: { fontSize: fontSize.sm, color: Colors.gray[400] },
+    cardItemCount: { color: Colors.gray[400] },
+    cardRight: { alignItems: 'flex-end', gap: spacing.xs },
+    cardTotal: {
+      fontSize: fontSize.lg,
+      fontWeight: '700',
+      color: Colors.executiveNavy,
+      letterSpacing: letterSpacing.tight,
+    },
+    chevron: { fontSize: 18, color: Colors.gray[300] },
+    separator: { height: 0 },
 
-  // Empty / no results
-  emptyInner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['4xl'] },
-  emptyIcon: { fontSize: 52, marginBottom: spacing.xl },
-  emptyTitle: {
-    fontSize: fontSize['3xl'],
-    fontWeight: '700',
-    color: Colors.gray[800],
-    marginBottom: spacing.sm,
-    letterSpacing: letterSpacing.tight,
-  },
-  emptySubtitle: {
-    fontSize: fontSize.md,
-    color: Colors.gray[400],
-    textAlign: 'center',
-    lineHeight: 22,
-  },
+    // Empty / no results
+    emptyInner: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: spacing['4xl'],
+    },
+    emptyIcon: { fontSize: 52, marginBottom: spacing.xl },
+    emptyTitle: {
+      fontSize: fontSize['3xl'],
+      fontWeight: '700',
+      color: Colors.gray[800],
+      marginBottom: spacing.sm,
+      letterSpacing: letterSpacing.tight,
+    },
+    emptySubtitle: {
+      fontSize: fontSize.md,
+      color: Colors.gray[400],
+      textAlign: 'center',
+      lineHeight: 22,
+    },
 
-  // Error
-  errorText: { fontSize: fontSize.md, color: Colors.gray[700], textAlign: 'center', marginBottom: spacing.lg },
-  retryButton: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing['2xl'],
-    backgroundColor: Colors.costcoRedSolid,
-    borderRadius: radius.lg,
-  },
-  retryText: { color: Colors.white, fontWeight: '700', fontSize: fontSize.md },
-});
+    // Error
+    errorText: {
+      fontSize: fontSize.md,
+      color: Colors.gray[700],
+      textAlign: 'center',
+      marginBottom: spacing.lg,
+    },
+    retryButton: {
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing['2xl'],
+      backgroundColor: Colors.costcoRedSolid,
+      borderRadius: radius.lg,
+    },
+    retryText: { color: Colors.white, fontWeight: '700', fontSize: fontSize.md },
+  });

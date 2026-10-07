@@ -56,7 +56,9 @@ export default function VerifyPhoneScreen() {
       .select('phone_number')
       .eq('id', session.user.id)
       .single()
-      .then(({ data }) => { if (data?.phone_number) setPhone(data.phone_number); });
+      .then(({ data }) => {
+        if (data?.phone_number) setPhone(data.phone_number);
+      });
   }, [session?.user.id]);
 
   async function sendCode() {
@@ -87,12 +89,18 @@ export default function VerifyPhoneScreen() {
       return;
     }
     posthog?.capture('sms_alerts_enabled');
-    Alert.alert('Weekly texts are on', 'You’ll get a summary of price drops every Friday afternoon.');
+    Alert.alert(
+      'Weekly texts are on',
+      'You’ll get a summary of price drops every Friday afternoon.',
+    );
     router.back();
   }
 
   return (
-    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <Pressable
           onPress={() => router.back()}
@@ -113,8 +121,8 @@ export default function VerifyPhoneScreen() {
           {step === 'phone' ? (
             <>
               <Text style={styles.body}>
-                Get one text every Friday afternoon with the price drops on things you bought —
-                and how much you could get back.
+                Get one text every Friday afternoon with the price drops on things you bought — and
+                how much you could get back.
               </Text>
               <View style={styles.field}>
                 <Text style={styles.label}>MOBILE NUMBER</Text>
@@ -133,18 +141,25 @@ export default function VerifyPhoneScreen() {
                   onSubmitEditing={sendCode}
                   autoFocus
                 />
-                <Text style={styles.hint}>Include your country code (+1 for the US and Canada).</Text>
+                <Text style={styles.hint}>
+                  Include your country code (+1 for the US and Canada).
+                </Text>
               </View>
             </>
           ) : (
             <>
               <Text style={styles.body}>
-                We texted a 6-digit code to <Text style={styles.bodyStrong}>{phone}</Text>. It expires in 10 minutes.
+                We texted a 6-digit code to <Text style={styles.bodyStrong}>{phone}</Text>. It
+                expires in 10 minutes.
               </Text>
               <View style={styles.field}>
                 <Text style={styles.label}>CODE</Text>
                 <TextInput
-                  style={[styles.input, styles.codeInput, focused === 'code' && styles.inputFocused]}
+                  style={[
+                    styles.input,
+                    styles.codeInput,
+                    focused === 'code' && styles.inputFocused,
+                  ]}
                   value={code}
                   onChangeText={(t) => setCode(t.replace(/\D/g, ''))}
                   onFocus={() => setFocused('code')}
@@ -168,15 +183,24 @@ export default function VerifyPhoneScreen() {
             onPress={step === 'phone' ? sendCode : verifyCode}
             disabled={loading}
           >
-            {loading
-              ? <ActivityIndicator color={Colors.white} />
-              : <Text style={styles.primaryBtnText}>{step === 'phone' ? 'Send Code' : 'Verify & Turn On'}</Text>}
+            {loading ? (
+              <ActivityIndicator color={Colors.white} />
+            ) : (
+              <Text style={styles.primaryBtnText}>
+                {step === 'phone' ? 'Send Code' : 'Verify & Turn On'}
+              </Text>
+            )}
           </Pressable>
 
           {step === 'code' && (
-            <Pressable onPress={() => setStep('phone')} hitSlop={8} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+            <Pressable
+              onPress={() => setStep('phone')}
+              hitSlop={8}
+              style={({ pressed }) => pressed && { opacity: 0.6 }}
+            >
               <Text style={styles.switchText}>
-                Wrong number or no text?{'  '}<Text style={styles.switchLink}>Try again</Text>
+                Wrong number or no text?{'  '}
+                <Text style={styles.switchLink}>Try again</Text>
               </Text>
             </Pressable>
           )}
@@ -193,73 +217,84 @@ export default function VerifyPhoneScreen() {
   );
 }
 
-const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.background },
+const makeStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: Colors.background },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerBack:     { minWidth: 60 },
-  headerBackText: { fontSize: fontSize.md, color: Colors.gray[500], fontWeight: '500' },
-  headerTitle:    { fontSize: fontSize.lg, fontWeight: '700', color: Colors.gray[900] },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.lg,
+      backgroundColor: Colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    headerBack: { minWidth: 60 },
+    headerBackText: { fontSize: fontSize.md, color: Colors.gray[500], fontWeight: '500' },
+    headerTitle: { fontSize: fontSize.lg, fontWeight: '700', color: Colors.gray[900] },
 
-  scroll: { padding: spacing['2xl'], gap: spacing.lg },
+    scroll: { padding: spacing['2xl'], gap: spacing.lg },
 
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: radius['2xl'],
-    padding: spacing.xl,
-    ...shadow.sm,
-  },
-  body: {
-    fontSize: fontSize.sm,
-    color: Colors.gray[500],
-    lineHeight: fontSize.sm * 1.5,
-    marginBottom: spacing.xl,
-  },
-  bodyStrong: { color: Colors.gray[900], fontWeight: '700' },
+    card: {
+      backgroundColor: Colors.surface,
+      borderRadius: radius['2xl'],
+      padding: spacing.xl,
+      ...shadow.sm,
+    },
+    body: {
+      fontSize: fontSize.sm,
+      color: Colors.gray[500],
+      lineHeight: fontSize.sm * 1.5,
+      marginBottom: spacing.xl,
+    },
+    bodyStrong: { color: Colors.gray[900], fontWeight: '700' },
 
-  field: { gap: spacing.xs, marginBottom: spacing.lg },
-  label: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-  },
-  input: {
-    backgroundColor: Colors.gray[100],
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    fontSize: fontSize.md,
-    color: Colors.gray[900],
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  inputFocused: { backgroundColor: Colors.surface, borderColor: Colors.executiveNavy },
-  codeInput: { fontSize: fontSize['2xl'], letterSpacing: 8, textAlign: 'center' },
-  hint: { fontSize: fontSize.xs, color: Colors.gray[400] },
+    field: { gap: spacing.xs, marginBottom: spacing.lg },
+    label: {
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+      color: Colors.gray[400],
+      letterSpacing: letterSpacing.caps,
+    },
+    input: {
+      backgroundColor: Colors.gray[100],
+      borderRadius: radius.lg,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      fontSize: fontSize.md,
+      color: Colors.gray[900],
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+    },
+    inputFocused: { backgroundColor: Colors.surface, borderColor: Colors.executiveNavy },
+    codeInput: { fontSize: fontSize['2xl'], letterSpacing: 8, textAlign: 'center' },
+    hint: { fontSize: fontSize.xs, color: Colors.gray[400] },
 
-  primaryBtn: {
-    backgroundColor: Colors.costcoRedSolid,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-    ...shadow.sm,
-  },
-  primaryBtnPressed: { backgroundColor: Colors.costcoRedDark, opacity: 0.95 },
-  primaryBtnText: { color: Colors.white, fontSize: fontSize.lg, fontWeight: '700', letterSpacing: letterSpacing.wide },
+    primaryBtn: {
+      backgroundColor: Colors.costcoRedSolid,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.lg,
+      alignItems: 'center',
+      marginBottom: spacing.lg,
+      ...shadow.sm,
+    },
+    primaryBtnPressed: { backgroundColor: Colors.costcoRedDark, opacity: 0.95 },
+    primaryBtnText: {
+      color: Colors.white,
+      fontSize: fontSize.lg,
+      fontWeight: '700',
+      letterSpacing: letterSpacing.wide,
+    },
 
-  switchText: { textAlign: 'center', fontSize: fontSize.sm, color: Colors.gray[500] },
-  switchLink: { color: Colors.executiveNavy, fontWeight: '700' },
+    switchText: { textAlign: 'center', fontSize: fontSize.sm, color: Colors.gray[500] },
+    switchLink: { color: Colors.executiveNavy, fontWeight: '700' },
 
-  legal: { fontSize: fontSize.xs, color: Colors.gray[400], lineHeight: fontSize.xs * 1.6, textAlign: 'center' },
-});
+    legal: {
+      fontSize: fontSize.xs,
+      color: Colors.gray[400],
+      lineHeight: fontSize.xs * 1.6,
+      textAlign: 'center',
+    },
+  });

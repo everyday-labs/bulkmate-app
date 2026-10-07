@@ -8,7 +8,14 @@ module.exports = defineConfig([
   // Formatting is Prettier's job (repo root .prettierrc.json) — turn off overlapping rules.
   prettierConfig,
   {
-    ignores: ['dist/*', 'ios/*', 'android/*', 'coverage/*', '.expo/*', 'e2e/**/playwright-report/*'],
+    ignores: [
+      'dist/*',
+      'ios/*',
+      'android/*',
+      'coverage/*',
+      '.expo/*',
+      'e2e/**/playwright-report/*',
+    ],
   },
   {
     rules: {
@@ -24,6 +31,13 @@ module.exports = defineConfig([
   },
   {
     files: ['scripts/**/*.js', '*.config.js'],
-    languageOptions: { globals: { __dirname: 'readonly', require: 'readonly', module: 'writable', process: 'readonly' } },
+    languageOptions: {
+      globals: {
+        __dirname: 'readonly',
+        require: 'readonly',
+        module: 'writable',
+        process: 'readonly',
+      },
+    },
   },
 ]);

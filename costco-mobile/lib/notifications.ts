@@ -41,12 +41,11 @@ export async function requestAndSavePushToken(): Promise<'granted' | 'denied'> {
     const { data: token } = await Notifications.getExpoPushTokenAsync({
       projectId: EAS_PROJECT_ID,
     });
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (session) {
-      await supabase
-        .from('profiles')
-        .update({ push_token: token })
-        .eq('id', session.user.id);
+      await supabase.from('profiles').update({ push_token: token }).eq('id', session.user.id);
     }
   } catch {
     // Token fetch fails on simulators — not a hard error

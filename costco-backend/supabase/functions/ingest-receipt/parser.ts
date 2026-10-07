@@ -21,7 +21,10 @@ export type ParsedItem = {
 };
 
 export function parseReceiptText(text: string): ParsedReceipt {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const lines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
   const items = extractItems(lines);
   const expectedItemCount = extractItemCount(lines);
   const subtotal = extractSubtotal(lines);
@@ -39,8 +42,7 @@ export function parseReceiptText(text: string): ParsedReceipt {
     // into one row with quantity > 1. Using items.length here would report a
     // false mismatch on every receipt containing a multi-buy.
     itemCountMismatch:
-      expectedItemCount !== null &&
-      items.reduce((n, i) => n + i.quantity, 0) !== expectedItemCount,
+      expectedItemCount !== null && items.reduce((n, i) => n + i.quantity, 0) !== expectedItemCount,
   };
 }
 
@@ -58,7 +60,8 @@ function extractDate(lines: string[]): string | null {
     if (match) {
       const [, month, day, yearRaw] = match;
       const year = yearRaw.length === 2 ? `20${yearRaw}` : yearRaw;
-      let m = parseInt(month), d = parseInt(day);
+      let m = parseInt(month),
+        d = parseInt(day);
       if (m > 12 && d <= 12) [m, d] = [d, m];
       if (m < 1 || m > 12 || d < 1 || d > 31) continue;
       return `${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -142,7 +145,10 @@ function extractTransactionNumber(lines: string[]): string | null {
   // Appears after the TOTAL/payment section as a standalone 10-20 digit line.
   let pastTotal = false;
   for (const line of lines) {
-    if (/^\*+\s*TOTAL/i.test(line)) { pastTotal = true; continue; }
+    if (/^\*+\s*TOTAL/i.test(line)) {
+      pastTotal = true;
+      continue;
+    }
     if (pastTotal && /^\d{10,20}$/.test(line)) return line;
   }
 
@@ -217,7 +223,7 @@ function extractItems(lines: string[]): ParsedItem[] {
   // ── Pass 1: classify each line ────────────────────────────────────────────
 
   // Coupon/CRV barcodes: 10+ leading digits (e.g. "00003790641898148", "0600000000 CA REDEMP V")
-  const couponPattern   = /^\d{10,}/;
+  const couponPattern = /^\d{10,}/;
   // SKU with inline price at end: "1234 ITEM NAME 8.99" or "1234567 8.99 A"
   // Min 4 digits: some Costco SKUs (e.g. 7812 YELLOW ONION) are 4 digits.
   // Optional leading letter may be attached ("E200303") or space-separated
@@ -231,16 +237,21 @@ function extractItems(lines: string[]): ParsedItem[] {
   // result. The section boundaries (Member → SUBTOTAL) plus the aggregate and
   // street-address filters are what keep short numbers from being misread as
   // SKUs, not the digit count itself.
-  const skuWithPrice    = /^(?:[A-Z]\s*)?([0-9]{3,9})\s+(.*?)\s+(\d{1,3}\.\d{2})\s*[A-Z]?\s*$/;
+  const skuWithPrice = /^(?:[A-Z]\s*)?([0-9]{3,9})\s+(.*?)\s+(\d{1,3}\.\d{2})\s*[A-Z]?\s*$/;
   // SKU without price: "1234 ITEM NAME" or just "1234567"
-  const skuOnly         = /^(?:[A-Z]\s*)?([0-9]{3,9})(?:\s+(.*))?$/;
+  const skuOnly = /^(?:[A-Z]\s*)?([0-9]{3,9})(?:\s+(.*))?$/;
   // Standalone price on its own line: "8.99", "24.99 A", ".99" (OCR-dropped leading digit)
   // \d* allows zero leading digits; \s*[A-Z]?\s* allows optional trailing tax code letter.
   const standalonePrice = /^(\d*\.\d{2})\s*[A-Z]?\s*$/;
   // Instant-savings line: "2.30-" or "3.00-A" (trailing tax code variant)
-  const savingsLine     = /^(\d{1,3}\.\d{2})-\s*[A-Z]?\s*$/;
+  const savingsLine = /^(\d{1,3}\.\d{2})-\s*[A-Z]?\s*$/;
 
-  type SkuEntry = { sku: string; description: string; price: number | null; discountAmount: number };
+  type SkuEntry = {
+    sku: string;
+    description: string;
+    price: number | null;
+    discountAmount: number;
+  };
   const skuEntries: SkuEntry[] = [];
   // Indices of skuEntries still waiting for a standalone price, oldest first.
   const pending: number[] = [];
@@ -250,7 +261,8 @@ function extractItems(lines: string[]): ParsedItem[] {
 
   // Lines that should never appear in the item section but might if OCR misreads
   // the SUBTOTAL boundary — skip them defensively.
-  const aggregateLinePattern = /^(SUB[\s-]?TOTAL|TAX\b|\*{2,}|CHANGE\b|APPROVED|VISA|AMOUNT:|INSTANT\s+SAVINGS|TOTAL\s+NUMBER)/i;
+  const aggregateLinePattern =
+    /^(SUB[\s-]?TOTAL|TAX\b|\*{2,}|CHANGE\b|APPROVED|VISA|AMOUNT:|INSTANT\s+SAVINGS|TOTAL\s+NUMBER)/i;
 
   for (const line of itemLines) {
     if (!line || aggregateLinePattern.test(line)) continue;
@@ -275,8 +287,8 @@ function extractItems(lines: string[]): ParsedItem[] {
     // SKU with inline price
     const withPrice = line.match(skuWithPrice);
     if (withPrice) {
-      const sku   = withPrice[1].replace(/^([A-Z])(?=[0-9])/, '');
-      const desc  = withPrice[2].replace(/\s+[A-Z]$/, '').trim();
+      const sku = withPrice[1].replace(/^([A-Z])(?=[0-9])/, '');
+      const desc = withPrice[2].replace(/\s+[A-Z]$/, '').trim();
       const price = parseFloat(withPrice[3]);
       if (price > 0) {
         skuEntries.push({ sku, description: desc || `Item ${sku}`, price, discountAmount: 0 });
@@ -288,7 +300,7 @@ function extractItems(lines: string[]): ParsedItem[] {
     // SKU without inline price — queue it as awaiting the next standalone price.
     const only = line.match(skuOnly);
     if (only) {
-      const sku  = only[1].replace(/^([A-Z])(?=[0-9])/, '');
+      const sku = only[1].replace(/^([A-Z])(?=[0-9])/, '');
       const desc = (only[2] ?? '').replace(/\s+[A-Z]$/, '').trim();
       skuEntries.push({ sku, description: desc || `Item ${sku}`, price: null, discountAmount: 0 });
       pending.push(skuEntries.length - 1);
