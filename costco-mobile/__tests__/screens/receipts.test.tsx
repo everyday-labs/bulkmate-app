@@ -115,7 +115,7 @@ describe('ReceiptsScreen', () => {
     await screen.findByText('Almaden');
 
     fireEvent.changeText(screen.getByPlaceholderText('Item, SKU, or warehouse…'), 'olive');
-    await waitFor(() => expect(screen.queryByText('#470')).toBeNull(), { timeout: 2000 });
+    await waitFor(() => expect(screen.queryByText('#470')).toBeNull());
     expect(screen.getByText('#1001')).toBeTruthy();
     expect(lastQuery('receipt_items')?.filters).toContainEqual([
       'or',
@@ -125,7 +125,7 @@ describe('ReceiptsScreen', () => {
     // Matching on the warehouse name works without any item hit.
     mockTable('receipt_items', []);
     fireEvent.changeText(screen.getByPlaceholderText('Item, SKU, or warehouse…'), 'almaden');
-    await waitFor(() => expect(screen.getByText('#470')).toBeTruthy(), { timeout: 2000 });
+    await waitFor(() => expect(screen.getByText('#470')).toBeTruthy());
     expect(screen.queryByText('#1001')).toBeNull();
   });
 
