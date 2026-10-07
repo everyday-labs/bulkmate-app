@@ -4,6 +4,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { sendBrevoSms } from '../_shared/brevo.ts';
 import { buildWeeklySms } from '../_shared/alertMessages.ts';
 import { capturePostHogException } from '../_shared/posthog.ts';
+import { isServiceRole } from '../_shared/auth.ts';
 
 // Weekly price-drop SMS digest — Friday 3 PM America/Los_Angeles.
 //
@@ -27,22 +28,6 @@ function laHourAndWeekday(now: Date): { hour: number; weekday: string } {
   };
 }
 
-// Only pg_cron (which sends the service-role key) may run this: with the
-// gateway's default verify_jwt, any signed-in user's token would otherwise be
-// accepted, and { force: true } would let them trigger paid texts to everyone.
-// The gateway has already verified the signature; this checks the role claim.
-function isServiceRole(req: Request): boolean {
-  const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer /, '');
-  const payload = token.split('.')[1];
-  if (!payload) return false;
-  try {
-    const claims = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
-    return claims.role === 'service_role';
-  } catch {
-    return false;
-  }
-}
-
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -51,6 +36,9 @@ const json = (body: unknown, status = 200) =>
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  // Only pg_cron (which sends the service-role key) may run this: with the
+  // gateway's default verify_jwt, any signed-in user's token would otherwise be
+  // accepted, and { force: true } would let them trigger paid texts to everyone.
   if (!isServiceRole(req)) return json({ error: 'Forbidden' }, 403);
 
   try {

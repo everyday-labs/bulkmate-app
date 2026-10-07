@@ -12,6 +12,7 @@ import { fetchFromRapidApi } from '../_shared/rapidApi.ts';
 import { fetchProductByUpc } from '../_shared/usdaFdc.ts';
 import { fetchOffProduct } from '../_shared/openFoodFacts.ts';
 import { capturePostHogException } from '../_shared/posthog.ts';
+import { getCallerUserId } from '../_shared/auth.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -294,16 +295,12 @@ async function resolveIngredients(
 // Record the lookup for the requesting user — non-blocking, best-effort
 async function recordLookup(
   supabase: SupabaseClient,
-  req: Request,
+  userId: string,
   product: { sku: string; name: string; brand: string | null; image_url: string | null; sale_price: number | null },
 ) {
   try {
-    const token = req.headers.get('Authorization')?.replace('Bearer ', '');
-    if (!token) return;
-    const { data: { user } } = await supabase.auth.getUser(token);
-    if (!user) return;
     await supabase.from('product_lookups').insert({
-      user_id: user.id,
+      user_id: userId,
       sku: product.sku,
       name: product.name,
       brand: product.brand,
@@ -330,6 +327,16 @@ serve(async (req) => {
     );
     const apiKey = Deno.env.get('RAPIDAPI_KEY') ?? '';
     const fdcApiKey = Deno.env.get('USDA_FDC_API_KEY') ?? '';
+
+    // Signed-in users only: a cache miss spends a paid RapidAPI call, and the
+    // public anon key alone passes the gateway's JWT check.
+    const userId = await getCallerUserId(supabase, req);
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 },
+      );
+    }
 
     const { sku } = await req.json() as { sku: string };
     if (!sku?.trim()) {
@@ -383,7 +390,7 @@ serve(async (req) => {
         };
 
         console.log(`barcode-lookup: cache hit for ${cleanSku} in ${Date.now() - start}ms`);
-        recordLookup(supabase, req, response); // fire and forget
+        recordLookup(supabase, userId, response); // fire and forget
         return new Response(JSON.stringify(response), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -428,7 +435,7 @@ serve(async (req) => {
       };
 
       console.log(`barcode-lookup: partial hit (no RapidAPI match) for ${cleanSku} in ${Date.now() - start}ms`);
-      recordLookup(supabase, req, response); // fire and forget
+      recordLookup(supabase, userId, response); // fire and forget
       return new Response(JSON.stringify(response), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -467,7 +474,7 @@ serve(async (req) => {
     };
 
     console.log(`barcode-lookup: API hit for ${cleanSku} in ${Date.now() - start}ms`);
-    recordLookup(supabase, req, response); // fire and forget
+    recordLookup(supabase, userId, response); // fire and forget
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
