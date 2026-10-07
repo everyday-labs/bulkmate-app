@@ -56,7 +56,7 @@ function extractDate(lines: string[]): string | null {
   for (const line of lines) {
     const match = line.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
     if (match) {
-      let [, month, day, yearRaw] = match;
+      const [, month, day, yearRaw] = match;
       const year = yearRaw.length === 2 ? `20${yearRaw}` : yearRaw;
       let m = parseInt(month), d = parseInt(day);
       if (m > 12 && d <= 12) [m, d] = [d, m];

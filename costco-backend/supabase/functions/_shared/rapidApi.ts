@@ -46,6 +46,8 @@ export async function fetchFromRapidApi(query: string, apiKey: string): Promise<
     }
 
     const json = await res.json();
+    // Untyped external JSON; fields are validated where they're read below.
+    // deno-lint-ignore no-explicit-any
     const products: any[] = json?.products ?? [];
     if (!products.length) return null;
 

@@ -1,9 +1,22 @@
 # Bulkmate — Test Plan
 
-**Last updated:** 2026-10-06  
+**Last updated:** 2026-10-07  
 **Status legend:** ⬜ Pending · 🔄 In Progress · ✅ Pass · ❌ Fail
 
 ---
+
+## Automated tests (added 2026-10-07)
+
+Run on every PR by CI (`.github/workflows/ci.yml`); see README → Tests for local commands.
+
+| Suite | Where | Covers |
+|---|---|---|
+| Receipt parser regression (16) | `costco-backend/supabase/functions/ingest-receipt/parser.test.ts` | Header fields, CRV deposits, batched / partial-batch layouts, instant savings, multi-buy merge, fuzzy Member line, street-address fallback, 3-digit SKUs, trailing-price recovery |
+| Edge Function helpers (22) | `costco-backend/supabase/functions/_shared/*.test.ts` | Price-drop email + weekly SMS copy (≤160 chars, ASCII), signed unsubscribe links (tamper/rotation), Brevo email/SMS payloads and failure handling, ingredient classification (OFF + keyword fallback), fan tier thresholds |
+| Mobile unit tests (14) | `costco-mobile/lib/__tests__/` | Placeholder names, offline receipt queue, Google sign-in wrapper (unavailable / cancel / in-progress / success / errors) |
+| Static checks | CI | Mobile `tsc` + WCAG contrast; Edge Functions `deno check` + `deno lint` |
+
+Everything below is **manual** — it needs a device, camera, GPS or live services.
 
 ## Current testing status (2026-08-11)
 

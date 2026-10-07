@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { capturePostHogException } from '../_shared/posthog.ts';
 import { awardCheckIn } from '../_shared/checkInRewards.ts';
@@ -27,7 +27,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 async function receiptCheckIn(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   userId: string,
   receiptId: string,
   warehouseId: string | undefined,
