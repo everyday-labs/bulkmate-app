@@ -108,7 +108,7 @@
 | 7.4 | Dismiss alert | Tap ✕ on alert card | Alert disappears from UI; `dismissed_at` set in DB | ⬜ |
 | 7.5 | pg_cron sweep | POST `{ sweep: true }` to Edge Function | All items in last 30 days checked; alerts for price drops | ⬜ |
 | 7.6 | No data graceful | SKU not in API and no ledger data | No alert created, no crash | ⬜ |
-| 7.7 | Daily sweep runs | Check `cron.job_run_details` after 08:00 UTC | `daily-price-match-sweep` status `succeeded` (it failed every run until pg_net was enabled 2026-10-06) | ⬜ |
+| 7.7 | Daily sweep runs | Check `cron.job_run_details` after 08:00 UTC | `daily-price-match-sweep` status `succeeded` (it failed every run until pg_net was enabled 2026-10-06) | ✅ 2026-10-07 (0 items in window) |
 | 7.8 | No repeat alerts | Same drop found by two sweeps | One push / one email total | ⬜ |
 | 7.9 | Deeper drop | Price falls further after an alert | Notifies again; a dismissed alert reappears | ⬜ |
 | 7.10 | Price-drop email | New drop for a user with email alerts on | Email "Price drop: you could get $X back"; View in Bulkmate opens the app on Alerts | ⬜ |
