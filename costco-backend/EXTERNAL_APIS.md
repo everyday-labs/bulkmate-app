@@ -1,7 +1,7 @@
 # External APIs
 
 Every third-party API this app calls, where it's called from, and what happens
-when it fails. All six clients live in `supabase/functions/_shared/` — one
+when it fails. All seven clients live in `supabase/functions/_shared/` — one
 file per API — so there's a single canonical place to look for "how do we
 call X" regardless of which Edge Function needs it.
 
@@ -12,6 +12,7 @@ call X" regardless of which Edge Function needs it.
 | Open Food Facts | `_shared/openFoodFacts.ts` | `barcode-lookup` | None (User-Agent required) | Free |
 | USDA FoodData Central | `_shared/usdaFdc.ts` | `barcode-lookup` (fallback only) | API key (query param) | Free |
 | Expo Push API | `_shared/expoPush.ts` | `price-match-check` | None (device push token) | Free |
+| Brevo (email + SMS) | `_shared/brevo.ts` | `price-match-check`, `weekly-price-texts`, `phone-verification` | API key (header) | Email free up to 300/day; SMS paid credits |
 | PostHog | `_shared/posthog.ts` | All 4 functions (top-level catch) | Project token | Free tier |
 
 No official Costco API exists — `api.costco.com` and other Costco-internal
@@ -195,6 +196,61 @@ back or block that write, since the in-app Alerts screen is the source of
 truth regardless of whether the push arrived.
 
 **Cost:** Free.
+
+---
+
+## Brevo (email + SMS)
+
+> **v1 ships email only (decided 2026-10-06).** The SMS path below is built but paused: the
+> `weekly-price-texts` cron job is unscheduled, the `weekly-price-texts` and `phone-verification`
+> functions are not deployed, and the app hides the toggle behind `SMS_ALERTS_ENABLED` in
+> `costco-mobile/lib/features.ts`. US texting needs a registered sender number and paid credits.
+> Re-enabling steps are in `migrations/20261007000002_pause_sms_for_v1.sql`.
+
+**What it's for:** Price-drop alerts outside the app:
+- **Email, immediately** — `price-match-check` sends one email per user per run
+  ("You could get $X back on N items" + a *View in Bulkmate* button) for drops
+  that are new or deeper than last time. Stamped in `price_alerts.emailed_at`.
+- **SMS, weekly** — `weekly-price-texts` sends a <=160-char digest on Fridays at
+  3 PM America/Los_Angeles (pg_cron fires at 22:00 and 23:00 UTC; the function
+  sends only in the hour that is 3 PM in LA). Stamped in `price_alerts.texted_at`.
+- **SMS verification codes** — `phone-verification`, before texts can be enabled.
+
+Auth emails (sign-up/reset codes) also go through Brevo, but via its **SMTP
+relay configured in the Supabase dashboard**, not this client.
+
+**Endpoints:** `POST https://api.brevo.com/v3/smtp/email`,
+`POST https://api.brevo.com/v3/transactionalSMS/send`
+
+**Auth:** `api-key` header — Edge Function secret `BREVO_API_KEY`. Optional
+secrets: `BREVO_SENDER_EMAIL` (default `noreply@everyday-labs.org`, must be a
+verified Brevo sender), `BREVO_SENDER_NAME` (default `Bulkmate`),
+`BREVO_SMS_SENDER` (default `Bulkmate`; alphanumeric senders aren't allowed in
+every country — the US needs a registered number).
+
+**Rules that matter:**
+- **SMS must stay GSM-7** (plain ASCII here): one emoji/curly quote/em dash
+  switches to UCS-2 and drops the single-SMS limit from 160 to 70 chars.
+- Brevo auto-switches any SMS containing a STOP/opt-out line to its
+  `marketing` type. The weekly digest includes "Reply STOP to opt out"
+  (US carriers expect it on recurring texts); verification codes don't.
+- Texts only go to `sms_alerts_enabled` users with `phone_verified_at` set.
+  The `guard_phone_verification` trigger stops clients from setting either
+  without going through `phone-verification`.
+- Every price email carries a signed one-click unsubscribe link
+  (`email-unsubscribe`, `verify_jwt = false`, HMAC via `NOTIFY_LINK_SECRET`) and
+  `List-Unsubscribe` / `List-Unsubscribe-Post` headers.
+- Links point at `https://everyday-labs.org/alerts`, a universal link
+  (apple-app-site-association on the website) that opens the app's `/alerts`
+  screen, with a web fallback page.
+
+**Fallback on failure:** `sendBrevoEmail` / `sendBrevoSms` never throw — a
+missing key or Brevo error is logged and returns `false`. The alert row is
+already written, the delivery stamp stays null, and the in-app Alerts screen
+remains the source of truth.
+
+**Cost:** Email free up to 300/day on the free plan. SMS needs purchased
+credits (per-country pricing).
 
 ---
 

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Switch,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +19,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { requestAndSavePushToken } from '../../lib/notifications';
 import { posthog } from '../../lib/posthog';
+import { SMS_ALERTS_ENABLED } from '../../lib/features';
 import { useTheme, type ThemeMode } from '../../contexts/ThemeContext';
 import type { ColorScheme } from '../../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../../constants/theme';
@@ -63,6 +65,9 @@ type ProfileData = {
   first_name: string | null;
   last_name: string | null;
   phone_number: string | null;
+  email_alerts_enabled: boolean;
+  sms_alerts_enabled: boolean;
+  phone_verified_at: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -135,7 +140,7 @@ export default function ProfileScreen() {
       const [{ data: profileData }, { data: badgesData }, { data: userBadgesData }] = await Promise.all([
         supabase
           .from('profiles')
-          .select('total_stars, fan_tier, display_name, first_name, last_name, phone_number')
+          .select('total_stars, fan_tier, display_name, first_name, last_name, phone_number, email_alerts_enabled, sms_alerts_enabled, phone_verified_at')
           .eq('id', userId)
           .single(),
         supabase
@@ -158,6 +163,22 @@ export default function ProfileScreen() {
       setLoadingProfile(false);
       setRefreshing(false);
     }
+  }
+
+  async function updateAlertPref(
+    patch: Partial<Pick<ProfileData, 'email_alerts_enabled' | 'sms_alerts_enabled'>>,
+  ) {
+    const userId = session?.user.id;
+    if (!userId || !profile) return;
+    const previous = profile;
+    setProfile({ ...profile, ...patch }); // optimistic
+    const { error } = await supabase.from('profiles').update(patch).eq('id', userId);
+    if (error) {
+      setProfile(previous);
+      Alert.alert('Could not save', 'Please try again.');
+      return;
+    }
+    posthog?.capture('alert_channel_changed', patch);
   }
 
   async function handleEnableNotifications() {
@@ -421,7 +442,7 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.rowContent}>
               <Text style={styles.rowTitle}>Edit Profile</Text>
-              <Text style={styles.rowSubtitle}>Name, phone number for SMS alerts</Text>
+              <Text style={styles.rowSubtitle}>Name and phone number</Text>
             </View>
             <Text style={styles.rowChevron}>›</Text>
           </Pressable>
@@ -449,6 +470,56 @@ export default function ProfileScreen() {
               Colors={Colors}
             />
           </View>
+
+          <View style={styles.rowSeparator} />
+
+          <View style={styles.settingsRow}>
+            <View style={styles.rowIconWrap}>
+              <Text style={styles.rowIcon}>✉️</Text>
+            </View>
+            <View style={styles.rowContent}>
+              <Text style={styles.rowTitle}>Price-Drop Emails</Text>
+              <Text style={styles.rowSubtitle} numberOfLines={1}>
+                {session?.user.email ? `Sent to ${session.user.email}` : 'Sent as soon as a price drops'}
+              </Text>
+            </View>
+            <Switch
+              value={profile?.email_alerts_enabled ?? false}
+              onValueChange={(on) => updateAlertPref({ email_alerts_enabled: on })}
+              disabled={!profile}
+              trackColor={{ true: Colors.costcoRedSolid, false: Colors.gray[300] }}
+            />
+          </View>
+
+          {SMS_ALERTS_ENABLED && (
+            <>
+              <View style={styles.rowSeparator} />
+
+              <View style={styles.settingsRow}>
+                <View style={styles.rowIconWrap}>
+                  <Text style={styles.rowIcon}>💬</Text>
+                </View>
+                <View style={styles.rowContent}>
+                  <Text style={styles.rowTitle}>Weekly Texts</Text>
+                  <Text style={styles.rowSubtitle} numberOfLines={2}>
+                    {profile?.phone_verified_at && profile.phone_number
+                      ? `Fridays 3 PM PT to ${profile.phone_number}`
+                      : 'Fridays 3 PM PT · verify your number to turn on'}
+                  </Text>
+                </View>
+                <Switch
+                  value={profile?.sms_alerts_enabled ?? false}
+                  onValueChange={(on) => {
+                    // Texts need a verified number; the server enforces this too.
+                    if (on && !profile?.phone_verified_at) router.push('/verify-phone');
+                    else updateAlertPref({ sms_alerts_enabled: on });
+                  }}
+                  disabled={!profile}
+                  trackColor={{ true: Colors.costcoRedSolid, false: Colors.gray[300] }}
+                />
+              </View>
+            </>
+          )}
 
           <View style={styles.rowSeparator} />
 
@@ -524,16 +595,16 @@ export default function ProfileScreen() {
         <View style={styles.aboutCard}>
           <View style={styles.aboutBuiltBy}>
             <View style={styles.aboutAvatar}>
-              <TinkerIllustration size={48} />
+              <MakerIllustration size={48} />
             </View>
             <View style={styles.aboutBuiltByText}>
-              <Text style={styles.aboutName}>Tinker</Text>
-              <Text style={styles.aboutRole}>Builder · Tech Enthusiast · Dota Noob</Text>
+              <Text style={styles.aboutName}>Everyday Labs</Text>
+              <Text style={styles.aboutRole}>Independent · Non-commercial · Open source</Text>
             </View>
           </View>
 
           <Text style={styles.aboutMission}>
-            I build side projects in my spare time to solve personal pain points and share them with the world. This app started because I kept missing Costco price-match windows and losing receipts — so I built something about it.
+            Everyday Labs builds small, useful apps for everyday problems and shares them openly. Bulkmate exists because receipts get lost and Costco price-match windows get missed.
           </Text>
 
           <View style={styles.aboutDivider} />
@@ -545,11 +616,11 @@ export default function ProfileScreen() {
           </View>
 
           <Text style={styles.aboutDisclaimer}>
-            Bulkmate is an independent app and is not affiliated with, endorsed by, or sponsored by Costco Wholesale Corporation. “Costco” and “Kirkland Signature” are trademarks of Costco Wholesale Corporation, used here only to describe the receipts and warehouses this app works with. Provided as-is — no warranties, no liability. Prices shown are crowdsourced and may not be accurate.
+            Bulkmate is an independent app by Everyday Labs and is not affiliated with, endorsed by, or sponsored by Costco Wholesale Corporation. “Costco” and “Kirkland Signature” are trademarks of Costco Wholesale Corporation, used here only to describe the receipts and warehouses this app works with. Provided as-is — no warranties, no liability. Prices shown are crowdsourced and may not be accurate.
           </Text>
         </View>
 
-        <Text style={styles.version}>Bulkmate · v1.0.0 · MIT License</Text>
+        <Text style={styles.version}>Bulkmate · v1.0.0 · © 2026 Everyday Labs · MIT License</Text>
       </View>
     </ScrollView>
   );
@@ -581,9 +652,9 @@ function MemberBadgeIllustration({ size = 48 }: { size?: number }) {
   );
 }
 
-// Minimal flat illustration for the "About" card — a person tinkering with a
-// gear/robotic part, standing in for an actual photo of "Tinker".
-function TinkerIllustration({ size = 48 }: { size?: number }) {
+// Minimal flat illustration for the "About" card — a person working on a
+// gear/robotic part, standing in for an Everyday Labs logo until one exists.
+function MakerIllustration({ size = 48 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 48 48">
       {/* head + shoulders */}

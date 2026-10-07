@@ -1,6 +1,7 @@
 {
   "name": "costco-mobile",
   "version": "1.0.0",
+  "author": "Everyday Labs",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",
@@ -8,6 +9,7 @@
     "@expo-google-fonts/outfit": "^0.4.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/netinfo": "11.4.1",
+    "@react-native-google-signin/google-signin": "^16.1.5",
     "@supabase/supabase-js": "^2.106.2",
     "expo": "~54.0.36",
     "expo-apple-authentication": "~8.0.8",

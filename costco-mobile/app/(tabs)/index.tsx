@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Image,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
@@ -87,9 +88,35 @@ export default function HomeScreen() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [activityFilter, setActivityFilter] = useState<'all' | 'receipt' | 'viewed'>('all');
   const [firstName, setFirstName] = useState<string | null>(null);
+  // Only true once the profile row has actually loaded without a first name —
+  // a failed load must not flash the "add your name" card.
+  const [nameMissing, setNameMissing] = useState(false);
+  const [nameNudgeDismissed, setNameNudgeDismissed] = useState<boolean | null>(null);
+
+  // Dismissal is a per-device convenience, keyed per user so a second account
+  // on the same phone still gets the card.
+  const nameNudgeKey = `nameNudgeDismissed:${session?.user.id ?? ''}`;
+  useEffect(() => {
+    if (!session?.user.id) return;
+    let cancelled = false;
+    AsyncStorage.getItem(nameNudgeKey)
+      .then((v) => { if (!cancelled) setNameNudgeDismissed(v === 'true'); })
+      .catch(() => { if (!cancelled) setNameNudgeDismissed(false); });
+    return () => { cancelled = true; };
+  }, [nameNudgeKey, session?.user.id]);
+
+  function dismissNameNudge() {
+    setNameNudgeDismissed(true);
+    AsyncStorage.setItem(nameNudgeKey, 'true').catch(() => {});
+    posthog?.capture('name_nudge_dismissed');
+  }
 
   useFocusEffect(
     useCallback(() => {
+      // useAuth resolves the session asynchronously, so the first focus fires
+      // with no user. Loading then would query id '' and race the real load —
+      // if it lands last it wipes the data (Home showed the placeholder name).
+      if (!session?.user.id) return;
       load(false);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [session?.user.id]),
@@ -210,7 +237,9 @@ export default function HomeScreen() {
         .slice(0, 10);
       setActivity(merged);
 
-      setFirstName((profileRow as { first_name: string | null } | null)?.first_name ?? null);
+      const profileFirstName = (profileRow as { first_name: string | null } | null)?.first_name ?? null;
+      setFirstName(profileFirstName);
+      setNameMissing(profileRow != null && !profileFirstName?.trim());
     } catch {
       // Fail silently — dashboard is non-critical
     } finally {
@@ -291,6 +320,36 @@ export default function HomeScreen() {
         <Text style={styles.greetingLine}>{greeting},</Text>
         <Text style={styles.greetingName}>{greetingName}</Text>
       </View>
+
+      {/* Optional name prompt — never blocks anything, dismissible for good */}
+      {nameMissing && nameNudgeDismissed === false && (
+        <Pressable
+          style={({ pressed }) => [styles.nudgeCard, pressed && styles.alertCardPressed]}
+          onPress={() => {
+            posthog?.capture('name_nudge_tapped');
+            router.push('/edit-profile');
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Add your name to your profile"
+        >
+          <View style={styles.nudgeIconWrap}>
+            <Text style={styles.alertIcon}>👋</Text>
+          </View>
+          <View style={styles.alertBody}>
+            <Text style={styles.nudgeTitle}>What should we call you?</Text>
+            <Text style={styles.nudgeSub}>Add your name to personalize your greeting.</Text>
+          </View>
+          <Pressable
+            onPress={dismissNameNudge}
+            hitSlop={12}
+            style={({ pressed }) => [styles.alertDismiss, pressed && { opacity: 0.6 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+          >
+            <Text style={styles.alertDismissText}>✕</Text>
+          </Pressable>
+        </Pressable>
+      )}
 
       {/* Price alert cards */}
       {alerts.length > 0 && (
@@ -625,6 +684,34 @@ const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
     letterSpacing: letterSpacing.tight,
     marginTop: 2,
   },
+
+  // Name nudge
+  nudgeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: radius.xl,
+    gap: spacing.md,
+    padding: spacing.lg,
+    marginTop: -spacing.md,
+    marginBottom: spacing['2xl'],
+    ...shadow.sm,
+  },
+  nudgeIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.lg,
+    backgroundColor: Colors.goldStarSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nudgeTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: Colors.gray[800],
+    marginBottom: 3,
+  },
+  nudgeSub: { fontSize: fontSize.xs, color: Colors.gray[500], lineHeight: 16 },
 
   // Price alerts
   alertsSection: { marginBottom: spacing['2xl'] },
