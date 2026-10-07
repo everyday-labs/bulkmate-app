@@ -54,20 +54,25 @@ npx expo run:ios                 # run on iOS simulator
 npx expo run:ios --device <udid> # build + install on a physical iPhone (needs paid Apple team, see Build Status)
 npx expo run:android             # run on Android emulator
 npx tsc --noEmit                 # typecheck (strict mode)
-npm test                         # Jest (jest-expo) — lib/__tests__/
+npm run lint                     # ESLint (eslint-config-expo), zero warnings
+npm test                         # Jest + RN Testing Library — __tests__/screens, lib/__tests__, hooks/__tests__
+npm run test:coverage            # + coverage; fails below jest.coverageThreshold (80/80/75/65)
 npm run check:contrast           # WCAG contrast of constants/colors.ts — must print "All pairings pass"
+npm run build:web && npm run test:visual   # Playwright visual regression (e2e/)
+../scripts/check-all.sh          # everything CI runs (also the pre-push hook)
 
 # Edge Functions (costco-backend/supabase/functions/) — Deno 2 (`npx deno …` works without installing)
 deno check .                     # typecheck every function + test
 deno lint
-deno test --allow-env            # *.test.ts next to the code they cover
+deno test --allow-env --allow-read   # *.test.ts next to the code they cover
+../../../scripts/deno-coverage.sh    # tests + coverage gate (≥90% lines over every source file)
 
 # Backend (costco-backend/supabase/)
 supabase db push                 # apply migrations to linked remote project
 supabase functions deploy <name> # deploy a single Edge Function
 ```
 
-**CI** (`.github/workflows/ci.yml`, added 2026-10-07) runs all of the above on every PR and push to `main`: mobile `tsc` + contrast + Jest, and Edge Functions `deno check` + `deno lint` + `deno test`. Keep it green — merge only when both jobs pass. Automated tests cover pure logic (receipt parser regression cases from `PARSER_DECISIONS.md`, alert copy, signed unsubscribe links, Brevo payloads, ingredient classification, fan tiers, offline queue, Google sign-in wrapper); anything touching the device, camera, GPS or live services is still the manual `TEST_PLAN.md`. **When a real receipt breaks the parser, add its shape to `ingest-receipt/parser.test.ts` first, then fix.** Supabase client params are typed as `SupabaseClient` imported from supabase-js — not `ReturnType<typeof createClient>`, which resolves table rows to `never` with the unpinned `@2` import.
+**Quality pipeline (2026-10-07).** CI (`.github/workflows/ci.yml`) runs on every PR and push to `main`: *Lint & typecheck* (Prettier on all tracked files, ESLint, tsc, contrast, deno check/lint), *Mobile tests* (Jest + coverage threshold), *Edge Function tests* (`scripts/deno-coverage.sh`, ≥90% lines), *Visual regression* (Playwright in the pinned `mcr.microsoft.com/playwright` image), and one aggregate **CI passed** status. Husky hooks live in `costco-mobile/.husky` (root `.lintstagedrc.mjs`): pre-commit = lint-staged on staged files + related tests; pre-push = `scripts/check-all.sh`. **There is deliberately no `package.json` at the repo root** — Deno (and Supabase's bundler) would then switch `costco-backend` to npm resolution and fail; repo tooling lives in `costco-mobile/package.json` and Prettier reads the root `.prettierrc.json`. Tests: mobile screens in `costco-mobile/__tests__/screens/` (never under `app/` — Expo Router would treat them as routes), using `test-utils/` (in-memory Supabase client, expo-router mock, `renderWithProviders`) and native-module mocks in `jest.setup.ts`. **Each Edge Function's logic is in `handler.ts` (exported `handler`); `index.ts` only calls `serve(handler)`** so tests can import it — keep new functions to that shape. Handler tests use `_testing/fakeSupabase.ts` (stubbed fetch for PostgREST/auth/storage/functions and external APIs); `coverage.test.ts` imports every module so untested files count as 0%. Visual baselines are Linux-only (`*-linux.png` committed; local `*-darwin.png` gitignored); a new or intentionally changed screen → CI uploads `visual-baselines` → commit them. **When a real receipt breaks the parser, add its shape to `ingest-receipt/parser.test.ts` first, then fix.** Supabase client params are typed as `SupabaseClient` imported from supabase-js — not `ReturnType<typeof createClient>`, which resolves table rows to `never` with the unpinned `@2` import.
 
 **Supabase CLI works** (verified 2026-08-11, CLI v2.111.0, project linked and authenticated) — `supabase functions deploy <name>` works directly and is the preferred path. This was broken earlier in the project's history (token format issue) and older notes may still say deploys must be done by hand via the dashboard; that's stale. Docker isn't running locally, so deploys emit a `WARNING: Docker is not running` line — harmless, the bundle still uploads and deploys fine.
 

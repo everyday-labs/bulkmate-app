@@ -58,7 +58,9 @@ try {
 } catch (err) {
   console.error(`Could not read a valid private key from: ${keyPath}`);
   console.error(`(${err.message})`);
-  console.error('\nExpected the .p8 file Apple gives you, starting with "-----BEGIN PRIVATE KEY-----".');
+  console.error(
+    '\nExpected the .p8 file Apple gives you, starting with "-----BEGIN PRIVATE KEY-----".',
+  );
   process.exit(1);
 }
 
@@ -88,6 +90,10 @@ const signature = signer.sign({ key: privateKey, dsaEncoding: 'ieee-p1363' });
 
 const jwt = `${signingInput}.${signature.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}`;
 
-console.log('\n=== Paste this into Supabase → Authentication → Providers → Apple → "Secret Key (for OAuth)" ===\n');
+console.log(
+  '\n=== Paste this into Supabase → Authentication → Providers → Apple → "Secret Key (for OAuth)" ===\n',
+);
 console.log(jwt);
-console.log(`\nExpires: ${new Date(exp * 1000).toISOString().slice(0, 10)} (Apple's 6-month max — regenerate before then)\n`);
+console.log(
+  `\nExpires: ${new Date(exp * 1000).toISOString().slice(0, 10)} (Apple's 6-month max — regenerate before then)\n`,
+);
