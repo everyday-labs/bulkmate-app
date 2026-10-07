@@ -421,7 +421,7 @@ serve(async (req) => {
 
         pushMessages.push({
           to: pushToken,
-          title: `Price Drop — You may be owed $${delta.toFixed(2)}`,
+          title: `Price drop: you could get $${delta.toFixed(2)} back`,
           body: `${name} dropped from $${item.net_paid.toFixed(2)} to $${result.current_price.toFixed(2)}. You may qualify for a price adjustment.`,
           sound: 'default',
           channelId: 'price-alerts',

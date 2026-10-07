@@ -157,7 +157,7 @@ export default function LoginScreen() {
             <Text style={styles.logoMarkText}>B</Text>
           </View>
           <Text style={styles.wordmark}>BULKMATE</Text>
-          <Text style={styles.tagline}>Warehouse Companion</Text>
+          <Text style={styles.tagline}>Never miss a price drop</Text>
         </View>
 
         {/* ── Form card ── */}
