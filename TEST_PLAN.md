@@ -18,7 +18,21 @@ Run on every PR by CI (`.github/workflows/ci.yml`); see README → Tests for loc
 
 Everything below is **manual** — it needs a device, camera, GPS or live services.
 
-## Current testing status (2026-08-11)
+## Before a manual pass
+
+The feature list these sections test is in `APP_OVERVIEW.md` → Features (each feature names its §).
+
+1. **Build:** a Release build on a physical iPhone (`CLAUDE.md` → Debug vs Release) — Expo Go can't do push, and the simulator can't do camera or GPS.
+2. **Accounts:** one fresh email account (for empty states and the sign-up code), one with history; an Apple ID with Hide My Email for 1.14 / 20.5.
+3. **Props:** two or three real Costco receipts (one with instant savings, one with a CRV deposit, one from a warehouse outside the Bay Area), a few grocery items with barcodes, and a trip to a warehouse for §10.
+4. **Backend checks:** `supabase db query --linked "<SQL>"` to confirm DB rows; Supabase dashboard → Edge Functions → Logs; PostHog → Activity for events.
+5. **Mark results** in the Status column with the date and where it ran, e.g. `✅ device 2026-10-12` or `❌ sim 2026-10-12 — <what broke>`.
+
+## Current testing status
+
+**Tally (2026-10-07):** 156 manual cases across 23 features — 8 ✅ pass, 2 ⏸ skipped while SMS is paused, 146 ⬜ pending, 0 ❌.
+
+*Snapshot from 2026-08-11:*
 
 **Verified in the iOS Simulator (Expo Go, against the real deployed backend):** Home screen (stats, Recent feed with day dividers + filter chips), Product Detail (including all three fallback states: no price data, no ingredients match, true 404), Receipt History, unified History screen, Spend Analytics, and Profile all render correctly with zero runtime errors. Warehouse data verified live: 723 rows across 11+ countries.
 
@@ -31,7 +45,7 @@ Everything below is **manual** — it needs a device, camera, GPS or live servic
 - Sign in with Apple
 - **Dark mode** — `simctl ui appearance dark` didn't propagate to the running Expo Go app; check manually via Profile → Preferences → Appearance
 
-**Blocker for device testing:** Apple Developer Program enrollment is pending. A free Personal Team can't provision this app because it uses both Sign In with Apple and Push Notifications. See `CLAUDE.md` → Build Status for the workaround if you want to test before enrollment clears.
+~~**Blocker for device testing:** Apple Developer Program enrollment is pending.~~ Cleared — enrolled 2026-08-11 and the app has been built and installed on a physical iPhone since (`CLAUDE.md` → Device build). What remains is legwork: run the device-only sections (§8 push, §9 barcode, §10 GPS check-in, §20 universal links) on a Release build.
 
 ---
 
@@ -98,6 +112,11 @@ Everything below is **manual** — it needs a device, camera, GPS or live servic
 | 5.1 | Items list | After successful scan | Each item row shows description, price, discount (if any) | ⬜ |
 | 5.2 | Total | Bottom of screen | Matches receipt total | ⬜ |
 | 5.3 | Navigate back | Tap Done or back | Goes to receipts list or home | ⬜ |
+| 5.4 | Fix an OCR misread | Tap an item row → change description/price → ✓ Done | Row and total update; value survives leaving and reopening the receipt | ⬜ |
+| 5.5 | Cancel an edit | Tap a row → change it → ✕ Cancel | Original values kept | ⬜ |
+| 5.6 | Full receipt image | Tap "Tap to view full receipt" | Full-screen image; ✕ Close returns; correct on rotation/iPad | ⬜ |
+| 5.7 | Share TC# | Tap Share | iOS share sheet with `TC# <transaction number>`; receipt without one shows "TC# not found on receipt" | ⬜ |
+| 5.8 | Notification ask | Fresh install, open the first scanned receipt | "Stay in the loop" sheet after ~1.5s; Not Now hides it and it never returns | ⬜ |
 
 ---
 
@@ -228,6 +247,117 @@ Everything below is **manual** — it needs a device, camera, GPS or live servic
 | 14.5 | Notification toggle | Permission undetermined | "Enable" button shown | ⬜ |
 | 14.6 | Pull to refresh | Pull down | Reloads profile + badges | ⬜ |
 | 14.7 | Sign out | Tap Sign Out | Returns to login screen | ⬜ |
+
+---
+
+## Feature 15 — Price Alerts Screen
+
+| # | Test | Steps | Expected | Status |
+|---|------|-------|----------|--------|
+| 15.1 | Open from Home | With an active alert, tap the alert card / "See all" on Home | Price Alerts screen: ACTIVE list and a "You may be owed" total | ⬜ |
+| 15.2 | Claim window | Alert on an item bought 25+ days ago | Days-left shown; "Claim window closing" label inside the last days of the 30-day window | ⬜ |
+| 15.3 | Mark as claimed | Tap Mark as claimed | Moves to CLAIMED; total drops; `price_alerts.dismissed_at` set; PostHog `price_alert_claimed` | ⬜ |
+| 15.4 | View Receipt | Tap 🧾 View Receipt on an alert | Opens that receipt's detail screen | ⬜ |
+| 15.5 | Empty state | Account with no alerts | "No price drops yet" | ⬜ |
+| 15.6 | Pull to refresh | Create an alert in the DB, pull down | New alert appears | ⬜ |
+
+---
+
+## Feature 16 — History Screens, Search, Filters & Sorting
+
+| # | Test | Steps | Expected | Status |
+|---|------|-------|----------|--------|
+| 16.1 | Unified History tabs | Home → See all | Receipts / Barcode / Check-ins tabs; each loads its own list | ⬜ |
+| 16.2 | Receipt search | Receipt History → type a warehouse or item | List narrows; "No results" when nothing matches | ⬜ |
+| 16.3 | Receipt filters | Apply a warehouse, a date range (Last 30 Days … Last Year) and an amount band (Under $50 … $300+) | Only matching receipts; clearing returns everything | ⬜ |
+| 16.4 | Receipt sort | Newest / Oldest / Highest total / Lowest total | Order changes accordingly | ⬜ |
+| 16.5 | Month drill-down | Stats → tap a month's bar | Receipt History filtered to that month, labelled with it | ⬜ |
+| 16.6 | Barcode history | Scan tab → Barcode → "View all your past lookups" | Past lookups; sort by date or price; tap opens product | ⬜ |
+| 16.7 | Check-in history | Scan tab → Check-in → "View all your past visits" | Past visits with rarity; sort by date or stars | ⬜ |
+| 16.8 | Load failure | Airplane Mode, open each history screen | "Failed to load …" + Try again (no crash); works after reconnecting | ⬜ |
+
+---
+
+## Feature 17 — Warehouse Matching & Manual Picker
+
+| # | Test | Steps | Expected | Status |
+|---|------|-------|----------|--------|
+| 17.1 | Auto match outside the Bay Area | Scan a receipt from a non-Bay-Area warehouse | Correct warehouse shown; its `warehouse_code` changes from `GP-…` to the real store number | ⬜ |
+| 17.2 | Picker appears | Receipt whose header can't be matched (or set `warehouse_id` null in DB) | Dashed "I'm unable to find the correct warehouse…" prompt | ⬜ |
+| 17.3 | Picker search | Open the picker; search by name, city and ZIP | Results update after typing stops (~250ms) | ⬜ |
+| 17.4 | Pick a warehouse | Select one | "Visit credited" alert, +1 star dated to the receipt's date, receipt shows the warehouse | ⬜ |
+| 17.5 | Skip | Tap "Can't find my warehouse" | "Saved without a warehouse" card; no star; receipt still saved; reopening offers the picker again | ⬜ |
+| 17.6 | Same-trip repeat | Two receipts from the same warehouse and day | Second one awards no extra star and shows no error | ⬜ |
+
+---
+
+## Feature 18 — Edit Profile & Preferences
+
+| # | Test | Steps | Expected | Status |
+|---|------|-------|----------|--------|
+| 18.1 | Edit name | Profile → Edit Profile → change first/last name → Save Changes | Home greeting and Profile show the new name | ⬜ |
+| 18.2 | Phone (optional) | Add a phone number, save; then clear it, save | Both save; phone isn't required | ⬜ |
+| 18.3 | Cancel | Change a field → Cancel | Nothing saved | ⬜ |
+| 18.4 | Save failure | Airplane Mode → Save | "Save failed" alert; form keeps its values | ⬜ |
+| 18.5 | Appearance | Profile → Appearance → Dark, Light, System | Every screen switches; choice survives an app restart; System follows iOS | ⬜ |
+| 18.6 | Dark-mode legibility | In Dark, visit every screen incl. product detail Nutri-Score A–E, avatar, Scan speed-dial | No white-on-light or dark-on-dark text | ⬜ |
+
+---
+
+## Feature 19 — Deleting Data
+
+| # | Test | Steps | Expected | Status |
+|---|------|-------|----------|--------|
+| 19.1 | Delete a receipt | Receipt detail → Delete Receipt → confirm | Gone from Home, History and Stats; its items and image are removed (check the Storage bucket) | ⬜ |
+| 19.2 | Delete account | Profile → Delete Account → confirm twice | Signed out to login; the same login no longer works | ⬜ |
+| 19.3 | Account data gone | After 19.2, query `receipts`, `check_ins`, `price_alerts`, `user_badges` for that user id, and the user's Storage folder | No rows, no images | ⬜ |
+| 19.4 | Cancel deletion | Tap Delete Account → cancel at either prompt | Nothing deleted | ⬜ |
+
+---
+
+## Feature 20 — Email Links & Universal Links
+
+| # | Test | Steps | Expected | Status |
+|---|------|-------|----------|--------|
+| 20.1 | Link opens app | On a phone with the app installed, tap "View in Bulkmate" in a price-drop email | App opens directly on the Alerts screen | ⬜ |
+| 20.2 | Fallback page | Open `https://everyday-labs.org/alerts` on a computer / phone without the app | Web fallback page loads | ⬜ |
+| 20.3 | AASA served | `curl -s https://everyday-labs.org/.well-known/apple-app-site-association` | JSON with app ID `XX3T25NCVV.com.twonk0609.bulkmate` and the `/alerts` paths | ⬜ |
+| 20.4 | Sender & deliverability | Check a received price-drop / auth email's headers | From `noreply@everyday-labs.org`; SPF, DKIM and DMARC pass; not in spam | ⬜ |
+| 20.5 | Apple private relay | Apple account with Hide My Email → trigger a price-drop email | Arrives at the relay address (Apple drops it if the domain isn't registered) | ⬜ |
+
+---
+
+## Feature 21 — Website (everyday-labs.org)
+
+| # | Test | Steps | Expected | Status |
+|---|------|-------|----------|--------|
+| 21.1 | Feedback form | Submit `everyday-labs.org/bulkmate/feedback/` | Success message; row appears in `feature_requests` | ⬜ |
+| 21.2 | Feedback is write-only | `GET <SUPABASE_URL>/rest/v1/feature_requests` with the anon key | Empty / denied — nobody can read others' feedback | ⬜ |
+| 21.3 | Policy & support | Open `/bulkmate/privacy/` and `/bulkmate/support/` | Load; privacy text matches `costco-mobile/docs/PRIVACY.md` | ⬜ |
+| 21.4 | Contact email | Send a mail to `hello@everyday-labs.org` | Arrives in the personal inbox (Cloudflare Email Routing) | ✅ 2026-10-07 |
+
+---
+
+## Feature 22 — Weekly Text Digest (⏸ paused for v1)
+
+Skip 22.2–22.3 until `SMS_ALERTS_ENABLED` is turned on (`costco-mobile/lib/features.ts`). Needs a registered US sender number and Brevo SMS credits.
+
+| # | Test | Steps | Expected | Status |
+|---|------|-------|----------|--------|
+| 22.1 | Hidden in v1 | Profile → Preferences | No Weekly Texts row | ⬜ |
+| 22.2 | Verify phone | (flag on) Turn on Weekly Texts → enter the 6-digit SMS code | Phone verified; toggle stays on | ⏸ |
+| 22.3 | Weekly digest | (flag on) Active drops, Friday 3 PM Pacific | One SMS ≤160 chars with "Reply STOP to opt out" | ⏸ |
+
+---
+
+## Feature 23 — Analytics & Error Reporting (PostHog)
+
+| # | Test | Steps | Expected | Status |
+|---|------|-------|----------|--------|
+| 23.1 | Funnel events | Sign in, scan a receipt, scan a product, check in | Matching events appear in PostHog → Activity for that user | ⬜ |
+| 23.2 | Failure events | Wrong password; check in from home | `sign_in_failed`, `warehouse_check_in_failed` with a `reason` | ⬜ |
+| 23.3 | Backend errors land | POST malformed JSON to `barcode-lookup` | Exception appears in PostHog Error Tracking (never confirmed so far) | ⬜ |
+| 23.4 | Replay is masked | Watch a session replay of a receipt screen | Text inputs and images masked | ⬜ |
 
 ---
 

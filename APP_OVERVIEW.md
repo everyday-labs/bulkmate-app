@@ -14,21 +14,83 @@ Scan your receipt and the app quietly does two useful things: it logs everything
 
 ## Features
 
-| Feature | What it does |
-|---|---|
-| **Receipt OCR ingestion** | Camera capture → Google Cloud Vision OCR → parsed line items (SKU, description, unit price, discount) → stored per-user. Works offline; queued scans drain once back online. Line items are inline-editable after the fact (tap a row on the receipt-success screen) to fix an OCR misread. |
-| **Sliding-window price match** | Every scanned item is watched for 30 days. If the price drops, you get a push notification and an email telling you the refund you may be owed. |
-| **Sign-in & account** | Email + password (8-digit emailed confirmation code), Sign in with Apple, or Google. In-app password reset by emailed code. Names are filled from Google/Apple; an optional Home card asks everyone else. |
-| **Barcode / product lookup** | Scan any product in-store to pull its current price, brand, and rating — plus, where available, a good/watch/avoid ingredient breakdown. |
-| **Geo-fenced check-ins** | Check in at a warehouse when your GPS is within range; earns 1 star, capped at once per warehouse per day. |
-| **Check-in on receipt scan** | Scanning a receipt also earns a star — a receipt is proof you were there. Dated to the receipt's transaction date, not the upload date, and a repeat from the same trip is a silent no-op. |
-| **Manual warehouse picker** | When a receipt header can't be matched to a known warehouse, a searchable picker lets you pick it by name, city, or ZIP. Optional — the receipt saves either way. |
-| **Account deletion** | Profile → Delete Account removes the account and every receipt, image, item, alert, check-in, star, and badge. |
-| **Fan tier progression** | Cumulative stars advance you through 5 named tiers. |
-| **Badge engine** | 10 badges tied to check-in counts, warehouse diversity, warehouse rarity, and tier milestones. |
-| **Spend analytics dashboard** | Monthly spend, top items by cost, in-store vs. price-match savings breakdown. |
-| **Warehouse rarity** | Each warehouse is tagged Common / Rare / Legendary, adding a collectible angle to visiting different locations. |
-| **Unified Recent feed** | Home screen shows receipts and viewed products together in one feed, sorted newest-first and grouped under day dividers (Today / Yesterday / N days ago), with All / Receipts / Viewed filter chips. |
+Complete inventory as of 2026-10-07, grouped by area. **Test** points at the matching section of
+`TEST_PLAN.md` (manual steps + status); external services behind each feature are in
+`costco-backend/EXTERNAL_APIS.md`. Status: ✅ shipped in v1 · ⏸ built but switched off for v1.
+
+### Account
+
+| Feature | What it does | Status | Test |
+|---|---|---|---|
+| **Email sign-up / sign-in** | Email + password; sign-up confirmed with an 8-digit emailed code (no links — there's no web callback). Unconfirmed accounts get a fresh code on sign-in. | ✅ | §1 |
+| **Sign in with Apple** | Native Apple sheet → Supabase. Name prefilled from Apple on first sign-in. | ✅ | §1 |
+| **Google sign-in** | Native Google sheet → ID token → Supabase. Name prefilled from Google. | ✅ | §1 |
+| **Password reset** | Forgot password? → 8-digit emailed code → new password, all in-app. | ✅ | §1 |
+| **Name card** | Optional Home card ("What should we call you?") for accounts with no name; dismissible for good. | ✅ | §1, §18 |
+| **Edit Profile** | First/last name and optional phone number. | ✅ | §18 |
+| **Account deletion** | Profile → Delete Account (two confirmations) removes the account and every receipt, image, item, alert, check-in, star, and badge. Required by App Review 5.1.1(v). | ✅ | §19 |
+
+### Receipts
+
+| Feature | What it does | Status | Test |
+|---|---|---|---|
+| **Receipt scan (OCR)** | Camera capture with framing tips → Google Cloud Vision OCR → parsed line items (SKU, description, price, discount, CRV, tax, TC#) → stored per-user. Multi-buys merged by SKU. | ✅ | §2, §3 |
+| **Offline queue** | No connection → receipt saved on device, uploaded automatically on reconnect. | ✅ | §4 |
+| **Receipt detail** | Items, totals, discounts, full-screen receipt image, Share TC#, inline-editable line items (tap a row to fix an OCR misread), Delete Receipt. Asks once ("Stay in the loop") to turn on notifications, 1.5s after the first receipt opens. | ✅ | §5, §19 |
+| **Duplicate detection** | Re-scanning the same receipt returns the existing one instead of a copy; the uploaded image is cleaned up. | ✅ | §3 |
+| **Warehouse matching** | Receipt header → warehouse by store number, else postal code, else city; self-heals placeholder `GP-` codes with the real store number. | ✅ | §3, §17 |
+| **Manual warehouse picker** | When no warehouse matches, a searchable picker (name, city, address, ZIP) links one by hand. Optional — "Can't find my warehouse" saves without one. | ✅ | §17 |
+| **Receipt history** | All receipts with search, warehouse / date-range / amount filters, sort (newest, oldest, highest, lowest), and a month drill-down from Stats. | ✅ | §6, §16 |
+
+### Price drops
+
+| Feature | What it does | Status | Test |
+|---|---|---|---|
+| **Sliding-window price match** | Every scanned item is watched for 30 days, inline after upload and in a daily 08:00 UTC sweep. Price source: 72h cache → OCR ledger → RapidAPI. | ✅ | §7 |
+| **Push alerts** | "Price Drop — you may be owed $X" push, only for new or deeper drops. | ✅ | §8 |
+| **Email alerts** | One email per user per run with total savings + "View in Bulkmate" universal link + one-click unsubscribe. On by default; toggle in Profile. | ✅ | §7, §20 |
+| **Price Alerts screen** | Active vs. Claimed alerts, "You may be owed" total, days left in the 30-day claim window ("Claim window closing"), Mark as claimed, View Receipt. Opened from Home or the email link. | ✅ | §15 |
+| **Weekly text digest** | Friday 3 PM Pacific SMS digest after verifying a phone by SMS code. | ⏸ `SMS_ALERTS_ENABLED=false` | §22 |
+
+### Products
+
+| Feature | What it does | Status | Test |
+|---|---|---|---|
+| **Barcode / product lookup** | Scan a product or shelf tag → current price, brand, rating, image, plus price history from other members' receipts. Partial result when only ingredient data exists. | ✅ | §9 |
+| **Ingredient good/watch/avoid** | NOVA group, Nutri-Score, flagged additives with plain-language reasons (Open Food Facts, USDA fallback). | ✅ | §9 |
+| **Barcode history** | Every product looked up, sortable by date or price. | ✅ | §16 |
+
+### Check-ins & game layer
+
+| Feature | What it does | Status | Test |
+|---|---|---|---|
+| **Geo-fenced check-ins** | Check in when GPS is within 50m of a warehouse; 1 star, once per warehouse per day. | ✅ | §10 |
+| **Check-in on receipt scan** | Scanning a receipt also earns a star, dated to the receipt's transaction date; a repeat from the same trip is a silent no-op. | ✅ | §10, §17 |
+| **Fan tier progression** | Cumulative stars advance you through 5 named tiers; tier ladder on Profile. | ✅ | §11 |
+| **Badge engine** | 10 badges tied to check-in counts, warehouse diversity, warehouse rarity, and tier milestones. | ✅ | §11 |
+| **Warehouse rarity** | 723 warehouses tagged Common / Rare / Legendary from Google Places ratings. | ✅ | §11 |
+| **Check-in history** | Every visit, sortable by date or stars. | ✅ | §16 |
+| **Celebrations** | Checkmark, confetti, halo and star-toss animations on scan and check-in. | ✅ | §10 |
+
+### Home, stats & settings
+
+| Feature | What it does | Status | Test |
+|---|---|---|---|
+| **Home dashboard** | Greeting, Total Spent / Saved / Receipts, active alert cards, quick actions (Scan, History, Check in). | ✅ | §12 |
+| **Unified Recent feed** | Receipts and viewed products in one feed, newest-first under day dividers, with All / Receipts / Viewed chips. | ✅ | §12 |
+| **Unified History** | One screen with Receipts / Barcode / Check-ins tabs. | ✅ | §16 |
+| **Spend analytics (Stats tab)** | Monthly spend chart (tap a month → its receipts), top items, in-store vs. price-match savings, averages. | ✅ | §13 |
+| **Appearance** | Light / Dark / System, persisted on device. | ✅ | §18 |
+| **Notification preferences** | Push on/off (with iOS Settings deep link when denied), price-drop emails on/off. | ✅ | §8, §14, §20 |
+| **Error fallback** | A themed recovery screen instead of a blank app on a render crash; crashes reported to PostHog. | ✅ | §23 |
+
+### Outside the app
+
+| Feature | What it does | Status | Test |
+|---|---|---|---|
+| **Universal links** | `https://everyday-labs.org/alerts` opens the app's Alerts screen (web fallback page when the app isn't installed). | ✅ | §20 |
+| **Feedback form** | `everyday-labs.org/bulkmate/feedback/` writes to Supabase `feature_requests` (insert-only, no reads). | ✅ | §21 |
+| **Privacy policy / support pages** | `everyday-labs.org/bulkmate/privacy/` and `/support/`. | ✅ | §21 |
 
 ---
 
