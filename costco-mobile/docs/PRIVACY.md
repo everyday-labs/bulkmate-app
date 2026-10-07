@@ -24,8 +24,9 @@ the data described in this policy. For any privacy question or request, contact
   first and last name (Apple only shares it on your first sign-in, and only if you allow it).
   You can change or clear it at any time on the Edit Profile screen. Email sign-ups start
   with no name.
-- **Phone number** — optional, only if you enter it on the Edit Profile screen. Nothing in the
-  app uses it yet.
+- **Phone number** — optional. It is used only if you turn on weekly texts: the number is
+  confirmed with a one-time code first, and is then used solely to send those texts. Changing
+  the number turns texts off until the new one is confirmed.
 
 ### Receipts
 - **The receipt photo you take**, stored as an image file.
@@ -47,6 +48,12 @@ sold, and it is never shared with advertisers.
 ### Notifications
 - **A push notification token** for your device, if you allow notifications. Used to alert you
   about price-match opportunities.
+- **Price-drop emails** go to your account email address when a price drops on something you
+  bought. They are on by default; every email has a one-click unsubscribe link, and they can be
+  turned off in **Profile → Preferences**.
+- **Weekly texts** (a Friday summary of price drops) are **off by default** and only sent after
+  you turn them on and confirm your number. Reply STOP or turn them off in **Profile →
+  Preferences** to stop them.
 
 ### Usage and diagnostics
 - **Analytics events** (screens opened, actions taken) and **crash/error reports**.
@@ -62,7 +69,7 @@ Bulkmate does not sell your data. It is processed by these services:
 |---|---|---|
 | **Supabase** | All account, receipt, check-in and profile data | Database, authentication, and file storage — this is where the app's data lives |
 | **Google Sign-In / Sign in with Apple** | Only if you choose them: they confirm your identity and share your email and name with the app | Signing in without a password |
-| **Google (Gmail)** | Your email address and a one-time code | Delivering sign-up confirmation and password reset emails |
+| **Brevo** | Your email address; your phone number only if you turn on texts; one-time codes and price-drop totals | Delivering sign-up, password-reset and price-drop emails, and weekly texts |
 | **Google Cloud Vision** | Your receipt images | Optical character recognition, to read items and prices off the photo |
 | **PostHog** | Usage events, error reports, masked session replays | Understanding how the app is used and diagnosing failures |
 | **Expo Push / Apple APNs** | Your push token and notification contents | Delivering push notifications |
@@ -86,7 +93,8 @@ If you would rather it be handled for you, email **hello@everyday-labs.org**.
 - **Location** — decline the permission, or revoke it in iOS Settings. Only check-ins stop
   working; everything else is unaffected.
 - **Camera** — decline the permission. Receipt and barcode scanning stop working.
-- **Notifications** — decline or revoke at any time in iOS Settings.
+- **Notifications** — decline or revoke push at any time in iOS Settings; turn price-drop
+  emails and weekly texts on or off in **Profile → Preferences**.
 - **Your receipts** — delete any of them individually, at any time, from the app.
 
 ## Children

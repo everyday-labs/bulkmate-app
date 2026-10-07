@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Switch,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,6 +64,9 @@ type ProfileData = {
   first_name: string | null;
   last_name: string | null;
   phone_number: string | null;
+  email_alerts_enabled: boolean;
+  sms_alerts_enabled: boolean;
+  phone_verified_at: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -135,7 +139,7 @@ export default function ProfileScreen() {
       const [{ data: profileData }, { data: badgesData }, { data: userBadgesData }] = await Promise.all([
         supabase
           .from('profiles')
-          .select('total_stars, fan_tier, display_name, first_name, last_name, phone_number')
+          .select('total_stars, fan_tier, display_name, first_name, last_name, phone_number, email_alerts_enabled, sms_alerts_enabled, phone_verified_at')
           .eq('id', userId)
           .single(),
         supabase
@@ -158,6 +162,22 @@ export default function ProfileScreen() {
       setLoadingProfile(false);
       setRefreshing(false);
     }
+  }
+
+  async function updateAlertPref(
+    patch: Partial<Pick<ProfileData, 'email_alerts_enabled' | 'sms_alerts_enabled'>>,
+  ) {
+    const userId = session?.user.id;
+    if (!userId || !profile) return;
+    const previous = profile;
+    setProfile({ ...profile, ...patch }); // optimistic
+    const { error } = await supabase.from('profiles').update(patch).eq('id', userId);
+    if (error) {
+      setProfile(previous);
+      Alert.alert('Could not save', 'Please try again.');
+      return;
+    }
+    posthog?.capture('alert_channel_changed', patch);
   }
 
   async function handleEnableNotifications() {
@@ -421,7 +441,7 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.rowContent}>
               <Text style={styles.rowTitle}>Edit Profile</Text>
-              <Text style={styles.rowSubtitle}>Name, phone number for SMS alerts</Text>
+              <Text style={styles.rowSubtitle}>Name and phone number</Text>
             </View>
             <Text style={styles.rowChevron}>›</Text>
           </Pressable>
@@ -447,6 +467,52 @@ export default function ProfileScreen() {
               onOpenSettings={() => Linking.openSettings()}
               styles={styles}
               Colors={Colors}
+            />
+          </View>
+
+          <View style={styles.rowSeparator} />
+
+          <View style={styles.settingsRow}>
+            <View style={styles.rowIconWrap}>
+              <Text style={styles.rowIcon}>✉️</Text>
+            </View>
+            <View style={styles.rowContent}>
+              <Text style={styles.rowTitle}>Price-Drop Emails</Text>
+              <Text style={styles.rowSubtitle} numberOfLines={1}>
+                {session?.user.email ? `Sent to ${session.user.email}` : 'Sent as soon as a price drops'}
+              </Text>
+            </View>
+            <Switch
+              value={profile?.email_alerts_enabled ?? false}
+              onValueChange={(on) => updateAlertPref({ email_alerts_enabled: on })}
+              disabled={!profile}
+              trackColor={{ true: Colors.costcoRedSolid, false: Colors.gray[300] }}
+            />
+          </View>
+
+          <View style={styles.rowSeparator} />
+
+          <View style={styles.settingsRow}>
+            <View style={styles.rowIconWrap}>
+              <Text style={styles.rowIcon}>💬</Text>
+            </View>
+            <View style={styles.rowContent}>
+              <Text style={styles.rowTitle}>Weekly Texts</Text>
+              <Text style={styles.rowSubtitle} numberOfLines={2}>
+                {profile?.phone_verified_at && profile.phone_number
+                  ? `Fridays 3 PM PT to ${profile.phone_number}`
+                  : 'Fridays 3 PM PT · verify your number to turn on'}
+              </Text>
+            </View>
+            <Switch
+              value={profile?.sms_alerts_enabled ?? false}
+              onValueChange={(on) => {
+                // Texts need a verified number; the server enforces this too.
+                if (on && !profile?.phone_verified_at) router.push('/verify-phone');
+                else updateAlertPref({ sms_alerts_enabled: on });
+              }}
+              disabled={!profile}
+              trackColor={{ true: Colors.costcoRedSolid, false: Colors.gray[300] }}
             />
           </View>
 

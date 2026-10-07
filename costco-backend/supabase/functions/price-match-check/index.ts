@@ -3,6 +3,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { fetchFromRapidApi } from '../_shared/rapidApi.ts';
 import { sendExpoPushNotifications, type ExpoPushMessage } from '../_shared/expoPush.ts';
+import { sendBrevoEmail } from '../_shared/brevo.ts';
+import { buildPriceDropEmail } from '../_shared/alertMessages.ts';
+import { unsubscribeUrl } from '../_shared/notifyLinks.ts';
 import { capturePostHogException } from '../_shared/posthog.ts';
 
 // ---------------------------------------------------------------------------
@@ -301,25 +304,31 @@ serve(async (req) => {
 
     console.log(`price-match-check: ${items.length} items, sweep=${sweep ?? false}`);
 
-    // Cache push tokens per user_id to avoid repeat DB lookups in sweep mode
-    const pushTokenCache = new Map<string, string | null>();
+    // Cache notification prefs per user_id to avoid repeat DB lookups in sweep mode
+    type NotifyPrefs = { pushToken: string | null; emailAlerts: boolean };
+    const prefsCache = new Map<string, NotifyPrefs>();
 
-    async function getPushToken(uid: string): Promise<string | null> {
-      if (pushTokenCache.has(uid)) return pushTokenCache.get(uid)!;
+    async function getNotifyPrefs(uid: string): Promise<NotifyPrefs> {
+      if (prefsCache.has(uid)) return prefsCache.get(uid)!;
       const { data } = await supabase
         .from('profiles')
-        .select('push_token')
+        .select('push_token, email_alerts_enabled')
         .eq('id', uid)
         .maybeSingle();
-      const token = data?.push_token ?? null;
-      pushTokenCache.set(uid, token);
-      return token;
+      const prefs = {
+        pushToken: data?.push_token ?? null,
+        emailAlerts: data?.email_alerts_enabled ?? false,
+      };
+      prefsCache.set(uid, prefs);
+      return prefs;
     }
 
     let alertsCreated = 0;
     let noDataCount = 0;
     const pushMessages: ExpoPushMessage[] = [];
     const notifiedAlertIds: string[] = [];
+    // New drops per user, for one summary email per user per run.
+    const emailBatches = new Map<string, { alertIds: string[]; total: number }>();
 
     for (const item of items) {
       await updateReceiptLedger(supabase, item.sku, item.net_paid);
@@ -334,6 +343,16 @@ serve(async (req) => {
       const delta = item.net_paid - result.current_price;
       if (delta <= 0.01) continue;
 
+      // The daily sweep re-finds every still-valid drop. Only notify when the
+      // drop is new or the price fell further since the last alert — this used
+      // to reset notified_at on every upsert, re-sending the same push daily.
+      const { data: existing } = await supabase
+        .from('price_alerts')
+        .select('delta')
+        .eq('receipt_item_id', item.receipt_item_id)
+        .maybeSingle();
+      const isNewDrop = !existing || delta > Number(existing.delta) + 0.01;
+
       const { data: alertRow, error: alertError } = await supabase
         .from('price_alerts')
         .upsert(
@@ -345,7 +364,12 @@ serve(async (req) => {
             current_price: result.current_price,
             delta,
             source: result.source === 'cache' ? 'rapidapi' : result.source,
-            notified_at: null,
+            // Upsert only overwrites the columns given, so a repeat finding
+            // keeps its delivery stamps (and a dismissal); a new/deeper drop
+            // clears them so every channel fires again and the alert reappears.
+            ...(isNewDrop
+              ? { notified_at: null, emailed_at: null, texted_at: null, dismissed_at: null }
+              : {}),
           },
           { onConflict: 'receipt_item_id' },
         )
@@ -357,14 +381,24 @@ serve(async (req) => {
         continue;
       }
 
+      if (!isNewDrop) continue;
+
       alertsCreated++;
       console.log(
         `Alert: SKU ${item.sku} paid $${item.net_paid} → now $${result.current_price}` +
         ` (Δ $${delta.toFixed(2)}) via ${result.source}`,
       );
 
+      const { pushToken, emailAlerts } = await getNotifyPrefs(item.user_id);
+
+      if (emailAlerts) {
+        const batch = emailBatches.get(item.user_id) ?? { alertIds: [], total: 0 };
+        batch.alertIds.push(alertRow.id);
+        batch.total += delta;
+        emailBatches.set(item.user_id, batch);
+      }
+
       // Queue a push notification if the user has a token
-      const pushToken = await getPushToken(item.user_id);
       if (pushToken) {
         // Truncate long product names to fit notification body
         const name = item.description.length > 60
@@ -400,11 +434,44 @@ serve(async (req) => {
       console.log(`Sent ${pushMessages.length} push notifications`);
     }
 
+    // One email per user per run, summing their new drops. Failures are logged
+    // and leave emailed_at null; they never fail the run.
+    let emailsSent = 0;
+    for (const [uid, batch] of emailBatches) {
+      const { data: userData } = await supabase.auth.admin.getUserById(uid);
+      const to = userData?.user?.email;
+      if (!to) continue;
+
+      const unsub = await unsubscribeUrl(uid);
+      const { subject, html, text } = buildPriceDropEmail(batch.alertIds.length, batch.total, unsub);
+      const sent = await sendBrevoEmail({
+        to,
+        subject,
+        html,
+        text,
+        tags: ['price-drop'],
+        // One-click unsubscribe (RFC 8058) — Gmail/Yahoo show an Unsubscribe
+        // button for it, and require it of bulk senders.
+        headers: {
+          'List-Unsubscribe': `<${unsub}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
+      });
+      if (sent) {
+        emailsSent++;
+        await supabase
+          .from('price_alerts')
+          .update({ emailed_at: new Date().toISOString() })
+          .in('id', batch.alertIds);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         checked: items.length,
         alerts_created: alertsCreated,
         pushes_sent: pushMessages.length,
+        emails_sent: emailsSent,
         no_data: noDataCount,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
