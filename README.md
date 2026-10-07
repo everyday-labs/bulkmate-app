@@ -74,7 +74,7 @@ No official Costco API exists, so pricing, ingredient, and OCR data are sourced 
 | API | Used for | Called from | Auth | Cost |
 |---|---|---|---|---|
 | **Google Cloud Vision** (`DOCUMENT_TEXT_DETECTION`) | OCR on receipt photos — turns a captured image into raw text for the line-item parser | `ingest-receipt` | API key | Paid, per image |
-| **RapidAPI — Costco Live Data** | Live Costco pricing, name, image, and rating for a scanned barcode or SKU | `barcode-lookup`, `price-match-check` | API key (header) | Paid, per request (cached 72h) |
+| **RapidAPI — Costco Live Data** | Live Costco pricing, name, image, and rating for a scanned barcode or SKU | `barcode-lookup`, `price-match-check` | API key (header) | Free Basic plan, 100 requests/month (cached 72h) |
 | **Open Food Facts** | Primary ingredient classification — real NOVA processing group, Nutri-Score (A–E), detected additive E-codes, and high/low nutrient-level flags for the good/watch/avoid ingredient breakdown | `barcode-lookup` | None (descriptive User-Agent required) | Free |
 | **USDA FoodData Central** | Fallback ingredient source when Open Food Facts has no match for a UPC — raw ingredient text only, classified with a weaker keyword heuristic | `barcode-lookup` | API key (query param) | Free |
 | **Expo Push API** | Delivers the "price drop" push notification when a price-match alert fires | `price-match-check` | None (per-device push token) | Free |
