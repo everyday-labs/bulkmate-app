@@ -17,7 +17,9 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   expect: {
-    toHaveScreenshot: { maxDiffPixelRatio: 0.01, animations: 'disabled', caret: 'hide' },
+    // Strict: a few dozen pixels of anti-aliasing noise at most. A ratio-based
+    // tolerance (1%) let a changed tagline through unnoticed.
+    toHaveScreenshot: { maxDiffPixels: 50, threshold: 0.2, animations: 'disabled', caret: 'hide' },
   },
   use: {
     baseURL: `http://localhost:${PORT}`,

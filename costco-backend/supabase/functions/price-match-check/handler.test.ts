@@ -86,7 +86,7 @@ Deno.test(
       assertEquals(alert.params.get('on_conflict'), 'receipt_item_id');
 
       const push = (api.calls(PUSH)[0].body as { title: string; data: { receiptId: string } }[])[0];
-      assertEquals(push.title, 'Price Drop — You may be owed $3.00');
+      assertEquals(push.title, 'Price drop: you could get $3.00 back');
       assertEquals(push.data.receiptId, 'r1');
 
       const email = api.calls(EMAIL)[0].body as {
