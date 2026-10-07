@@ -1,0 +1,2 @@
+# Runs from the repo root. Same checks as CI, including coverage thresholds.
+scripts/check-all.sh

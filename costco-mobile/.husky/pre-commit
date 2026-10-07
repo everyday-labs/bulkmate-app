@@ -1,0 +1,3 @@
+# Runs from the repo root. Formats + lints staged files, then typechecks and
+# runs the tests related to what's staged. Full suite: pre-push / CI.
+costco-mobile/node_modules/.bin/lint-staged --config .lintstagedrc.mjs
