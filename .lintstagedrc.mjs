@@ -25,6 +25,6 @@ export default {
   'costco-backend/supabase/functions/**/*.ts': [
     `${DENO} lint`,
     () => `${DENO} check .`,
-    () => `${DENO} test --allow-env`,
+    () => `${DENO} test --allow-env --allow-read`,
   ],
 };
