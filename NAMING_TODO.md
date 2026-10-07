@@ -93,7 +93,10 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 - [ ] **Google Cloud project name** — "Bulkmate" (or "Everyday Labs" if it'll host more apps).
 - [ ] **Google Auth Platform → Branding**: app name `Bulkmate`, logo, support email, developer
       contact, app home page + privacy policy URL (website), authorized domain. Required before
-      publishing out of "Testing".
+      publishing out of "Testing". User support email must be your Google account (Gmail) or a
+      Google Group you own — `hello@` is rejected there; use `hello@everyday-labs.org` for
+      developer contact. Home `https://everyday-labs.org/bulkmate/`, privacy
+      `https://everyday-labs.org/bulkmate/privacy/`, authorized domain `everyday-labs.org`.
 - [ ] **OAuth clients** (iOS, Web) — names like "Bulkmate iOS" / "Bulkmate Supabase" for clarity.
 - [ ] Web client **redirect URI** `https://lylpdnqrguzxoompllsa.supabase.co/auth/v1/callback` —
       was returning `redirect_uri_mismatch`; add it.
@@ -109,7 +112,7 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 - [ ] **Expo / EAS** project display name → "Bulkmate" (slug stays `costco-app`).
 - [ ] **RapidAPI** app name → "Bulkmate".
 - [x] **Open Food Facts** User-Agent `Bulkmate/1.0 (Everyday Labs; hello@everyday-labs.org)` —
-      contact switched 2026-10-07; redeploy `barcode-lookup` to ship it.
+      contact switched + `barcode-lookup` redeployed 2026-10-07.
 - [ ] **USDA FoodData Central** API key registration — app/org name.
 
 ## 6. Web presence (after the site exists)
