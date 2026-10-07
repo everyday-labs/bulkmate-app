@@ -48,15 +48,15 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 ## 2. Emails (Supabase → Authentication → Emails)
 
 - [ ] **SMTP sender name** = `Bulkmate` (set) — or "Bulkmate by Everyday Labs"? Pick per the pattern.
-- [ ] **SMTP port** — was `453` (typo), must be `465`. Re-run the sign-up test after.
-- [ ] **Confirm sign up** template — repo version has the Everyday Labs footer; re-paste
+- [x] **SMTP port** — was `453` (typo), fixed to `465` 2026-10-06; sign-up test passed (HTTP 200, email sent).
+- [x] **Confirm sign up** template — repo version has the Everyday Labs footer; re-paste
       `costco-backend/supabase/templates/confirm-signup.html`. Subject → `Your Bulkmate code: {{ .Token }}`.
-- [ ] **Reset password** template — re-paste `templates/reset-password.html`; subject
+- [x] **Reset password** template — re-paste `templates/reset-password.html`; subject
       `Your Bulkmate password reset code`.
 - [ ] **Other templates still on Supabase defaults** — Magic Link, Change Email Address, Invite User,
       Reauthentication. Unused today, but they'd go out with generic text and a broken link. Brand
       them the same way, or confirm they can't be triggered.
-- [ ] **Site URL** — still `http://localhost:3000` → set to `bulkmate://` (or the website once live).
+- [x] **Site URL** — set to `bulkmate://` 2026-10-06 (could point at everyday-labs.org instead).
 - [ ] **Gmail account display name** for balajic0623@gmail.com — shows in some clients next to the
       address. Set it to match (Gmail → Settings → Accounts → "Send mail as").
 - [ ] **Sign in with Apple private relay** — users who pick "Hide My Email" get emails at
@@ -95,8 +95,8 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 - [ ] **PostHog** organization → "Everyday Labs", project → "Bulkmate".
 - [ ] **Expo / EAS** project display name → "Bulkmate" (slug stays `costco-app`).
 - [ ] **RapidAPI** app name → "Bulkmate".
-- [ ] **Open Food Facts** User-Agent now `Bulkmate/1.0 (Everyday Labs; balajic0623@gmail.com)` —
-      **needs `supabase functions deploy barcode-lookup`** to go live.
+- [x] **Open Food Facts** User-Agent `Bulkmate/1.0 (Everyday Labs; balajic0623@gmail.com)` —
+      deployed 2026-10-06.
 - [ ] **USDA FoodData Central** API key registration — app/org name.
 
 ## 6. Web presence (after the site exists)
