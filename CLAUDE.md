@@ -54,11 +54,20 @@ npx expo run:ios                 # run on iOS simulator
 npx expo run:ios --device <udid> # build + install on a physical iPhone (needs paid Apple team, see Build Status)
 npx expo run:android             # run on Android emulator
 npx tsc --noEmit                 # typecheck (strict mode)
+npm test                         # Jest (jest-expo) — lib/__tests__/
+npm run check:contrast           # WCAG contrast of constants/colors.ts — must print "All pairings pass"
+
+# Edge Functions (costco-backend/supabase/functions/) — Deno 2 (`npx deno …` works without installing)
+deno check .                     # typecheck every function + test
+deno lint
+deno test --allow-env            # *.test.ts next to the code they cover
 
 # Backend (costco-backend/supabase/)
 supabase db push                 # apply migrations to linked remote project
 supabase functions deploy <name> # deploy a single Edge Function
 ```
+
+**CI** (`.github/workflows/ci.yml`, added 2026-10-07) runs all of the above on every PR and push to `main`: mobile `tsc` + contrast + Jest, and Edge Functions `deno check` + `deno lint` + `deno test`. Keep it green — merge only when both jobs pass. Automated tests cover pure logic (receipt parser regression cases from `PARSER_DECISIONS.md`, alert copy, signed unsubscribe links, Brevo payloads, ingredient classification, fan tiers, offline queue, Google sign-in wrapper); anything touching the device, camera, GPS or live services is still the manual `TEST_PLAN.md`. **When a real receipt breaks the parser, add its shape to `ingest-receipt/parser.test.ts` first, then fix.** Supabase client params are typed as `SupabaseClient` imported from supabase-js — not `ReturnType<typeof createClient>`, which resolves table rows to `never` with the unpinned `@2` import.
 
 **Supabase CLI works** (verified 2026-08-11, CLI v2.111.0, project linked and authenticated) — `supabase functions deploy <name>` works directly and is the preferred path. This was broken earlier in the project's history (token format issue) and older notes may still say deploys must be done by hand via the dashboard; that's stale. Docker isn't running locally, so deploys emit a `WARNING: Docker is not running` line — harmless, the bundle still uploads and deploys fine.
 

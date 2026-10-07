@@ -13,7 +13,7 @@ export const LightColors = {
   executiveNavyDark: '#12203A',
   executiveNavyLight: '#3D4F75',
   goldStarAccent: '#C9A84C',
-  goldStarDark: '#A98A3A',
+  goldStarDark: '#A28438',     // darkened from #A98A3A: 3:1 on goldStarSubtle chips
   goldStarLight: '#E0C67A',
 
   // Solid navy fill for opaque decorative blocks (avatars, active pills) that
@@ -56,7 +56,7 @@ export const LightColors = {
     100: '#F4F2EE',
     200: '#E8E5DF',
     300: '#D4D0C8',
-    400: '#A8A39A',
+    400: '#958F84',   // darkened from #A8A39A: 3:1 muted text on background/surface
     500: '#78726A',
     600: '#57534D',
     700: '#3D3935',
@@ -67,7 +67,7 @@ export const LightColors = {
   // === Semantic ===
   success: '#2D8A6E',
   successBg: '#E3F3EE',
-  successText: '#2D8A6E',
+  successText: '#237A5F',      // = successSolid; #2D8A6E was 3.68:1 on successBg
   savings: '#2D8A6E',
   savingsBg: '#E3F3EE',
   warning: '#D4842A',
