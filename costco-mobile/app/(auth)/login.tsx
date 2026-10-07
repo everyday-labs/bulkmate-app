@@ -53,7 +53,7 @@ export default function LoginScreen() {
       posthog?.capture('sign_in_failed', { sign_in_method: 'email', error: error.message });
       Alert.alert('Sign in failed', error.message);
     } else {
-      posthog?.identify(data.user.id, data.user.email ? { email: data.user.email } : undefined);
+      posthog?.identify(data.user.id);
       posthog?.capture('user_signed_in', { sign_in_method: 'email' });
     }
     setLoading(false);
@@ -91,7 +91,7 @@ export default function LoginScreen() {
             .eq('id', data.user.id)
             .is('first_name', null);
         }
-        posthog?.identify(data.user.id, data.user.email ? { email: data.user.email } : undefined);
+        posthog?.identify(data.user.id);
         posthog?.capture('user_signed_in', { sign_in_method: 'apple' });
       }
     } catch (e: any) {
@@ -119,7 +119,7 @@ export default function LoginScreen() {
         posthog?.capture('sign_in_failed', { sign_in_method: 'google', error: error.message });
         Alert.alert('Google sign-in failed', error.message);
       } else {
-        posthog?.identify(data.user.id, data.user.email ? { email: data.user.email } : undefined);
+        posthog?.identify(data.user.id);
         posthog?.capture('user_signed_in', { sign_in_method: 'google' });
       }
     } catch (e: any) {

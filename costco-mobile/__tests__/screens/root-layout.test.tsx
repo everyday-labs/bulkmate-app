@@ -37,7 +37,7 @@ describe('RootLayout auth gate', () => {
     setSegments(['(auth)', 'login']);
     await renderLayout();
     expect(router.replace).toHaveBeenCalledWith('/(tabs)');
-    expect(posthog!.identify).toHaveBeenCalledWith(TEST_USER.id, { email: TEST_USER.email });
+    expect(posthog!.identify).toHaveBeenCalledWith(TEST_USER.id);
   });
 
   it('lets a user who just verified a reset code finish setting the password', async () => {
