@@ -11,7 +11,7 @@ one, consistently. Work through it top to bottom; tick items as you go.
 | **Everyday Labs** | The publisher — legal, copyright, "who is responsible" | `© 2026 Everyday Labs`, privacy policy, terms, App Store copyright, GitHub org, website |
 | ~~Tinker~~ | **Retired from public copy (2026-10-06).** All public text is third person, as Everyday Labs | — |
 | **noreply@everyday-labs.org** | Sender address for all outgoing email (send-only, Brevo, DKIM + DMARC) | Supabase Auth SMTP sender, price-drop emails (`_shared/brevo.ts`) |
-| **hello@everyday-labs.org** | The one public contact address (until `hello@` forwarding exists) | Privacy policy, support page, store listings, OAuth consent screen |
+| **hello@everyday-labs.org** | The one public contact address (Cloudflare Email Routing → personal Gmail) | Privacy policy, support/feedback pages, site `_config.yml` `email`, store listings, OAuth consent screen |
 
 **Never rename** (would break things): bundle ID `com.twonk0609.bulkmate`, Expo `slug: costco-app`,
 EAS owner `twonk0609s-team`, ASC app id `6800910077`. These are invisible to users.
@@ -63,8 +63,8 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
   - [x] Invite User ← `templates/invite.html`, subject `You're invited to Bulkmate`
   - [x] Reauthentication ← `templates/reauthentication.html`, subject `Your Bulkmate confirmation code`
 - [x] **Site URL** — set to `bulkmate://` 2026-10-06 (could point at everyday-labs.org instead).
-- [ ] **Gmail account display name** for hello@everyday-labs.org — shows in some clients next to the
-      address. Set it to match (Gmail → Settings → Accounts → "Send mail as").
+- [x] ~~**Gmail account display name**~~ — moot since 2026-10-07: the Gmail address is no longer
+      public (contact is `hello@everyday-labs.org`).
 - [x] **Sign in with Apple private relay** — users who pick "Hide My Email" get emails at
       `@privaterelay.appleid.com`, and Apple **drops** mail from senders not registered in
       Apple Developer → Certificates, IDs & Profiles → Services → *Sign in with Apple for Email
@@ -109,7 +109,7 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 - [ ] **Expo / EAS** project display name → "Bulkmate" (slug stays `costco-app`).
 - [ ] **RapidAPI** app name → "Bulkmate".
 - [x] **Open Food Facts** User-Agent `Bulkmate/1.0 (Everyday Labs; hello@everyday-labs.org)` —
-      deployed 2026-10-06.
+      contact switched 2026-10-07; redeploy `barcode-lookup` to ship it.
 - [ ] **USDA FoodData Central** API key registration — app/org name.
 
 ## 6. Web presence (after the site exists)
@@ -119,9 +119,10 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
       Claude walkthrough), `/bulkmate/privacy`, `/bulkmate/support`, `/bulkmate/feedback` (2026-10-06).
 - [ ] Transfer `balajic0623/costco-app` → `everyday-labs/` (maybe rename to `bulkmate`);
       `git remote set-url origin …` locally.
-- [x] Domain `everyday-labs.org` bought 2026-10-06 → DNS, HTTPS, verified domain done. Still open:
-      `hello@` forwarding → then switch the contact email to it and update every place above that
-      lists hello@everyday-labs.org.
+- [x] Domain `everyday-labs.org` bought 2026-10-06 → DNS, HTTPS, verified domain done.
+      `hello@` forwarding (Cloudflare Email Routing) verified 2026-10-07; contact email switched to it
+      in PRIVACY.md (both copies), site `_config.yml` + feedback page, OFF User-Agent. Still to
+      change by hand: App Store Connect contact/review info, Google consent screen support email.
 - [x] **Brevo sending domain** — SPF (`v=spf1 include:_spf.mx.cloudflare.net include:spf.brevo.com ~all`, 2026-10-07) + DKIM (`brevo1/brevo2._domainkey` CNAMEs) + DMARC
       (`_dmarc` TXT `v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com`) live 2026-10-06; test
       email received. Later: move to `p=quarantine` after ~2 weeks of clean Brevo DMARC reports —
