@@ -189,8 +189,7 @@ export default function EditProfileScreen() {
           <View style={styles.phoneNote}>
             <Text style={styles.phoneNoteIcon}>🔒</Text>
             <Text style={styles.phoneNoteText}>
-              We'll only text you when a price-match refund is available on something you bought.
-              We never share your number with anyone.
+              Optional. Bulkmate doesn't send texts yet, and your number is never shared with anyone.
             </Text>
           </View>
         </View>

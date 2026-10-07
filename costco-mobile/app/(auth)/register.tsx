@@ -11,7 +11,7 @@ import {
   Platform,
   Pressable,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { posthog } from '../../lib/posthog';
@@ -19,15 +19,25 @@ import { useThemeColors } from '../../contexts/ThemeContext';
 import type { ColorScheme } from '../../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../../constants/theme';
 
+// Email confirmation is code-based, same as password reset: the "Confirm
+// signup" email carries {{ .Token }} and the user types it here. The emailed
+// link would redirect to the project's Site URL, and the app has no website.
+// verifyOtp signs the user in, and _layout then routes to the tabs.
+type Step = 'form' | 'code';
+
 export default function RegisterScreen() {
   const router = useRouter();
+  // Login sends an unconfirmed user here with their email to finish verifying.
+  const { verifyEmail } = useLocalSearchParams<{ verifyEmail?: string }>();
   const insets = useSafeAreaInsets();
   const Colors = useThemeColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
-  const [email, setEmail] = useState('');
+  const [step, setStep] = useState<Step>(verifyEmail ? 'code' : 'form');
+  const [email, setEmail] = useState(verifyEmail ?? '');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [focused, setFocused] = useState<'email' | 'password' | null>(null);
+  const [focused, setFocused] = useState<'email' | 'password' | 'code' | null>(null);
 
   async function signUp() {
     if (!email || !password) {
@@ -39,16 +49,51 @@ export default function RegisterScreen() {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+    setLoading(false);
     if (error) {
       posthog?.capture('sign_up_failed', { sign_up_method: 'email', error: error.message });
       Alert.alert('Sign up failed', error.message);
-    } else {
-      posthog?.capture('user_registered', { sign_up_method: 'email' });
-      Alert.alert('Almost there', 'Check your email to confirm your account.');
-      router.replace('/(auth)/login');
+      return;
     }
+    posthog?.capture('user_registered', { sign_up_method: 'email' });
+    // With confirmations off a session comes back immediately and _layout
+    // takes over; otherwise the code is on its way.
+    if (!data.session) {
+      setCode('');
+      setStep('code');
+    }
+  }
+
+  async function verifyCode() {
+    if (code.trim().length < 8) {
+      Alert.alert('Enter the code', 'Type the 8-digit code from the email.');
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: code.trim(),
+      type: 'signup',
+    });
     setLoading(false);
+    if (error) {
+      posthog?.capture('email_verification_failed', { error: error.message });
+      Alert.alert('Code not accepted', 'That code is invalid or has expired. Request a new one and try again.');
+      return;
+    }
+    posthog?.capture('email_verified');
+  }
+
+  async function resendCode() {
+    setLoading(true);
+    const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
+    setLoading(false);
+    if (error) {
+      Alert.alert('Could not resend code', error.message);
+      return;
+    }
+    Alert.alert('Code sent', `A new code is on its way to ${email.trim()}.`);
   }
 
   return (
@@ -67,13 +112,75 @@ export default function RegisterScreen() {
         {/* ── Brand mark ── */}
         <View style={styles.brandSection}>
           <View style={styles.logoMark}>
-            <Text style={styles.logoMarkText}>C</Text>
+            <Text style={styles.logoMarkText}>B</Text>
           </View>
-          <Text style={styles.wordmark}>COSTCO</Text>
+          <Text style={styles.wordmark}>BULKMATE</Text>
           <Text style={styles.tagline}>Start tracking your savings</Text>
         </View>
 
         {/* ── Form card ── */}
+        {step === 'code' ? (
+          <View style={styles.card}>
+            <Text style={styles.cardHeading}>Confirm your email</Text>
+            <Text style={styles.body}>
+              We sent an 8-digit code to <Text style={styles.bodyStrong}>{email.trim()}</Text>.
+              Enter it below to finish creating your account.
+            </Text>
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>CODE</Text>
+              <TextInput
+                style={[styles.input, styles.codeInput, focused === 'code' && styles.inputFocused]}
+                placeholder="12345678"
+                placeholderTextColor={Colors.gray[400]}
+                value={code}
+                onChangeText={(t) => setCode(t.replace(/\D/g, ''))}
+                onFocus={() => setFocused('code')}
+                onBlur={() => setFocused(null)}
+                keyboardType="number-pad"
+                textContentType="oneTimeCode"
+                autoComplete="one-time-code"
+                maxLength={8}
+                returnKeyType="done"
+                onSubmitEditing={verifyCode}
+                autoFocus
+              />
+            </View>
+
+            <Pressable
+              style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
+              onPress={verifyCode}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color={Colors.white} />
+                : <Text style={styles.primaryBtnText}>Verify Email</Text>
+              }
+            </Pressable>
+
+            <Pressable
+              onPress={resendCode}
+              disabled={loading}
+              hitSlop={8}
+              style={({ pressed }) => [styles.secondaryLink, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={styles.switchText}>
+                Didn&apos;t get it?{'  '}
+                <Text style={styles.switchLink}>Resend code</Text>
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => { setStep('form'); setCode(''); }}
+              hitSlop={8}
+              style={({ pressed }) => pressed && { opacity: 0.6 }}
+            >
+              <Text style={styles.switchText}>
+                Wrong email?{'  '}
+                <Text style={styles.switchLink}>Start over</Text>
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
         <View style={styles.card}>
           <Text style={styles.cardHeading}>Create account</Text>
 
@@ -132,9 +239,10 @@ export default function RegisterScreen() {
             </Text>
           </Pressable>
         </View>
+        )}
 
         <Text style={styles.legal}>
-          By creating an account you agree to our Terms of Service and Privacy Policy.
+          By creating an account you agree to the Everyday Labs Terms of Service and Privacy Policy.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -143,6 +251,19 @@ export default function RegisterScreen() {
 
 const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
+  body: {
+    fontSize: fontSize.sm,
+    color: Colors.gray[500],
+    lineHeight: fontSize.sm * 1.5,
+    marginBottom: spacing.xl,
+  },
+  bodyStrong: { color: Colors.gray[900], fontWeight: '700' },
+  codeInput: {
+    fontSize: fontSize['2xl'],
+    letterSpacing: 8,
+    textAlign: 'center',
+  },
+  secondaryLink: { marginBottom: spacing.md },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing['2xl'] },
 
   brandSection: { alignItems: 'center', marginBottom: spacing['4xl'] },

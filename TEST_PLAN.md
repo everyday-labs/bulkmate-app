@@ -1,6 +1,6 @@
 # Bulkmate — Test Plan
 
-**Last updated:** 2026-08-11  
+**Last updated:** 2026-10-06  
 **Status legend:** ⬜ Pending · 🔄 In Progress · ✅ Pass · ❌ Fail
 
 ---
@@ -32,6 +32,15 @@
 | 1.4 | Sign out | Profile tab → Sign Out | Session cleared, redirected to Login | ⬜ |
 | 1.5 | Session persistence | Kill app, reopen | Still logged in (no login screen) | ⬜ |
 | 1.6 | Wrong password | Login with bad password | Error message shown | ⬜ |
+| 1.7 | Email sign-up code | Register → enter the 8-digit code from the email | Signed in, lands on Home; email is from Bulkmate &lt;noreply@everyday-labs.org&gt; | ⬜ |
+| 1.8 | Wrong / resent code | Enter a wrong code; tap Resend code | "Code not accepted"; a new email arrives | ⬜ |
+| 1.9 | Unconfirmed sign-in | Register, quit before the code, then sign in | Fresh code sent, code screen opens | ⬜ |
+| 1.10 | Google sign-in (new) | Tap Sign in with Google with a new account | Home greets you by your Google first name on first load | ✅ device 2026-10-06 |
+| 1.11 | Google cancel | Open the Google sheet, close it | No alert, stays on login | ⬜ |
+| 1.12 | Google re-sign-in | Sign out → Google again | Account picker shows; same user | ⬜ |
+| 1.13 | Password reset | Forgot password? → email → 8-digit code → new password | Lands on Home; new password works, old one fails | ⬜ |
+| 1.14 | Apple sign-in after rename | Sign in with Apple on the Bulkmate build | Works (needs `com.twonk0609.bulkmate` in Supabase's Apple Client IDs) | ⬜ |
+| 1.15 | Name card | New email account → Home | "What should we call you?" card; tap → Edit Profile; ✕ hides it for good | ⬜ |
 
 ---
 
@@ -99,6 +108,12 @@
 | 7.4 | Dismiss alert | Tap ✕ on alert card | Alert disappears from UI; `dismissed_at` set in DB | ⬜ |
 | 7.5 | pg_cron sweep | POST `{ sweep: true }` to Edge Function | All items in last 30 days checked; alerts for price drops | ⬜ |
 | 7.6 | No data graceful | SKU not in API and no ledger data | No alert created, no crash | ⬜ |
+| 7.7 | Daily sweep runs | Check `cron.job_run_details` after 08:00 UTC | `daily-price-match-sweep` status `succeeded` (it failed every run until pg_net was enabled 2026-10-06) | ✅ 2026-10-07 (0 items in window) |
+| 7.8 | No repeat alerts | Same drop found by two sweeps | One push / one email total | ⬜ |
+| 7.9 | Deeper drop | Price falls further after an alert | Notifies again; a dismissed alert reappears | ⬜ |
+| 7.10 | Price-drop email | New drop for a user with email alerts on | Email "Price drop: you could get $X back"; View in Bulkmate opens the app on Alerts | ⬜ |
+| 7.11 | Email unsubscribe | Tap "Stop price-drop emails" in the email | Confirmation page; Profile → Price-Drop Emails shows off | ⬜ |
+| 7.12 | Email toggle | Turn Price-Drop Emails off in Profile | No email on the next drop; push unaffected | ⬜ |
 
 ---
 

@@ -2,7 +2,7 @@
 
 *(Renamed from "Costco Companion" before beta distribution — see the README's naming note.)*
 
-A gamified, open-source Costco membership companion app (iOS/Android, mobile-only for v1). It turns the boring parts of being a Costco member — tracking receipts, catching price drops, remembering which warehouse you visited — into something closer to a collection game. Not affiliated with Costco.
+A gamified, open-source Costco membership companion app (iOS/Android, mobile-only for v1), published by **Everyday Labs**. It turns the boring parts of being a Costco member — tracking receipts, catching price drops, remembering which warehouse you visited — into something closer to a collection game. Not affiliated with Costco.
 
 ---
 
@@ -17,7 +17,8 @@ Scan your receipt and the app quietly does two useful things: it logs everything
 | Feature | What it does |
 |---|---|
 | **Receipt OCR ingestion** | Camera capture → Google Cloud Vision OCR → parsed line items (SKU, description, unit price, discount) → stored per-user. Works offline; queued scans drain once back online. Line items are inline-editable after the fact (tap a row on the receipt-success screen) to fix an OCR misread. |
-| **Sliding-window price match** | Every scanned item is watched for 30 days. If the price drops, you get a push notification telling you the refund you may be owed. |
+| **Sliding-window price match** | Every scanned item is watched for 30 days. If the price drops, you get a push notification and an email telling you the refund you may be owed. |
+| **Sign-in & account** | Email + password (8-digit emailed confirmation code), Sign in with Apple, or Google. In-app password reset by emailed code. Names are filled from Google/Apple; an optional Home card asks everyone else. |
 | **Barcode / product lookup** | Scan any product in-store to pull its current price, brand, and rating — plus, where available, a good/watch/avoid ingredient breakdown. |
 | **Geo-fenced check-ins** | Check in at a warehouse when your GPS is within range; earns 1 star, capped at once per warehouse per day. |
 | **Check-in on receipt scan** | Scanning a receipt also earns a star — a receipt is proof you were there. Dated to the receipt's transaction date, not the upload date, and a repeat from the same trip is a silent no-op. |
@@ -48,11 +49,14 @@ The **best current price** = `min(RapidAPI sale price, OCR ledger median)` — w
 An alert fires when:
 ```
 delta = net_paid - best_current_price
-if delta > $0.01 → create/upsert price_alerts row, queue push notification
+if delta > $0.01 → create/upsert price_alerts row
+  notify (push + email) only if the drop is new, or deeper than the last alert's delta by > $0.01
 ```
-Alerts are keyed by `receipt_item_id` (upsert, so re-checking the same item doesn't duplicate). Once a push is sent, `notified_at` is stamped so the daily sweep won't re-notify for the same alert.
+Alerts are keyed by `receipt_item_id` (upsert, so re-checking the same item doesn't duplicate). Each channel has its own stamp (`notified_at` for push, `emailed_at` for email). A repeat finding by the daily sweep keeps those stamps, so it doesn't re-notify; a deeper drop clears them (and any dismissal) so it notifies again. Until 2026-10-06 every upsert reset `notified_at`, which would have re-pushed the same drop daily — and the daily sweep itself had never run until `pg_net` was enabled that day.
 
 Push copy example: *"Price Drop — You may be owed $X.XX. [Item] dropped from $Y to $Z. You may qualify for a price adjustment."*
+
+Email: one per user per check, subject *"Price drop: you could get $X back"*, body = total savings across the new drops + a **View in Bulkmate** button (universal link `https://everyday-labs.org/alerts`, opens the app's Alerts screen) + one-click unsubscribe.
 
 ### Ingredient classification (`barcode-lookup` Edge Function)
 
