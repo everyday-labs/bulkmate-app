@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import * as Notifications from 'expo-notifications';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
@@ -673,7 +673,7 @@ export default function ProfileScreen() {
         <View style={styles.aboutCard}>
           <View style={styles.aboutBuiltBy}>
             <View style={styles.aboutAvatar}>
-              <MakerIllustration size={48} />
+              <EverydayLabsMark size={30} />
             </View>
             <View style={styles.aboutBuiltByText}>
               <Text style={styles.aboutName}>Everyday Labs</Text>
@@ -749,31 +749,26 @@ function MemberBadgeIllustration({ size = 48 }: { size?: number }) {
   );
 }
 
-// Minimal flat illustration for the "About" card — a person working on a
-// gear/robotic part, standing in for an Everyday Labs logo until one exists.
-function MakerIllustration({ size = 48 }: { size?: number }) {
+// Everyday Labs mark for the "About" card — the brand kit's
+// everyday-labs-mark-white.svg (white flask, orange sun), drawn on the navy avatar.
+function EverydayLabsMark({ size = 30 }: { size?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 48 48">
-      {/* head + shoulders */}
-      <Circle cx="19" cy="16" r="7" fill="#FFFFFF" opacity={0.95} />
-      <Path d="M7 40 C7 28.5 12 24 19 24 C26 24 31 28.5 31 40 Z" fill="#FFFFFF" opacity={0.95} />
-      {/* gear the figure is tinkering with */}
-      <G transform="translate(33,33)">
-        {[0, 60, 120, 180, 240, 300].map((deg) => (
-          <Rect
-            key={deg}
-            x={-2}
-            y={-10}
-            width={4}
-            height={5}
-            rx={1}
-            fill="#C9A84C"
-            transform={`rotate(${deg})`}
-          />
-        ))}
-        <Circle cx={0} cy={0} r={7} fill="#C9A84C" />
-        <Circle cx={0} cy={0} r={3} fill="#1B2A4A" />
-      </G>
+    <Svg width={size} height={size} viewBox="0 0 64 64" fill="none">
+      <Path d="M22 6h20" stroke="#FFFFFF" strokeWidth={4} strokeLinecap="round" />
+      <Path
+        d="M26 6v17L10.5 51.5A4.5 4.5 0 0 0 14.5 58h35a4.5 4.5 0 0 0 4-6.5L38 23V6"
+        stroke="#FFFFFF"
+        strokeWidth={4}
+        strokeLinejoin="round"
+      />
+      <Path d="M20 50a12 12 0 0 1 24 0z" fill="#FF7A1A" />
+      <Path d="M14 50h36" stroke="#FFFFFF" strokeWidth={3} strokeLinecap="round" />
+      <Path
+        d="M32 30v4M22.5 34l2.5 3M41.5 34l-2.5 3"
+        stroke="#FF7A1A"
+        strokeWidth={3}
+        strokeLinecap="round"
+      />
     </Svg>
   );
 }

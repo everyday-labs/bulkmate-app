@@ -228,3 +228,7 @@ MIT — free to use, modify, and distribute. © 2026 Everyday Labs. See [LICENSE
 ## Contributing
 
 PRs and issues welcome. If you hit a bug or have an idea, open an issue and let's talk about it.
+
+---
+
+<p align="center"><a href="https://everyday-labs.org"><img src="https://everyday-labs.org/assets/logos/logo-horizontal.svg" alt="Everyday Labs" width="200"></a></p>
