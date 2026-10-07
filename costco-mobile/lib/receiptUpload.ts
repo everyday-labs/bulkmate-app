@@ -20,7 +20,9 @@ export async function uploadReceipt(imageUri: string): Promise<UploadReceiptResu
 
   const fileName = `${Date.now()}.${ext}`;
   const contentType = ext === 'png' ? 'image/png' : 'image/jpeg';
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
 
   const filePath = `${session.user.id}/${fileName}`;

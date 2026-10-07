@@ -13,6 +13,8 @@ const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 let mod: typeof GoogleSignInModule | null = null;
 if (webClientId && iosClientId) {
   try {
+    // Lazy on purpose: a static import crashes builds without the native module.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     mod = require('@react-native-google-signin/google-signin');
     // webClientId makes Google mint the ID token for the *web* client, which is
     // the audience Supabase's Google provider validates against.

@@ -3,9 +3,9 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const FAN_TIERS = [
   { min: 21, name: 'ExecutiveExplorer' },
   { min: 11, name: 'GoldStarGuru' },
-  { min: 6,  name: 'BulkBuyer' },
-  { min: 3,  name: 'WholesaleWanderer' },
-  { min: 1,  name: 'KirklandCadet' },
+  { min: 6, name: 'BulkBuyer' },
+  { min: 3, name: 'WholesaleWanderer' },
+  { min: 1, name: 'KirklandCadet' },
 ] as const;
 
 export function tierForStars(stars: number): string {
@@ -26,21 +26,10 @@ export async function evaluateBadges(
 ): Promise<NewBadge[]> {
   const [totalCheckInsRes, distinctWarehousesRes, existingBadgesRes, badgeDefsRes] =
     await Promise.all([
-      supabase
-        .from('check_ins')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId),
-      supabase
-        .from('check_ins')
-        .select('warehouse_id')
-        .eq('user_id', userId),
-      supabase
-        .from('user_badges')
-        .select('badges(trigger_key)')
-        .eq('user_id', userId),
-      supabase
-        .from('badges')
-        .select('id, trigger_key, name, icon'),
+      supabase.from('check_ins').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+      supabase.from('check_ins').select('warehouse_id').eq('user_id', userId),
+      supabase.from('user_badges').select('badges(trigger_key)').eq('user_id', userId),
+      supabase.from('badges').select('id, trigger_key, name, icon'),
     ]);
 
   const totalCheckIns = totalCheckInsRes.count ?? 0;
@@ -62,15 +51,16 @@ export async function evaluateBadges(
   const tierName = tierForStars(totalStars);
   const satisfied = new Set<string>();
 
-  if (totalCheckIns >= 1)  satisfied.add('first_checkin');
-  if (totalCheckIns >= 5)  satisfied.add('five_checkins');
+  if (totalCheckIns >= 1) satisfied.add('first_checkin');
+  if (totalCheckIns >= 5) satisfied.add('five_checkins');
   if (totalCheckIns >= 10) satisfied.add('ten_checkins');
   if (distinctWarehouses >= 3) satisfied.add('three_warehouses');
   if (distinctWarehouses >= 5) satisfied.add('five_warehouses');
-  if (warehouseTier === 'Rare')      satisfied.add('rare_warehouse');
+  if (warehouseTier === 'Rare') satisfied.add('rare_warehouse');
   if (warehouseTier === 'Legendary') satisfied.add('legendary_warehouse');
   if (totalStars >= 10) satisfied.add('ten_stars');
-  if (tierName === 'GoldStarGuru' || tierName === 'ExecutiveExplorer') satisfied.add('gold_star_guru');
+  if (tierName === 'GoldStarGuru' || tierName === 'ExecutiveExplorer')
+    satisfied.add('gold_star_guru');
   if (tierName === 'ExecutiveExplorer') satisfied.add('executive_explorer');
 
   const newlyEarned = badgeDefs.filter(
@@ -79,9 +69,9 @@ export async function evaluateBadges(
 
   if (newlyEarned.length === 0) return [];
 
-  await supabase.from('user_badges').insert(
-    newlyEarned.map((b) => ({ user_id: userId, badge_id: b.id, warehouse_id: null })),
-  );
+  await supabase
+    .from('user_badges')
+    .insert(newlyEarned.map((b) => ({ user_id: userId, badge_id: b.id, warehouse_id: null })));
 
   return newlyEarned.map((b) => ({ trigger_key: b.trigger_key, name: b.name, icon: b.icon }));
 }
@@ -151,10 +141,7 @@ export async function awardCheckIn(
   const total_stars = prevStars + 1;
   const fan_tier = tierForStars(total_stars);
 
-  await supabase
-    .from('profiles')
-    .update({ total_stars, fan_tier })
-    .eq('id', input.user_id);
+  await supabase.from('profiles').update({ total_stars, fan_tier }).eq('id', input.user_id);
 
   const new_badges = await evaluateBadges(supabase, input.user_id, warehouseTier, total_stars);
 

@@ -41,7 +41,10 @@ export function DrawnCheck({
   const progress = useSharedValue(0);
 
   useEffect(() => {
-    progress.value = withDelay(delay, withTiming(1, { duration: 380, easing: Easing.out(Easing.cubic) }));
+    progress.value = withDelay(
+      delay,
+      withTiming(1, { duration: 380, easing: Easing.out(Easing.cubic) }),
+    );
   }, [progress, delay]);
 
   const animatedProps = useAnimatedProps(() => ({
@@ -64,28 +67,45 @@ export function DrawnCheck({
 }
 
 // ── Confetti burst (radiating pieces from center) ────────────────────────────
-const CONFETTI_TONES = [Colors.goldStarAccent, Colors.success, Colors.costcoRed, Colors.executiveNavyLight];
+const CONFETTI_TONES = [
+  Colors.goldStarAccent,
+  Colors.success,
+  Colors.costcoRed,
+  Colors.executiveNavyLight,
+];
 
-function ConfettiPiece({ index, count, distance }: { index: number; count: number; distance: number }) {
+function ConfettiPiece({
+  index,
+  count,
+  distance,
+}: {
+  index: number;
+  count: number;
+  distance: number;
+}) {
   const progress = useSharedValue(0);
   const angle = (360 / count) * index;
   const pieceDistance = distance + (index % 3) * 8;
 
   useEffect(() => {
-    progress.value = withDelay(index * 28, withTiming(1, { duration: 750, easing: Easing.out(Easing.cubic) }));
+    progress.value = withDelay(
+      index * 28,
+      withTiming(1, { duration: 750, easing: Easing.out(Easing.cubic) }),
+    );
   }, [progress, index]);
 
   const animatedStyle = useAnimatedStyle(() => {
     const travel = progress.value * pieceDistance;
     const scale = 0.4 + progress.value * 0.2;
-    const opacity = progress.value < 0.1 ? progress.value / 0.1 : progress.value > 0.7 ? (1 - progress.value) / 0.3 : 1;
+    const opacity =
+      progress.value < 0.1
+        ? progress.value / 0.1
+        : progress.value > 0.7
+          ? (1 - progress.value) / 0.3
+          : 1;
     return {
       opacity,
-      transform: [
-        { rotate: `${angle}deg` },
-        { translateY: -travel },
-        { scale },
-      ],
+      transform: [{ rotate: `${angle}deg` }, { translateY: -travel }, { scale }],
     };
   });
 
@@ -100,7 +120,13 @@ function ConfettiPiece({ index, count, distance }: { index: number; count: numbe
   );
 }
 
-export function ConfettiBurst({ count = 12, distance = 56 }: { count?: number; distance?: number }) {
+export function ConfettiBurst({
+  count = 12,
+  distance = 56,
+}: {
+  count?: number;
+  distance?: number;
+}) {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       {Array.from({ length: count }).map((_, i) => (
@@ -153,7 +179,11 @@ export function RingOut({
     transform: [{ scale: scale.value }],
   }));
 
-  return <Animated.View style={[StyleSheet.absoluteFill, styles.ring, { borderColor: color }, animatedStyle, style]} />;
+  return (
+    <Animated.View
+      style={[StyleSheet.absoluteFill, styles.ring, { borderColor: color }, animatedStyle, style]}
+    />
+  );
 }
 
 // ── Tossed-in star (bounce + rotate, staggered by index) ─────────────────────
@@ -216,7 +246,15 @@ export function StarToss({
 }
 
 // ── Shake/wobble (failure feedback) ───────────────────────────────────────────
-export function Wobble({ trigger, style, children }: { trigger: number; style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
+export function Wobble({
+  trigger,
+  style,
+  children,
+}: {
+  trigger: number;
+  style?: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+}) {
   const rotate = useSharedValue(0);
 
   useEffect(() => {
@@ -240,13 +278,57 @@ export function Wobble({ trigger, style, children }: { trigger: number; style?: 
 export type ScanFrameState = 'idle' | 'scanning' | 'success' | 'error';
 
 const CORNER_POSITIONS: { key: string; style: ViewStyle }[] = [
-  { key: 'tl', style: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: radius.lg } },
-  { key: 'tr', style: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: radius.lg } },
-  { key: 'bl', style: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: radius.lg } },
-  { key: 'br', style: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: radius.lg } },
+  {
+    key: 'tl',
+    style: {
+      top: 0,
+      left: 0,
+      borderTopWidth: 3,
+      borderLeftWidth: 3,
+      borderTopLeftRadius: radius.lg,
+    },
+  },
+  {
+    key: 'tr',
+    style: {
+      top: 0,
+      right: 0,
+      borderTopWidth: 3,
+      borderRightWidth: 3,
+      borderTopRightRadius: radius.lg,
+    },
+  },
+  {
+    key: 'bl',
+    style: {
+      bottom: 0,
+      left: 0,
+      borderBottomWidth: 3,
+      borderLeftWidth: 3,
+      borderBottomLeftRadius: radius.lg,
+    },
+  },
+  {
+    key: 'br',
+    style: {
+      bottom: 0,
+      right: 0,
+      borderBottomWidth: 3,
+      borderRightWidth: 3,
+      borderBottomRightRadius: radius.lg,
+    },
+  },
 ];
 
-function Corner({ pos, active, color }: { pos: (typeof CORNER_POSITIONS)[number]; active: boolean; color: string }) {
+function Corner({
+  pos,
+  active,
+  color,
+}: {
+  pos: (typeof CORNER_POSITIONS)[number];
+  active: boolean;
+  color: string;
+}) {
   const opacity = useSharedValue(0.45);
   const scale = useSharedValue(1);
   const cornerIndex = CORNER_POSITIONS.findIndex((c) => c.key === pos.key);
@@ -254,8 +336,22 @@ function Corner({ pos, active, color }: { pos: (typeof CORNER_POSITIONS)[number]
   useEffect(() => {
     if (active) {
       const delay = cornerIndex * 120;
-      opacity.value = withDelay(delay, withRepeat(withSequence(withTiming(1, { duration: 800 }), withTiming(0.45, { duration: 800 })), -1, true));
-      scale.value = withDelay(delay, withRepeat(withSequence(withTiming(1.08, { duration: 800 }), withTiming(1, { duration: 800 })), -1, true));
+      opacity.value = withDelay(
+        delay,
+        withRepeat(
+          withSequence(withTiming(1, { duration: 800 }), withTiming(0.45, { duration: 800 })),
+          -1,
+          true,
+        ),
+      );
+      scale.value = withDelay(
+        delay,
+        withRepeat(
+          withSequence(withTiming(1.08, { duration: 800 }), withTiming(1, { duration: 800 })),
+          -1,
+          true,
+        ),
+      );
     } else {
       opacity.value = withTiming(0.45, { duration: 200 });
       scale.value = withTiming(1, { duration: 200 });
@@ -268,7 +364,9 @@ function Corner({ pos, active, color }: { pos: (typeof CORNER_POSITIONS)[number]
     transform: [{ scale: scale.value }],
   }));
 
-  return <Animated.View style={[styles.corner, pos.style, { borderColor: color }, animatedStyle]} />;
+  return (
+    <Animated.View style={[styles.corner, pos.style, { borderColor: color }, animatedStyle]} />
+  );
 }
 
 function SweepLine({ active }: { active: boolean }) {
@@ -336,7 +434,13 @@ export function ScanFrame({
           {CORNER_POSITIONS.map((pos) => (
             <Corner key={pos.key} pos={pos} active={active} color={accentColor} />
           ))}
-          <View style={[styles.guide, { borderColor: `${accentColor}55` }, failed && styles.guideDashed]} />
+          <View
+            style={[
+              styles.guide,
+              { borderColor: `${accentColor}55` },
+              failed && styles.guideDashed,
+            ]}
+          />
           <SweepLine active={active} />
 
           {done && (
@@ -370,7 +474,9 @@ export function ScanFrame({
 
       <View style={styles.pillRow}>
         <View style={[styles.pill, done && styles.pillSuccess, failed && styles.pillError]}>
-          <Text style={styles.pillText}>{done ? 'Done' : failed ? 'Scan failed' : active ? scanningLabel : idleLabel}</Text>
+          <Text style={styles.pillText}>
+            {done ? 'Done' : failed ? 'Scan failed' : active ? scanningLabel : idleLabel}
+          </Text>
         </View>
       </View>
     </View>
@@ -444,9 +550,25 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   errorIcon: { fontSize: 28, color: Colors.warning, fontWeight: '800' },
-  centerTitle: { color: Colors.white, fontSize: fontSize.lg, fontWeight: '700', textAlign: 'center' },
-  centerSub: { color: 'rgba(255,255,255,0.75)', fontSize: fontSize.sm, textAlign: 'center', paddingHorizontal: spacing['2xl'] },
-  pillRow: { position: 'absolute', left: 0, right: 0, bottom: spacing['2xl'], alignItems: 'center' },
+  centerTitle: {
+    color: Colors.white,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  centerSub: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: fontSize.sm,
+    textAlign: 'center',
+    paddingHorizontal: spacing['2xl'],
+  },
+  pillRow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: spacing['2xl'],
+    alignItems: 'center',
+  },
   pill: {
     backgroundColor: 'rgba(0,0,0,0.55)',
     borderRadius: radius.pill,
@@ -455,5 +577,11 @@ const styles = StyleSheet.create({
   },
   pillSuccess: { backgroundColor: 'rgba(45,138,110,0.9)' },
   pillError: { backgroundColor: 'rgba(212,132,42,0.9)' },
-  pillText: { color: Colors.white, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  pillText: {
+    color: Colors.white,
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
 });

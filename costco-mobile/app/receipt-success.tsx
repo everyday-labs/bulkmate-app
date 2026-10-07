@@ -53,7 +53,10 @@ type ReceiptDetails = {
 };
 
 export default function ReceiptSuccessScreen() {
-  const { receiptId, duplicate } = useLocalSearchParams<{ receiptId: string; duplicate?: string }>();
+  const { receiptId, duplicate } = useLocalSearchParams<{
+    receiptId: string;
+    duplicate?: string;
+  }>();
   const isDuplicate = duplicate === 'true';
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -83,19 +86,20 @@ export default function ReceiptSuccessScreen() {
 
   async function fetchReceipt(id: string) {
     try {
-      const [{ data: receiptRow, error: rErr }, { data: items, error: iErr }] =
-        await Promise.all([
-          supabase
-            .from('receipts')
-            .select('id, transaction_date, transaction_number, total_amount, tax_amount, image_path, warehouse_id, warehouses(name, address, city, state)')
-            .eq('id', id)
-            .single(),
-          supabase
-            .from('receipt_items')
-            .select('id, sku, description, unit_price, quantity, discount_amount')
-            .eq('receipt_id', id)
-            .order('id'),
-        ]);
+      const [{ data: receiptRow, error: rErr }, { data: items, error: iErr }] = await Promise.all([
+        supabase
+          .from('receipts')
+          .select(
+            'id, transaction_date, transaction_number, total_amount, tax_amount, image_path, warehouse_id, warehouses(name, address, city, state)',
+          )
+          .eq('id', id)
+          .single(),
+        supabase
+          .from('receipt_items')
+          .select('id, sku, description, unit_price, quantity, discount_amount')
+          .eq('receipt_id', id)
+          .order('id'),
+      ]);
 
       if (rErr) throw rErr;
       if (iErr) throw iErr;
@@ -196,7 +200,7 @@ export default function ReceiptSuccessScreen() {
       setEditingItemId(null);
       posthog?.capture('receipt_item_edited');
     } catch (e: unknown) {
-      Alert.alert('Couldn\'t save', e instanceof Error ? e.message : 'Please try again.');
+      Alert.alert("Couldn't save", e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setSavingItemId(null);
     }
@@ -229,16 +233,10 @@ export default function ReceiptSuccessScreen() {
       posthog?.capture('receipt_warehouse_picked', { warehouse_id: warehouse.id });
 
       if (data && !data.already_checked_in) {
-        Alert.alert(
-          'Visit credited',
-          `You earned a star for your visit to ${warehouse.name}.`,
-        );
+        Alert.alert('Visit credited', `You earned a star for your visit to ${warehouse.name}.`);
       }
     } catch (e: unknown) {
-      Alert.alert(
-        'Couldn\'t save warehouse',
-        e instanceof Error ? e.message : 'Please try again.',
-      );
+      Alert.alert("Couldn't save warehouse", e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setLinkingWarehouse(false);
     }
@@ -443,7 +441,13 @@ export default function ReceiptSuccessScreen() {
           <View style={styles.totalsBlock}>
             <TotalRow label="Item total" value={itemTotal} styles={styles} Colors={Colors} />
             {totalSavings > 0 && (
-              <TotalRow label="Instant savings" value={-totalSavings} highlight="savings" styles={styles} Colors={Colors} />
+              <TotalRow
+                label="Instant savings"
+                value={-totalSavings}
+                highlight="savings"
+                styles={styles}
+                Colors={Colors}
+              />
             )}
             <TotalRow label="Subtotal" value={subtotal} styles={styles} Colors={Colors} />
             {receipt.tax_amount != null && (
@@ -503,7 +507,7 @@ export default function ReceiptSuccessScreen() {
               ]}
               onPress={() => setShowImageModal(false)}
             >
-              <Text style={imageViewerStyles.closeText}>✕  Close</Text>
+              <Text style={imageViewerStyles.closeText}>✕ Close</Text>
             </Pressable>
             <Image
               source={{ uri: receipt.imageUrl }}
@@ -541,14 +545,19 @@ function NotificationPrompt({
       <Pressable style={notifStyles.backdrop} onPress={onDismiss}>
         <Pressable style={[notifStyles.sheet, { paddingBottom: insets.bottom + spacing['2xl'] }]}>
           <View style={notifStyles.handle} />
-          <BellRing><Text style={notifStyles.icon}>🔔</Text></BellRing>
+          <BellRing>
+            <Text style={notifStyles.icon}>🔔</Text>
+          </BellRing>
           <Text style={notifStyles.title}>Stay in the loop</Text>
           <Text style={notifStyles.body}>
             Get notified when a price drops on something you bought — we'll let you know if you may
             be owed a refund.
           </Text>
           <Pressable
-            style={({ pressed }) => [notifStyles.allowButton, pressed && notifStyles.allowButtonPressed]}
+            style={({ pressed }) => [
+              notifStyles.allowButton,
+              pressed && notifStyles.allowButtonPressed,
+            ]}
             onPress={onAllow}
           >
             <Text style={notifStyles.allowText}>Enable Notifications</Text>
@@ -618,13 +627,9 @@ function EditableItemRow({
           {/* Show the line total (unit × qty) as the headline number, with the
               per-unit breakdown underneath — otherwise bumping quantity to 2
               leaves the price looking unchanged, which reads as a bug. */}
-          <Text style={styles.itemPrice}>
-            ${(item.unit_price * item.quantity).toFixed(2)}
-          </Text>
+          <Text style={styles.itemPrice}>${(item.unit_price * item.quantity).toFixed(2)}</Text>
           {item.quantity > 1 && (
-            <Text style={styles.itemUnitPrice}>
-              ${item.unit_price.toFixed(2)} each
-            </Text>
+            <Text style={styles.itemUnitPrice}>${item.unit_price.toFixed(2)} each</Text>
           )}
           {item.discount_amount > 0 && (
             <Text style={styles.itemDiscount}>−${item.discount_amount.toFixed(2)}</Text>
@@ -636,7 +641,9 @@ function EditableItemRow({
 
   return (
     <View style={styles.editRow}>
-      <Text style={styles.editDescription} numberOfLines={2}>{item.description}</Text>
+      <Text style={styles.editDescription} numberOfLines={2}>
+        {item.description}
+      </Text>
       <View style={styles.editFieldsRow}>
         <View style={styles.editField}>
           <Text style={styles.editFieldLabel}>QTY</Text>
@@ -675,17 +682,25 @@ function EditableItemRow({
       <Text style={styles.editLineTotal}>
         Line total:{'  '}
         <Text style={styles.editLineTotalValue}>
-          ${Math.max(
+          $
+          {Math.max(
             0,
-            (Math.max(1, parseInt(qty, 10) || 1) * (parseFloat(price) || 0)) - (parseFloat(discount) || 0),
+            Math.max(1, parseInt(qty, 10) || 1) * (parseFloat(price) || 0) -
+              (parseFloat(discount) || 0),
           ).toFixed(2)}
         </Text>
-        {(parseInt(qty, 10) || 1) > 1 ? `   (${Math.max(1, parseInt(qty, 10) || 1)} × $${(parseFloat(price) || 0).toFixed(2)})` : ''}
+        {(parseInt(qty, 10) || 1) > 1
+          ? `   (${Math.max(1, parseInt(qty, 10) || 1)} × $${(parseFloat(price) || 0).toFixed(2)})`
+          : ''}
       </Text>
 
       <View style={styles.editActionsRow}>
         <Pressable
-          style={({ pressed }) => [styles.editDoneBtn, pressed && { opacity: 0.85 }, saving && { opacity: 0.6 }]}
+          style={({ pressed }) => [
+            styles.editDoneBtn,
+            pressed && { opacity: 0.85 },
+            saving && { opacity: 0.6 },
+          ]}
           disabled={saving}
           onPress={() =>
             onSave({
@@ -695,7 +710,11 @@ function EditableItemRow({
             })
           }
         >
-          {saving ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.editDoneText}>✓ Done</Text>}
+          {saving ? (
+            <ActivityIndicator size="small" color={Colors.white} />
+          ) : (
+            <Text style={styles.editDoneText}>✓ Done</Text>
+          )}
         </Pressable>
         <Pressable
           style={({ pressed }) => [styles.editCancelBtn, pressed && { opacity: 0.7 }]}
@@ -724,9 +743,9 @@ function TotalRow({
   styles: Styles;
   Colors: ColorScheme;
 }) {
-  const valueColor = highlight === 'savings' ? Colors.savings : bold ? Colors.executiveNavy : Colors.gray[600];
-  const formattedValue =
-    value < 0 ? `−$${Math.abs(value).toFixed(2)}` : `$${value.toFixed(2)}`;
+  const valueColor =
+    highlight === 'savings' ? Colors.savings : bold ? Colors.executiveNavy : Colors.gray[600];
+  const formattedValue = value < 0 ? `−$${Math.abs(value).toFixed(2)}` : `$${value.toFixed(2)}`;
   return (
     <View style={styles.totalRow}>
       <Text style={[styles.totalLabel, bold && styles.totalLabelBold]}>{label}</Text>
@@ -737,364 +756,390 @@ function TotalRow({
   );
 }
 
-const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing['2xl'],
-    backgroundColor: Colors.background,
-  },
-  loadingText: { marginTop: spacing.md, fontSize: fontSize.md, color: Colors.gray[400] },
-  errorText: { fontSize: fontSize.md, color: Colors.gray[700], textAlign: 'center', marginBottom: spacing.xl },
-  listContent: { paddingBottom: spacing.lg },
+const makeStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.background },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: spacing['2xl'],
+      backgroundColor: Colors.background,
+    },
+    loadingText: { marginTop: spacing.md, fontSize: fontSize.md, color: Colors.gray[400] },
+    errorText: {
+      fontSize: fontSize.md,
+      color: Colors.gray[700],
+      textAlign: 'center',
+      marginBottom: spacing.xl,
+    },
+    listContent: { paddingBottom: spacing.lg },
 
-  // Header
-  header: {
-    alignItems: 'center',
-    paddingBottom: spacing['2xl'],
-    paddingHorizontal: spacing['2xl'],
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    marginBottom: spacing.lg,
-  },
-  checkCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: radius.pill,
-    backgroundColor: Colors.successSolid,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-    ...shadow.md,
-  },
-  checkMark: { color: Colors.white, fontSize: 28, fontWeight: '800' },
-  title: {
-    fontSize: fontSize['2xl'],
-    fontWeight: '800',
-    color: Colors.gray[900],
-    letterSpacing: letterSpacing.tight,
-    marginBottom: spacing.xs,
-  },
-  dateText: { fontSize: fontSize.sm, color: Colors.gray[400], letterSpacing: letterSpacing.wide },
+    // Header
+    header: {
+      alignItems: 'center',
+      paddingBottom: spacing['2xl'],
+      paddingHorizontal: spacing['2xl'],
+      backgroundColor: Colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+      marginBottom: spacing.lg,
+    },
+    checkCircle: {
+      width: 60,
+      height: 60,
+      borderRadius: radius.pill,
+      backgroundColor: Colors.successSolid,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.lg,
+      ...shadow.md,
+    },
+    checkMark: { color: Colors.white, fontSize: 28, fontWeight: '800' },
+    title: {
+      fontSize: fontSize['2xl'],
+      fontWeight: '800',
+      color: Colors.gray[900],
+      letterSpacing: letterSpacing.tight,
+      marginBottom: spacing.xs,
+    },
+    dateText: { fontSize: fontSize.sm, color: Colors.gray[400], letterSpacing: letterSpacing.wide },
 
-  // Duplicate banner
-  duplicateBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: Colors.warningBg,
-    borderRadius: radius.lg,
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.warning,
-  },
-  duplicateIcon: { fontSize: 14, marginTop: 1 },
-  duplicateText: { flex: 1, fontSize: fontSize.sm, color: Colors.warningText, lineHeight: 20 },
+    // Duplicate banner
+    duplicateBanner: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      backgroundColor: Colors.warningBg,
+      borderRadius: radius.lg,
+      borderLeftWidth: 3,
+      borderLeftColor: Colors.warning,
+    },
+    duplicateIcon: { fontSize: 14, marginTop: 1 },
+    duplicateText: { flex: 1, fontSize: fontSize.sm, color: Colors.warningText, lineHeight: 20 },
 
-  // Warehouse card
-  warehouseCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.lg,
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    ...shadow.sm,
-  },
-  warehouseIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.lg,
-    backgroundColor: Colors.infoBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  warehouseIcon: { fontSize: 20 },
-  warehouseName: {
-    fontSize: fontSize.md,
-    fontWeight: '700',
-    color: Colors.executiveNavy,
-    marginBottom: 2,
-  },
-  warehouseDetail: { fontSize: fontSize.sm, color: Colors.gray[400], marginTop: 2 },
-  warehouseUnknownCard: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: Colors.costcoRed,
-  },
-  warehouseUnknownAction: {
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    color: Colors.costcoRed,
-    marginTop: 4,
-  },
+    // Warehouse card
+    warehouseCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.md,
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+      padding: spacing.lg,
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      ...shadow.sm,
+    },
+    warehouseIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: radius.lg,
+      backgroundColor: Colors.infoBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    warehouseIcon: { fontSize: 20 },
+    warehouseName: {
+      fontSize: fontSize.md,
+      fontWeight: '700',
+      color: Colors.executiveNavy,
+      marginBottom: 2,
+    },
+    warehouseDetail: { fontSize: fontSize.sm, color: Colors.gray[400], marginTop: 2 },
+    warehouseUnknownCard: {
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: Colors.costcoRed,
+    },
+    warehouseUnknownAction: {
+      fontSize: fontSize.sm,
+      fontWeight: '600',
+      color: Colors.costcoRed,
+      marginTop: 4,
+    },
 
-  // Transaction number
-  tcRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  tcRowMuted: { justifyContent: 'center' },
-  tcLabel: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-    marginBottom: 3,
-  },
-  tcValue: {
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    color: Colors.gray[800],
-    fontVariant: ['tabular-nums'],
-  },
-  tcNotFound: { fontSize: fontSize.sm, color: Colors.gray[400], fontStyle: 'italic' },
-  copyBtn: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: Colors.navySolid,
-    borderRadius: radius.md,
-  },
-  copyBtnPressed: { backgroundColor: '#12203A' },
-  copyBtnText: { color: Colors.white, fontSize: fontSize.sm, fontWeight: '700' },
+    // Transaction number
+    tcRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      borderWidth: 1,
+      borderColor: Colors.border,
+    },
+    tcRowMuted: { justifyContent: 'center' },
+    tcLabel: {
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+      color: Colors.gray[400],
+      letterSpacing: letterSpacing.caps,
+      marginBottom: 3,
+    },
+    tcValue: {
+      fontSize: fontSize.md,
+      fontWeight: '600',
+      color: Colors.gray[800],
+      fontVariant: ['tabular-nums'],
+    },
+    tcNotFound: { fontSize: fontSize.sm, color: Colors.gray[400], fontStyle: 'italic' },
+    copyBtn: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      backgroundColor: Colors.navySolid,
+      borderRadius: radius.md,
+    },
+    copyBtnPressed: { backgroundColor: '#12203A' },
+    copyBtnText: { color: Colors.white, fontSize: fontSize.sm, fontWeight: '700' },
 
-  // Receipt image thumbnail
-  imageThumbnailWrapper: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    borderRadius: radius.xl,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...shadow.sm,
-  },
-  imageThumbnail: { width: '100%', height: 160 },
-  imageExpandHint: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-  },
-  imageExpandText: { color: Colors.white, fontSize: fontSize.xs, fontWeight: '600', letterSpacing: letterSpacing.wide },
+    // Receipt image thumbnail
+    imageThumbnailWrapper: {
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.lg,
+      borderRadius: radius.xl,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: Colors.border,
+      ...shadow.sm,
+    },
+    imageThumbnail: { width: '100%', height: 160 },
+    imageExpandHint: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      alignItems: 'center',
+    },
+    imageExpandText: {
+      color: Colors.white,
+      fontSize: fontSize.xs,
+      fontWeight: '600',
+      letterSpacing: letterSpacing.wide,
+    },
 
-  // Items section
-  sectionLabel: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    textTransform: 'uppercase',
-    letterSpacing: letterSpacing.caps,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.xs,
-    marginTop: spacing.sm,
-  },
-  sectionHint: {
-    fontSize: fontSize.xs,
-    color: Colors.gray[400],
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: Colors.surface,
-  },
-  itemRowPressed: { backgroundColor: Colors.gray[50] },
-  itemInfo: { flex: 1, paddingRight: spacing.md },
-  itemDescription: { fontSize: fontSize.md, color: Colors.gray[800], fontWeight: '500' },
-  itemSku: { fontSize: fontSize.xs, color: Colors.gray[400], marginTop: 3, letterSpacing: letterSpacing.wide },
-  itemPricing: { alignItems: 'flex-end' },
-  itemPrice: { fontSize: fontSize.md, fontWeight: '700', color: Colors.gray[800] },
-  itemDiscount: { fontSize: fontSize.sm, color: Colors.savings, marginTop: 2, fontWeight: '600' },
-  itemUnitPrice: { fontSize: fontSize.xs, color: Colors.gray[400], marginTop: 2 },
-  editLineTotal: {
-    fontSize: fontSize.sm,
-    color: Colors.gray[500],
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  editLineTotalValue: { fontWeight: '800', color: Colors.gray[900] },
-  separator: { height: 1, backgroundColor: Colors.border, marginLeft: spacing.lg },
+    // Items section
+    sectionLabel: {
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+      color: Colors.gray[400],
+      textTransform: 'uppercase',
+      letterSpacing: letterSpacing.caps,
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.xs,
+      marginTop: spacing.sm,
+    },
+    sectionHint: {
+      fontSize: fontSize.xs,
+      color: Colors.gray[400],
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.sm,
+    },
+    itemRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      backgroundColor: Colors.surface,
+    },
+    itemRowPressed: { backgroundColor: Colors.gray[50] },
+    itemInfo: { flex: 1, paddingRight: spacing.md },
+    itemDescription: { fontSize: fontSize.md, color: Colors.gray[800], fontWeight: '500' },
+    itemSku: {
+      fontSize: fontSize.xs,
+      color: Colors.gray[400],
+      marginTop: 3,
+      letterSpacing: letterSpacing.wide,
+    },
+    itemPricing: { alignItems: 'flex-end' },
+    itemPrice: { fontSize: fontSize.md, fontWeight: '700', color: Colors.gray[800] },
+    itemDiscount: { fontSize: fontSize.sm, color: Colors.savings, marginTop: 2, fontWeight: '600' },
+    itemUnitPrice: { fontSize: fontSize.xs, color: Colors.gray[400], marginTop: 2 },
+    editLineTotal: {
+      fontSize: fontSize.sm,
+      color: Colors.gray[500],
+      marginTop: spacing.sm,
+      marginBottom: spacing.xs,
+    },
+    editLineTotalValue: { fontWeight: '800', color: Colors.gray[900] },
+    separator: { height: 1, backgroundColor: Colors.border, marginLeft: spacing.lg },
 
-  // Inline item editing
-  editRow: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: Colors.surfaceSunken,
-    gap: spacing.sm,
-  },
-  editDescription: { fontSize: fontSize.md, color: Colors.gray[800], fontWeight: '600' },
-  editFieldsRow: { flexDirection: 'row', gap: spacing.sm },
-  editField: { flex: 1, gap: 2 },
-  editFieldLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-  },
-  editInput: {
-    backgroundColor: Colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    fontSize: fontSize.md,
-    color: Colors.gray[900],
-  },
-  editActionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
-  editDoneBtn: {
-    flex: 1,
-    backgroundColor: Colors.successSolid,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-  },
-  editDoneText: { color: Colors.white, fontSize: fontSize.sm, fontWeight: '700' },
-  editCancelBtn: {
-    flex: 1,
-    backgroundColor: Colors.gray[200],
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-  },
-  editCancelText: { color: Colors.gray[700], fontSize: fontSize.sm, fontWeight: '700' },
+    // Inline item editing
+    editRow: {
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      backgroundColor: Colors.surfaceSunken,
+      gap: spacing.sm,
+    },
+    editDescription: { fontSize: fontSize.md, color: Colors.gray[800], fontWeight: '600' },
+    editFieldsRow: { flexDirection: 'row', gap: spacing.sm },
+    editField: { flex: 1, gap: 2 },
+    editFieldLabel: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: Colors.gray[400],
+      letterSpacing: letterSpacing.caps,
+    },
+    editInput: {
+      backgroundColor: Colors.surface,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: Colors.border,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.sm,
+      fontSize: fontSize.md,
+      color: Colors.gray[900],
+    },
+    editActionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+    editDoneBtn: {
+      flex: 1,
+      backgroundColor: Colors.successSolid,
+      borderRadius: radius.md,
+      paddingVertical: spacing.sm,
+      alignItems: 'center',
+    },
+    editDoneText: { color: Colors.white, fontSize: fontSize.sm, fontWeight: '700' },
+    editCancelBtn: {
+      flex: 1,
+      backgroundColor: Colors.gray[200],
+      borderRadius: radius.md,
+      paddingVertical: spacing.sm,
+      alignItems: 'center',
+    },
+    editCancelText: { color: Colors.gray[700], fontSize: fontSize.sm, fontWeight: '700' },
 
-  // Totals
-  totalsBlock: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    ...shadow.sm,
-    marginBottom: spacing.xl,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.xs + 1,
-  },
-  totalLabel: { fontSize: fontSize.sm, color: Colors.gray[500] },
-  totalLabelBold: { fontSize: fontSize.md, fontWeight: '700', color: Colors.gray[900] },
-  totalValue: { fontSize: fontSize.sm },
-  totalValueBold: { fontSize: fontSize.lg, fontWeight: '800', letterSpacing: letterSpacing.tight },
-  grandTotalDivider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginVertical: spacing.sm,
-  },
+    // Totals
+    totalsBlock: {
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.md,
+      paddingTop: spacing.md,
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.lg,
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      ...shadow.sm,
+      marginBottom: spacing.xl,
+    },
+    totalRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.xs + 1,
+    },
+    totalLabel: { fontSize: fontSize.sm, color: Colors.gray[500] },
+    totalLabelBold: { fontSize: fontSize.md, fontWeight: '700', color: Colors.gray[900] },
+    totalValue: { fontSize: fontSize.sm },
+    totalValueBold: {
+      fontSize: fontSize.lg,
+      fontWeight: '800',
+      letterSpacing: letterSpacing.tight,
+    },
+    grandTotalDivider: {
+      height: 1,
+      backgroundColor: Colors.border,
+      marginVertical: spacing.sm,
+    },
 
-  // Footer
-  footer: {
-    paddingTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    gap: spacing.xs,
-    backgroundColor: Colors.surface,
-  },
-  doneButton: {
-    backgroundColor: Colors.costcoRedSolid,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    ...shadow.sm,
-  },
-  doneButtonPressed: { backgroundColor: Colors.costcoRedDark, opacity: 0.95 },
-  doneButtonText: {
-    color: Colors.white,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    letterSpacing: letterSpacing.wide,
-  },
-  deleteButton: {
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  deleteButtonText: { color: Colors.gray[400], fontSize: fontSize.sm, fontWeight: '500' },
-});
+    // Footer
+    footer: {
+      paddingTop: spacing.lg,
+      paddingHorizontal: spacing.lg,
+      borderTopWidth: 1,
+      borderTopColor: Colors.border,
+      gap: spacing.xs,
+      backgroundColor: Colors.surface,
+    },
+    doneButton: {
+      backgroundColor: Colors.costcoRedSolid,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.lg,
+      alignItems: 'center',
+      ...shadow.sm,
+    },
+    doneButtonPressed: { backgroundColor: Colors.costcoRedDark, opacity: 0.95 },
+    doneButtonText: {
+      color: Colors.white,
+      fontSize: fontSize.lg,
+      fontWeight: '700',
+      letterSpacing: letterSpacing.wide,
+    },
+    deleteButton: {
+      paddingVertical: spacing.md,
+      alignItems: 'center',
+    },
+    deleteButtonText: { color: Colors.gray[400], fontSize: fontSize.sm, fontWeight: '500' },
+  });
 
-const makeNotifStyles = (Colors: ColorScheme) => StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: radius['3xl'],
-    borderTopRightRadius: radius['3xl'],
-    paddingTop: spacing.md,
-    paddingHorizontal: spacing['2xl'],
-    alignItems: 'center',
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.gray[300],
-    marginBottom: spacing['2xl'],
-  },
-  icon: { fontSize: 44, marginBottom: spacing.lg },
-  title: {
-    fontSize: fontSize['2xl'],
-    fontWeight: '800',
-    color: Colors.gray[900],
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-    letterSpacing: letterSpacing.tight,
-  },
-  body: {
-    fontSize: fontSize.md,
-    color: Colors.gray[500],
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: spacing['2xl'],
-  },
-  allowButton: {
-    width: '100%',
-    backgroundColor: Colors.costcoRedSolid,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    ...shadow.sm,
-  },
-  allowButtonPressed: { backgroundColor: Colors.costcoRedDark },
-  allowText: { color: Colors.white, fontSize: fontSize.md, fontWeight: '700', letterSpacing: letterSpacing.wide },
-  dismissButton: {
-    width: '100%',
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  dismissText: { color: Colors.gray[400], fontSize: fontSize.sm, fontWeight: '500' },
-});
+const makeNotifStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: Colors.surface,
+      borderTopLeftRadius: radius['3xl'],
+      borderTopRightRadius: radius['3xl'],
+      paddingTop: spacing.md,
+      paddingHorizontal: spacing['2xl'],
+      alignItems: 'center',
+    },
+    handle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: Colors.gray[300],
+      marginBottom: spacing['2xl'],
+    },
+    icon: { fontSize: 44, marginBottom: spacing.lg },
+    title: {
+      fontSize: fontSize['2xl'],
+      fontWeight: '800',
+      color: Colors.gray[900],
+      marginBottom: spacing.sm,
+      textAlign: 'center',
+      letterSpacing: letterSpacing.tight,
+    },
+    body: {
+      fontSize: fontSize.md,
+      color: Colors.gray[500],
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: spacing['2xl'],
+    },
+    allowButton: {
+      width: '100%',
+      backgroundColor: Colors.costcoRedSolid,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.lg,
+      alignItems: 'center',
+      marginBottom: spacing.md,
+      ...shadow.sm,
+    },
+    allowButtonPressed: { backgroundColor: Colors.costcoRedDark },
+    allowText: {
+      color: Colors.white,
+      fontSize: fontSize.md,
+      fontWeight: '700',
+      letterSpacing: letterSpacing.wide,
+    },
+    dismissButton: {
+      width: '100%',
+      paddingVertical: spacing.md,
+      alignItems: 'center',
+    },
+    dismissText: { color: Colors.gray[400], fontSize: fontSize.sm, fontWeight: '500' },
+  });
 
 const imageViewerStyles = StyleSheet.create({
   container: {

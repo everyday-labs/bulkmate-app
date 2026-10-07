@@ -13,9 +13,7 @@ describe('placeholderNameFor', () => {
   });
 
   it('spreads different users across the list', () => {
-    const names = new Set(
-      Array.from({ length: 50 }, (_, i) => placeholderNameFor(`user-${i}`)),
-    );
+    const names = new Set(Array.from({ length: 50 }, (_, i) => placeholderNameFor(`user-${i}`)));
     expect(names.size).toBeGreaterThan(1);
   });
 });

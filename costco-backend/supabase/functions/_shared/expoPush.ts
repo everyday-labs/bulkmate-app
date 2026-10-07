@@ -37,7 +37,7 @@ export async function sendExpoPushNotifications(messages: ExpoPushMessage[]): Pr
       const res = await fetch('https://exp.host/--/api/v2/push/send', {
         method: 'POST',
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(chunk),
@@ -46,7 +46,10 @@ export async function sendExpoPushNotifications(messages: ExpoPushMessage[]): Pr
         console.warn('Expo Push API error:', res.status, await res.text());
       } else {
         const result = await res.json();
-        console.log(`Expo push sent ${chunk.length} messages:`, JSON.stringify(result?.data?.slice(0, 3)));
+        console.log(
+          `Expo push sent ${chunk.length} messages:`,
+          JSON.stringify(result?.data?.slice(0, 3)),
+        );
       }
     } catch (err) {
       console.warn('Expo push fetch failed:', err);

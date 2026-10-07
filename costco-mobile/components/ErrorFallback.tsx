@@ -15,38 +15,44 @@ export function ErrorFallback(_props: PostHogErrorBoundaryFallbackProps) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + spacing['3xl'], paddingBottom: insets.bottom + spacing['3xl'] }]}>
+    <View
+      style={[
+        styles.root,
+        { paddingTop: insets.top + spacing['3xl'], paddingBottom: insets.bottom + spacing['3xl'] },
+      ]}
+    >
       <Text style={styles.icon}>⚠️</Text>
       <Text style={styles.title}>Something went wrong</Text>
       <Text style={styles.subtitle}>
-        The app hit an unexpected error. Close and reopen Bulkmate to
-        keep going — this has already been reported.
+        The app hit an unexpected error. Close and reopen Bulkmate to keep going — this has already
+        been reported.
       </Text>
     </View>
   );
 }
 
-const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing['2xl'],
-  },
-  icon: { fontSize: 48, marginBottom: spacing.xl },
-  title: {
-    fontSize: fontSize['2xl'],
-    fontWeight: '800',
-    color: Colors.gray[900],
-    marginBottom: spacing.sm,
-    letterSpacing: letterSpacing.tight,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: fontSize.md,
-    color: Colors.gray[400],
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-});
+const makeStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: Colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing['2xl'],
+    },
+    icon: { fontSize: 48, marginBottom: spacing.xl },
+    title: {
+      fontSize: fontSize['2xl'],
+      fontWeight: '800',
+      color: Colors.gray[900],
+      marginBottom: spacing.sm,
+      letterSpacing: letterSpacing.tight,
+      textAlign: 'center',
+    },
+    subtitle: {
+      fontSize: fontSize.md,
+      color: Colors.gray[400],
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+  });
