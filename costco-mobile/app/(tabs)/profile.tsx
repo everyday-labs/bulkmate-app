@@ -692,6 +692,14 @@ export default function ProfileScreen() {
             <View style={styles.aboutPill}>
               <Text style={styles.aboutPillText}>Open Source · MIT</Text>
             </View>
+            <Pressable
+              style={styles.aboutPill}
+              onPress={() => Linking.openURL('https://everyday-labs.org/bulkmate/')}
+              accessibilityRole="link"
+              accessibilityLabel="Open everyday-labs.org"
+            >
+              <Text style={styles.aboutPillText}>everyday-labs.org ↗</Text>
+            </Pressable>
           </View>
 
           <Text style={styles.aboutDisclaimer}>

@@ -16,35 +16,38 @@ one, consistently. Work through it top to bottom; tick items as you go.
 **Never rename** (would break things): bundle ID `com.twonk0609.bulkmate`, Expo `slug: costco-app`,
 EAS owner `twonk0609s-team`, ASC app id `6800910077`. These are invisible to users.
 
-Open decision: should user-facing copy say "Bulkmate by Everyday Labs" in one consistent form?
-Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, website, and store listing.
+Decided 2026-10-07: the pattern is **"Bulkmate by Everyday Labs"** (already used by the unsubscribe
+page footer, README, privacy policy and the About card's "an independent app by Everyday Labs").
+Use it in emails, website, and store listing.
 
 ---
 
 ## 1. In the repo
 
-- [ ] **Login tagline** says "Warehouse Companion" (`costco-mobile/app/(auth)/login.tsx`) — leftover
-      from the "Costco Companion" days. Keep, or replace with something on-brand (register screen
-      uses "Start tracking your savings").
-- [ ] **Push notification copy** (`price-match-check/index.ts:376`) — title is "Price Drop — You may
-      be owed $X". iOS already shows "Bulkmate" as the app name above it; confirm wording.
+- [x] **Login tagline** "Warehouse Companion" → "Never miss a price drop"
+      (`costco-mobile/app/(auth)/login.tsx`, 2026-10-07; register keeps "Start tracking your savings").
+- [x] **Push notification copy** (`price-match-check/index.ts`) — title now "Price drop: you could
+      get $X back", matching the email subject (2026-10-07). iOS shows "Bulkmate" above it.
+      Takes effect once `price-match-check` is redeployed.
 - [x] **CLAUDE.md Release build commands** still reference `costcomobile.xcworkspace` / scheme
       `costcomobile` / `costcomobile.app` — the iOS project is now `Bulkmate.xcworkspace` / scheme
       `Bulkmate`. Fix the commands.
-- [ ] `costco-backend/scripts/generate-apple-client-secret.mjs` example comment uses the old client
-      id `com.twonk0609.costco-app` → update to `com.twonk0609.bulkmate`.
-- [ ] Design docs still titled "Costco Companion" (`docs/design-system/animation-plan-2026-08-04.md`,
-      `styles.reference.css`) — historical; either leave with a "renamed" note or update titles.
-- [ ] `costco-mobile/package.json` `"name": "costco-mobile"` — internal only; leave unless renaming
-      the folders too.
+- [x] `costco-backend/scripts/generate-apple-client-secret.mjs` example comment → `com.twonk0609.bulkmate`.
+- [x] Design docs (`docs/design-system/animation-plan-2026-08-04.md`, `styles.reference.css`) —
+      titles now "Bulkmate", with a "formerly Costco Companion" note (2026-10-07).
+- [x] `costco-mobile/package.json` `"name": "costco-mobile"` — internal only; decided to leave it
+      (2026-10-07) unless the folders get renamed with the repo transfer.
 - [ ] Repo/folder names (`costco-app`, `costco-mobile`, `costco-backend`) — internal, but public if
-      the repo is open source. Decide whether to rename alongside the GitHub org move (step 6).
+      the repo is open source. Decide alongside the GitHub org move (step 6).
 - [ ] Profile → About card (`app/(tabs)/profile.tsx`): now "Everyday Labs" (third person) + footer
-      "© 2026 Everyday Labs" — check it reads well on device (light + dark mode).
-- [ ] README, APP_OVERVIEW, PRIVACY.md, LICENSE — reread together once the website exists; add the
-      website URL and make the "by Everyday Labs" phrasing match the pattern chosen above.
-- [ ] Final sweep: `git grep -niE "costco companion|tinker|everyday labs|bulkmate|\bI\b|\bmy\b"` and eyeball
-      every hit against the rules table.
+      "© 2026 Everyday Labs", plus an `everyday-labs.org ↗` pill linking to the Bulkmate page
+      (2026-10-07). Still to do: check it on device (light + dark mode).
+- [x] README, APP_OVERVIEW, PRIVACY.md, LICENSE — reread 2026-10-07: README links the website, all
+      four use "by Everyday Labs" / "© 2026 Everyday Labs"; APP_OVERVIEW push example updated.
+- [x] Final sweep: `git grep -niE "costco companion|tinker|everyday labs|bulkmate|\bI\b|\bmy\b"` and eyeball
+      every hit against the rules table. Done 2026-10-07: no old names in app/backend code; the
+      receipt-success "I'm unable to find…" prompt → "Bulkmate was unable to find…". Remaining
+      "Costco Companion" mentions are the deliberate rename notes.
 
 ## 2. Emails (Supabase → Authentication → Emails)
 
@@ -86,12 +89,13 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 - [ ] **App Review contact info** — name/email consistent with the above.
 - [ ] Apple Developer → Identifiers: App ID description for `com.twonk0609.bulkmate` reads "Bulkmate";
       old `com.twonk0609.costco-app` App ID / Services ID — rename description or remove if unused.
-- [ ] **Supabase Apple provider Client IDs** must include `com.twonk0609.bulkmate` (pending — Apple
-      sign-in fails without it).
+- [x] **Supabase Apple provider Client IDs** include `com.twonk0609.bulkmate` (confirmed in the
+      dashboard 2026-10-07; Apple sign-in fails without it).
 
 ## 4. Google
 
-- [ ] **Google Cloud project name** — "Bulkmate" (or "Everyday Labs" if it'll host more apps).
+- [x] **Google Cloud project name** — renamed "costco app" → "Bulkmate" (2026-10-07; display name
+      only, project ID unchanged).
 - [ ] **Google Auth Platform → Branding**: app name `Bulkmate`, logo, support email, developer
       contact, app home page + privacy policy URL (website), authorized domain. Required before
       publishing out of "Testing". User support email must be your Google account (Gmail) or a
@@ -99,8 +103,9 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
       developer contact. Home `https://everyday-labs.org/bulkmate/`, privacy
       `https://everyday-labs.org/bulkmate/privacy/`, authorized domain `everyday-labs.org`.
 - [ ] **OAuth clients** (iOS, Web) — names like "Bulkmate iOS" / "Bulkmate Supabase" for clarity.
-- [ ] Web client **redirect URI** `https://lylpdnqrguzxoompllsa.supabase.co/auth/v1/callback` —
-      was returning `redirect_uri_mismatch`; add it.
+- [x] Web client **redirect URI** `https://lylpdnqrguzxoompllsa.supabase.co/auth/v1/callback` —
+      added 2026-10-07 (was returning `redirect_uri_mismatch`). Web client ID matches Supabase's
+      Google provider.
 
 ## 5. Other services
 
@@ -110,7 +115,8 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 
 - [ ] **Supabase** project name (dashboard) — "Bulkmate".
 - [ ] **PostHog** organization → "Everyday Labs", project → "Bulkmate".
-- [ ] **Expo / EAS** project display name → "Bulkmate" (slug stays `costco-app`).
+- [x] **Expo / EAS** project display name → "Bulkmate" (slug stays `costco-app`). Checked
+      2026-10-07: comes from `app.json` `expo.name`, already "Bulkmate"; nothing to change.
 - [ ] **RapidAPI** app name → "Bulkmate".
 - [x] **Open Food Facts** User-Agent `Bulkmate/1.0 (Everyday Labs; hello@everyday-labs.org)` —
       contact switched + `barcode-lookup` redeployed 2026-10-07.
