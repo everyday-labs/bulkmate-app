@@ -15,7 +15,14 @@ import { useAuth } from '../../hooks/useAuth';
 import { useThemeColors } from '../../contexts/ThemeContext';
 import type { ColorScheme } from '../../constants/colors';
 import { spacing, fontSize, radius, shadow, letterSpacing } from '../../constants/theme';
-import { FloatView, ShimmerIcon, TagSwing, BellRing, ScanLineIcon, PinPulse } from '../../components/Motion';
+import {
+  FloatView,
+  ShimmerIcon,
+  TagSwing,
+  BellRing,
+  ScanLineIcon,
+  PinPulse,
+} from '../../components/Motion';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,8 +36,8 @@ type AnalyticsData = {
   totalReceipts: number;
   avgBasket: number;
   priceMatchSavings: number;
-  monthlyBuckets: MonthBucket[];   // last 6 months
-  topItems: TopItem[];              // top 5 by spend
+  monthlyBuckets: MonthBucket[]; // last 6 months
+  topItems: TopItem[]; // top 5 by spend
   warehouseVisits: number;
 };
 
@@ -84,31 +91,26 @@ export default function AnalyticsScreen() {
       const userId = session?.user.id;
       if (!userId) return;
 
-      const [
-        { data: receipts },
-        { data: items },
-        { data: alerts },
-        { data: checkIns },
-      ] = await Promise.all([
-        supabase
-          .from('receipts')
-          .select('id, transaction_date, total_amount')
-          .eq('user_id', userId)
-          .order('transaction_date', { ascending: false }),
-        supabase
-          .from('receipt_items')
-          .select('description, unit_price, quantity, discount_amount, receipt_id, receipts!inner(user_id, transaction_date)')
-          .eq('receipts.user_id', userId),
-        supabase
-          .from('price_alerts')
-          .select('delta')
-          .eq('user_id', userId)
-          .not('delta', 'is', null),
-        supabase
-          .from('check_ins')
-          .select('id')
-          .eq('user_id', userId),
-      ]);
+      const [{ data: receipts }, { data: items }, { data: alerts }, { data: checkIns }] =
+        await Promise.all([
+          supabase
+            .from('receipts')
+            .select('id, transaction_date, total_amount')
+            .eq('user_id', userId)
+            .order('transaction_date', { ascending: false }),
+          supabase
+            .from('receipt_items')
+            .select(
+              'description, unit_price, quantity, discount_amount, receipt_id, receipts!inner(user_id, transaction_date)',
+            )
+            .eq('receipts.user_id', userId),
+          supabase
+            .from('price_alerts')
+            .select('delta')
+            .eq('user_id', userId)
+            .not('delta', 'is', null),
+          supabase.from('check_ins').select('id').eq('user_id', userId),
+        ]);
 
       const receiptList = receipts ?? [];
       const itemList = items ?? [];
@@ -116,7 +118,10 @@ export default function AnalyticsScreen() {
       // Totals
       const totalSpend = receiptList.reduce((s: number, r: any) => s + (r.total_amount ?? 0), 0);
       const totalSaved = itemList.reduce((s: number, i: any) => s + (i.discount_amount ?? 0), 0);
-      const priceMatchSavings = (alerts ?? []).reduce((s: number, a: any) => s + Number(a.delta ?? 0), 0);
+      const priceMatchSavings = (alerts ?? []).reduce(
+        (s: number, a: any) => s + Number(a.delta ?? 0),
+        0,
+      );
       const avgBasket = receiptList.length > 0 ? totalSpend / receiptList.length : 0;
 
       // Monthly buckets
@@ -139,7 +144,8 @@ export default function AnalyticsScreen() {
         // convention as receipt-success.tsx's itemTotal. OCR-parsed rows are
         // always quantity 1, so this only differs once a user edits one.
         itemMap.set(key, {
-          total_spend: existing.total_spend + Number(item.unit_price ?? 0) * Number(item.quantity ?? 1),
+          total_spend:
+            existing.total_spend + Number(item.unit_price ?? 0) * Number(item.quantity ?? 1),
           quantity: existing.quantity + Number(item.quantity ?? 1),
         });
       }
@@ -195,7 +201,9 @@ export default function AnalyticsScreen() {
         </View>
       ) : !data || data.totalReceipts === 0 ? (
         <View style={styles.emptyCard}>
-          <FloatView><Text style={styles.emptyIcon}>📊</Text></FloatView>
+          <FloatView>
+            <Text style={styles.emptyIcon}>📊</Text>
+          </FloatView>
           <Text style={styles.emptyTitle}>No data yet</Text>
           <Text style={styles.emptySubtitle}>
             Scan a few Costco receipts to unlock your spend analytics.
@@ -246,7 +254,9 @@ export default function AnalyticsScreen() {
               buckets={data.monthlyBuckets}
               styles={styles}
               Colors={Colors}
-              onSelectMonth={(b) => router.push({ pathname: '/receipts', params: { month: b.key, label: b.label } })}
+              onSelectMonth={(b) =>
+                router.push({ pathname: '/receipts', params: { month: b.key, label: b.label } })
+              }
             />
           </View>
 
@@ -272,7 +282,12 @@ export default function AnalyticsScreen() {
           {/* ── Activity stats ── */}
           <View style={styles.activityRow}>
             <ActivityStat icon="🧾" value={data.totalReceipts} label="Receipts" styles={styles} />
-            <ActivityStat icon="📍" value={data.warehouseVisits} label="Check-ins" styles={styles} />
+            <ActivityStat
+              icon="📍"
+              value={data.warehouseVisits}
+              label="Check-ins"
+              styles={styles}
+            />
           </View>
         </>
       )}
@@ -287,21 +302,39 @@ export default function AnalyticsScreen() {
 type Styles = ReturnType<typeof makeStyles>;
 
 function MetricCard({
-  label, value, icon, accent, bg, styles,
+  label,
+  value,
+  icon,
+  accent,
+  bg,
+  styles,
 }: {
-  label: string; value: string; icon: string; accent: string; bg: string; styles: Styles;
+  label: string;
+  value: string;
+  icon: string;
+  accent: string;
+  bg: string;
+  styles: Styles;
 }) {
   return (
     <View style={styles.metricCard}>
       <View style={[styles.metricIconWrap, { backgroundColor: bg }]}>
         {icon === '💳' ? (
-          <ShimmerIcon><Text style={styles.metricIcon}>{icon}</Text></ShimmerIcon>
+          <ShimmerIcon>
+            <Text style={styles.metricIcon}>{icon}</Text>
+          </ShimmerIcon>
         ) : icon === '🏷' ? (
-          <TagSwing><Text style={styles.metricIcon}>{icon}</Text></TagSwing>
+          <TagSwing>
+            <Text style={styles.metricIcon}>{icon}</Text>
+          </TagSwing>
         ) : icon === '🔔' ? (
-          <BellRing><Text style={styles.metricIcon}>{icon}</Text></BellRing>
+          <BellRing>
+            <Text style={styles.metricIcon}>{icon}</Text>
+          </BellRing>
         ) : icon === '🧾' ? (
-          <ScanLineIcon color={accent}><Text style={styles.metricIcon}>{icon}</Text></ScanLineIcon>
+          <ScanLineIcon color={accent}>
+            <Text style={styles.metricIcon}>{icon}</Text>
+          </ScanLineIcon>
         ) : (
           <Text style={styles.metricIcon}>{icon}</Text>
         )}
@@ -313,9 +346,15 @@ function MetricCard({
 }
 
 function MonthlyChart({
-  buckets, styles, Colors, onSelectMonth,
+  buckets,
+  styles,
+  Colors,
+  onSelectMonth,
 }: {
-  buckets: MonthBucket[]; styles: Styles; Colors: ColorScheme; onSelectMonth: (b: MonthBucket) => void;
+  buckets: MonthBucket[];
+  styles: Styles;
+  Colors: ColorScheme;
+  onSelectMonth: (b: MonthBucket) => void;
 }) {
   const maxSpend = Math.max(...buckets.map((b) => b.spend), 1);
 
@@ -330,12 +369,17 @@ function MonthlyChart({
           return (
             <Pressable
               key={b.label}
-              style={({ pressed }) => [styles.barColumn, pressed && hasReceipts && { opacity: 0.7 }]}
+              style={({ pressed }) => [
+                styles.barColumn,
+                pressed && hasReceipts && { opacity: 0.7 },
+              ]}
               onPress={() => hasReceipts && onSelectMonth(b)}
               disabled={!hasReceipts}
             >
               <Text style={styles.barAmount}>
-                {b.spend > 0 ? `$${b.spend >= 1000 ? (b.spend / 1000).toFixed(1) + 'k' : b.spend.toFixed(0)}` : ''}
+                {b.spend > 0
+                  ? `$${b.spend >= 1000 ? (b.spend / 1000).toFixed(1) + 'k' : b.spend.toFixed(0)}`
+                  : ''}
               </Text>
               <View style={styles.barTrack}>
                 <View
@@ -348,7 +392,12 @@ function MonthlyChart({
                   ]}
                 />
               </View>
-              <Text style={[styles.barLabel, isActive && { color: Colors.costcoRed, fontWeight: '700' }]}>
+              <Text
+                style={[
+                  styles.barLabel,
+                  isActive && { color: Colors.costcoRed, fontWeight: '700' },
+                ]}
+              >
                 {b.label}
               </Text>
             </Pressable>
@@ -359,14 +408,28 @@ function MonthlyChart({
   );
 }
 
-function TopItemsList({ items, styles, Colors }: { items: TopItem[]; styles: Styles; Colors: ColorScheme }) {
+function TopItemsList({
+  items,
+  styles,
+  Colors,
+}: {
+  items: TopItem[];
+  styles: Styles;
+  Colors: ColorScheme;
+}) {
   const maxSpend = Math.max(...items.map((i) => i.total_spend), 1);
 
   return (
     <View style={styles.topItemsList}>
       {items.map((item, idx) => {
         const barWidth = (item.total_spend / maxSpend) * 100;
-        const rankColors = [Colors.costcoRed, Colors.executiveNavy, Colors.savings, Colors.warning, Colors.gray[400]];
+        const rankColors = [
+          Colors.costcoRed,
+          Colors.executiveNavy,
+          Colors.savings,
+          Colors.warning,
+          Colors.gray[400],
+        ];
         const color = rankColors[idx] ?? Colors.gray[400];
 
         return (
@@ -376,11 +439,15 @@ function TopItemsList({ items, styles, Colors }: { items: TopItem[]; styles: Sty
             </View>
             <View style={styles.topItemContent}>
               <View style={styles.topItemHeader}>
-                <Text style={styles.topItemName} numberOfLines={1}>{item.description}</Text>
+                <Text style={styles.topItemName} numberOfLines={1}>
+                  {item.description}
+                </Text>
                 <Text style={[styles.topItemSpend, { color }]}>${item.total_spend.toFixed(2)}</Text>
               </View>
               <View style={styles.topItemBarTrack}>
-                <View style={[styles.topItemBarFill, { width: `${barWidth}%`, backgroundColor: color }]} />
+                <View
+                  style={[styles.topItemBarFill, { width: `${barWidth}%`, backgroundColor: color }]}
+                />
               </View>
               <Text style={styles.topItemQty}>
                 {item.quantity} {item.quantity === 1 ? 'unit' : 'units'} purchased
@@ -393,7 +460,17 @@ function TopItemsList({ items, styles, Colors }: { items: TopItem[]; styles: Sty
   );
 }
 
-function SavingsBreakdown({ inStore, priceMatch, styles, Colors }: { inStore: number; priceMatch: number; styles: Styles; Colors: ColorScheme }) {
+function SavingsBreakdown({
+  inStore,
+  priceMatch,
+  styles,
+  Colors,
+}: {
+  inStore: number;
+  priceMatch: number;
+  styles: Styles;
+  Colors: ColorScheme;
+}) {
   const total = inStore + priceMatch;
   const inStorePct = total > 0 ? (inStore / total) * 100 : 50;
   const priceMatchPct = 100 - inStorePct;
@@ -403,7 +480,12 @@ function SavingsBreakdown({ inStore, priceMatch, styles, Colors }: { inStore: nu
       {/* Stacked bar */}
       <View style={styles.savingsBar}>
         <View style={[styles.savingsSegment, { flex: inStore, backgroundColor: Colors.savings }]} />
-        <View style={[styles.savingsSegment, { flex: priceMatch, backgroundColor: Colors.goldStarAccent }]} />
+        <View
+          style={[
+            styles.savingsSegment,
+            { flex: priceMatch, backgroundColor: Colors.goldStarAccent },
+          ]}
+        />
       </View>
 
       {/* Legend */}
@@ -436,13 +518,27 @@ function SavingsBreakdown({ inStore, priceMatch, styles, Colors }: { inStore: nu
   );
 }
 
-function ActivityStat({ icon, value, label, styles }: { icon: string; value: number; label: string; styles: Styles }) {
+function ActivityStat({
+  icon,
+  value,
+  label,
+  styles,
+}: {
+  icon: string;
+  value: number;
+  label: string;
+  styles: Styles;
+}) {
   return (
     <View style={styles.activityCard}>
       {icon === '🧾' ? (
-        <ScanLineIcon color="rgba(150,150,150,0.65)"><Text style={styles.activityIcon}>{icon}</Text></ScanLineIcon>
+        <ScanLineIcon color="rgba(150,150,150,0.65)">
+          <Text style={styles.activityIcon}>{icon}</Text>
+        </ScanLineIcon>
       ) : icon === '📍' ? (
-        <PinPulse color="rgba(150,150,150,0.5)"><Text style={styles.activityIcon}>{icon}</Text></PinPulse>
+        <PinPulse color="rgba(150,150,150,0.5)">
+          <Text style={styles.activityIcon}>{icon}</Text>
+        </PinPulse>
       ) : (
         <Text style={styles.activityIcon}>{icon}</Text>
       )}
@@ -456,216 +552,217 @@ function ActivityStat({ icon, value, label, styles }: { icon: string; value: num
 // Styles
 // ---------------------------------------------------------------------------
 
-const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingHorizontal: spacing['2xl'] },
+const makeStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: Colors.background },
+    scroll: { paddingHorizontal: spacing['2xl'] },
 
-  // Header
-  headingSection: { marginBottom: spacing['2xl'] },
-  headingTitle: {
-    fontSize: fontSize['3xl'],
-    fontWeight: '800',
-    color: Colors.gray[900],
-    letterSpacing: letterSpacing.tight,
-    marginBottom: spacing.xs,
-  },
-  headingSubtitle: { fontSize: fontSize.sm, color: Colors.gray[400] },
+    // Header
+    headingSection: { marginBottom: spacing['2xl'] },
+    headingTitle: {
+      fontSize: fontSize['3xl'],
+      fontWeight: '800',
+      color: Colors.gray[900],
+      letterSpacing: letterSpacing.tight,
+      marginBottom: spacing.xs,
+    },
+    headingSubtitle: { fontSize: fontSize.sm, color: Colors.gray[400] },
 
-  // Loading / empty
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.lg,
-    paddingTop: spacing['4xl'],
-  },
-  loadingText: { fontSize: fontSize.sm, color: Colors.gray[400] },
-  emptyCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: radius['2xl'],
-    padding: spacing['3xl'],
-    alignItems: 'center',
-    gap: spacing.md,
-    ...shadow.md,
-  },
-  emptyIcon: { fontSize: 48 },
-  emptyTitle: {
-    fontSize: fontSize['2xl'],
-    fontWeight: '800',
-    color: Colors.gray[800],
-    letterSpacing: letterSpacing.tight,
-  },
-  emptySubtitle: {
-    fontSize: fontSize.md,
-    color: Colors.gray[400],
-    textAlign: 'center',
-    lineHeight: 22,
-  },
+    // Loading / empty
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.lg,
+      paddingTop: spacing['4xl'],
+    },
+    loadingText: { fontSize: fontSize.sm, color: Colors.gray[400] },
+    emptyCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: radius['2xl'],
+      padding: spacing['3xl'],
+      alignItems: 'center',
+      gap: spacing.md,
+      ...shadow.md,
+    },
+    emptyIcon: { fontSize: 48 },
+    emptyTitle: {
+      fontSize: fontSize['2xl'],
+      fontWeight: '800',
+      color: Colors.gray[800],
+      letterSpacing: letterSpacing.tight,
+    },
+    emptySubtitle: {
+      fontSize: fontSize.md,
+      color: Colors.gray[400],
+      textAlign: 'center',
+      lineHeight: 22,
+    },
 
-  // Metric cards (2x2 grid)
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  metricCard: {
-    width: '47.5%',
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    ...shadow.sm,
-  },
-  metricIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  metricIcon: { fontSize: 18 },
-  metricValue: {
-    fontSize: fontSize.xl,
-    fontWeight: '800',
-    letterSpacing: letterSpacing.tight,
-    marginBottom: 2,
-  },
-  metricLabel: { fontSize: fontSize.xs, color: Colors.gray[400], fontWeight: '600' },
+    // Metric cards (2x2 grid)
+    metricsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.md,
+      marginBottom: spacing.xl,
+    },
+    metricCard: {
+      width: '47.5%',
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      padding: spacing.lg,
+      ...shadow.sm,
+    },
+    metricIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: radius.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.sm,
+    },
+    metricIcon: { fontSize: 18 },
+    metricValue: {
+      fontSize: fontSize.xl,
+      fontWeight: '800',
+      letterSpacing: letterSpacing.tight,
+      marginBottom: 2,
+    },
+    metricLabel: { fontSize: fontSize.xs, color: Colors.gray[400], fontWeight: '600' },
 
-  // Card container
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: radius['2xl'],
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
-    ...shadow.sm,
-  },
-  cardTitle: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-    marginBottom: spacing.xl,
-  },
+    // Card container
+    card: {
+      backgroundColor: Colors.surface,
+      borderRadius: radius['2xl'],
+      padding: spacing.xl,
+      marginBottom: spacing.xl,
+      ...shadow.sm,
+    },
+    cardTitle: {
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+      color: Colors.gray[400],
+      letterSpacing: letterSpacing.caps,
+      marginBottom: spacing.xl,
+    },
 
-  // Monthly chart
-  chartArea: { height: 180 },
-  barsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    height: '100%',
-    gap: spacing.xs,
-  },
-  barColumn: {
-    flex: 1,
-    alignItems: 'center',
-    height: '100%',
-    justifyContent: 'flex-end',
-  },
-  barAmount: {
-    fontSize: 9,
-    color: Colors.gray[400],
-    fontWeight: '600',
-    marginBottom: spacing.xs,
-    textAlign: 'center',
-  },
-  barTrack: {
-    width: '100%',
-    height: '72%',
-    justifyContent: 'flex-end',
-    backgroundColor: Colors.gray[100],
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  barFill: {
-    width: '100%',
-    borderRadius: radius.sm,
-  },
-  barLabel: {
-    fontSize: 9,
-    color: Colors.gray[400],
-    marginTop: spacing.xs,
-    textAlign: 'center',
-  },
+    // Monthly chart
+    chartArea: { height: 180 },
+    barsRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      height: '100%',
+      gap: spacing.xs,
+    },
+    barColumn: {
+      flex: 1,
+      alignItems: 'center',
+      height: '100%',
+      justifyContent: 'flex-end',
+    },
+    barAmount: {
+      fontSize: 9,
+      color: Colors.gray[400],
+      fontWeight: '600',
+      marginBottom: spacing.xs,
+      textAlign: 'center',
+    },
+    barTrack: {
+      width: '100%',
+      height: '72%',
+      justifyContent: 'flex-end',
+      backgroundColor: Colors.gray[100],
+      borderRadius: radius.sm,
+      overflow: 'hidden',
+    },
+    barFill: {
+      width: '100%',
+      borderRadius: radius.sm,
+    },
+    barLabel: {
+      fontSize: 9,
+      color: Colors.gray[400],
+      marginTop: spacing.xs,
+      textAlign: 'center',
+    },
 
-  // Top items
-  topItemsList: { gap: spacing.xl },
-  topItemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  topItemRankWrap: {
-    width: 24,
-    alignItems: 'center',
-    paddingTop: 2,
-  },
-  topItemRank: { fontSize: fontSize.md, fontWeight: '800' },
-  topItemContent: { flex: 1, gap: spacing.xs },
-  topItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  topItemName: {
-    flex: 1,
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: Colors.gray[800],
-    marginRight: spacing.sm,
-  },
-  topItemSpend: { fontSize: fontSize.md, fontWeight: '800', letterSpacing: letterSpacing.tight },
-  topItemBarTrack: {
-    height: 5,
-    backgroundColor: Colors.gray[100],
-    borderRadius: radius.pill,
-    overflow: 'hidden',
-  },
-  topItemBarFill: { height: '100%', borderRadius: radius.pill },
-  topItemQty: { fontSize: fontSize.xs, color: Colors.gray[400] },
+    // Top items
+    topItemsList: { gap: spacing.xl },
+    topItemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+    topItemRankWrap: {
+      width: 24,
+      alignItems: 'center',
+      paddingTop: 2,
+    },
+    topItemRank: { fontSize: fontSize.md, fontWeight: '800' },
+    topItemContent: { flex: 1, gap: spacing.xs },
+    topItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    topItemName: {
+      flex: 1,
+      fontSize: fontSize.sm,
+      fontWeight: '700',
+      color: Colors.gray[800],
+      marginRight: spacing.sm,
+    },
+    topItemSpend: { fontSize: fontSize.md, fontWeight: '800', letterSpacing: letterSpacing.tight },
+    topItemBarTrack: {
+      height: 5,
+      backgroundColor: Colors.gray[100],
+      borderRadius: radius.pill,
+      overflow: 'hidden',
+    },
+    topItemBarFill: { height: '100%', borderRadius: radius.pill },
+    topItemQty: { fontSize: fontSize.xs, color: Colors.gray[400] },
 
-  // Savings breakdown
-  savingsSection: { gap: spacing.lg },
-  savingsBar: {
-    height: 12,
-    flexDirection: 'row',
-    borderRadius: radius.pill,
-    overflow: 'hidden',
-    backgroundColor: Colors.gray[100],
-  },
-  savingsSegment: { height: '100%' },
-  savingsLegend: { gap: spacing.md },
-  savingsLegendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  savingsLegendDot: { width: 10, height: 10, borderRadius: radius.pill },
-  savingsLegendLabel: { fontSize: fontSize.xs, color: Colors.gray[500], marginBottom: 1 },
-  savingsLegendValue: { fontSize: fontSize.md, fontWeight: '700' },
-  savingsTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  savingsTotalLabel: { fontSize: fontSize.sm, fontWeight: '600', color: Colors.gray[600] },
-  savingsTotalValue: {
-    fontSize: fontSize.xl,
-    fontWeight: '800',
-    color: Colors.savings,
-    letterSpacing: letterSpacing.tight,
-  },
+    // Savings breakdown
+    savingsSection: { gap: spacing.lg },
+    savingsBar: {
+      height: 12,
+      flexDirection: 'row',
+      borderRadius: radius.pill,
+      overflow: 'hidden',
+      backgroundColor: Colors.gray[100],
+    },
+    savingsSegment: { height: '100%' },
+    savingsLegend: { gap: spacing.md },
+    savingsLegendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    savingsLegendDot: { width: 10, height: 10, borderRadius: radius.pill },
+    savingsLegendLabel: { fontSize: fontSize.xs, color: Colors.gray[500], marginBottom: 1 },
+    savingsLegendValue: { fontSize: fontSize.md, fontWeight: '700' },
+    savingsTotalRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: Colors.border,
+    },
+    savingsTotalLabel: { fontSize: fontSize.sm, fontWeight: '600', color: Colors.gray[600] },
+    savingsTotalValue: {
+      fontSize: fontSize.xl,
+      fontWeight: '800',
+      color: Colors.savings,
+      letterSpacing: letterSpacing.tight,
+    },
 
-  // Activity stats
-  activityRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.xl },
-  activityCard: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.xl,
-    alignItems: 'center',
-    gap: spacing.xs,
-    ...shadow.sm,
-  },
-  activityIcon: { fontSize: 28 },
-  activityValue: {
-    fontSize: fontSize['3xl'],
-    fontWeight: '800',
-    color: Colors.gray[900],
-    letterSpacing: letterSpacing.tight,
-  },
-  activityLabel: { fontSize: fontSize.xs, color: Colors.gray[400], fontWeight: '600' },
-});
+    // Activity stats
+    activityRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.xl },
+    activityCard: {
+      flex: 1,
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      padding: spacing.xl,
+      alignItems: 'center',
+      gap: spacing.xs,
+      ...shadow.sm,
+    },
+    activityIcon: { fontSize: 28 },
+    activityValue: {
+      fontSize: fontSize['3xl'],
+      fontWeight: '800',
+      color: Colors.gray[900],
+      letterSpacing: letterSpacing.tight,
+    },
+    activityLabel: { fontSize: fontSize.xs, color: Colors.gray[400], fontWeight: '600' },
+  });

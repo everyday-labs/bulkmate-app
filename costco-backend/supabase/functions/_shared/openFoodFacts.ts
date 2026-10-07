@@ -58,7 +58,8 @@ function readPalmOil(analysisTags: unknown): 'yes' | 'no' | 'unknown' {
   if (!Array.isArray(analysisTags)) return 'unknown';
   const tags = analysisTags.map((t) => String(t).toLowerCase());
   if (tags.some((t) => t.includes('palm-oil-content-yes') || t === 'en:palm-oil')) return 'yes';
-  if (tags.some((t) => t.includes('palm-oil-free') || t.includes('palm-oil-content-no'))) return 'no';
+  if (tags.some((t) => t.includes('palm-oil-free') || t.includes('palm-oil-content-no')))
+    return 'no';
   return 'unknown';
 }
 
@@ -88,7 +89,8 @@ export async function fetchOffProduct(upc: string): Promise<OffProduct | null> {
       brand: p.brands || null,
       ingredientsText: p.ingredients_text || null,
       novaGroup: typeof p.nova_group === 'number' ? p.nova_group : null,
-      nutriscoreGrade: p.nutriscore_grade && p.nutriscore_grade !== 'unknown' ? p.nutriscore_grade : null,
+      nutriscoreGrade:
+        p.nutriscore_grade && p.nutriscore_grade !== 'unknown' ? p.nutriscore_grade : null,
       additives: normalizeAdditiveTags(p.additives_tags),
       nutrientLevels: normalizeNutrientLevels(p.nutrient_levels_tags),
       palmOil: readPalmOil(p.ingredients_analysis_tags),

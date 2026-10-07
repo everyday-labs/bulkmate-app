@@ -30,7 +30,10 @@ export type RapidApiProduct = {
  * failing the whole request; callers should fall back to cached data or the
  * OCR ledger when they get `null` back.
  */
-export async function fetchFromRapidApi(query: string, apiKey: string): Promise<RapidApiProduct | null> {
+export async function fetchFromRapidApi(
+  query: string,
+  apiKey: string,
+): Promise<RapidApiProduct | null> {
   try {
     const url = `https://${RAPIDAPI_HOST}/search?query=${encodeURIComponent(query)}&rows=1`;
     const res = await fetch(url, {
@@ -54,21 +57,27 @@ export async function fetchFromRapidApi(query: string, apiKey: string): Promise<
     const p = products[0];
 
     // Prefer the warehouse sale price; fall back to the generic `price` field.
-    const sale_price = p.item_location_pricing_salePrice != null
-      ? Number(p.item_location_pricing_salePrice)
-      : p.price != null ? Number(p.price) : null;
+    const sale_price =
+      p.item_location_pricing_salePrice != null
+        ? Number(p.item_location_pricing_salePrice)
+        : p.price != null
+          ? Number(p.price)
+          : null;
 
-    const list_price = p.item_location_pricing_listPrice != null
-      ? Number(p.item_location_pricing_listPrice) : null;
+    const list_price =
+      p.item_location_pricing_listPrice != null ? Number(p.item_location_pricing_listPrice) : null;
 
-    const online_price = p.item_warehouse_onlinePrice != null
-      ? Number(p.item_warehouse_onlinePrice) : null;
+    const online_price =
+      p.item_warehouse_onlinePrice != null ? Number(p.item_warehouse_onlinePrice) : null;
 
     const brand = (Array.isArray(p.Brand_attr) ? p.Brand_attr[0] : null) ?? p.brand ?? null;
     const in_warehouse = p.item_program_eligibility?.includes('InWarehouse') ?? false;
-    const rating = p.review_rating != null
-      ? Number(p.review_rating)
-      : p.item_ratings != null ? Number(p.item_ratings) : null;
+    const rating =
+      p.review_rating != null
+        ? Number(p.review_rating)
+        : p.item_ratings != null
+          ? Number(p.item_ratings)
+          : null;
 
     return {
       // Costco's item_number is the canonical SKU; fall back to ecom_id or

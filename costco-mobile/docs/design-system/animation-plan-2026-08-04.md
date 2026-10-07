@@ -4,7 +4,9 @@
 > further design-system work, including a second reference-app audit and a prioritized backlog,
 > see `reference-app-audit-2026-08-05.md` in this same folder.
 
-# Costco Companion App — Design System & Animation Plan
+# Bulkmate — Design System & Animation Plan
+
+*(Written when the app was still called "Costco Companion"; historical plan, titles updated after the rename.)*
 
 ## Goal
 Create a minimal, clean, quirky design system for the iOS/Android Costco companion app, plus motion/illustration rules that bring the game layer (stars, badges, tiers, warehouse rarity) to life.

@@ -11,3 +11,10 @@
 AuthKey_*.p8
 *.mobileprovision
 *.p12
+
+node_modules/
+coverage/
+playwright-report/
+test-results/
+/deno.lock
+.cov/
