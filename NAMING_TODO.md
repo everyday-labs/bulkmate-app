@@ -86,12 +86,13 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
 - [ ] **App Review contact info** — name/email consistent with the above.
 - [ ] Apple Developer → Identifiers: App ID description for `com.twonk0609.bulkmate` reads "Bulkmate";
       old `com.twonk0609.costco-app` App ID / Services ID — rename description or remove if unused.
-- [ ] **Supabase Apple provider Client IDs** must include `com.twonk0609.bulkmate` (pending — Apple
-      sign-in fails without it).
+- [x] **Supabase Apple provider Client IDs** include `com.twonk0609.bulkmate` (confirmed in the
+      dashboard 2026-10-07; Apple sign-in fails without it).
 
 ## 4. Google
 
-- [ ] **Google Cloud project name** — "Bulkmate" (or "Everyday Labs" if it'll host more apps).
+- [x] **Google Cloud project name** — renamed "costco app" → "Bulkmate" (2026-10-07; display name
+      only, project ID unchanged).
 - [ ] **Google Auth Platform → Branding**: app name `Bulkmate`, logo, support email, developer
       contact, app home page + privacy policy URL (website), authorized domain. Required before
       publishing out of "Testing". User support email must be your Google account (Gmail) or a
@@ -99,8 +100,9 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
       developer contact. Home `https://everyday-labs.org/bulkmate/`, privacy
       `https://everyday-labs.org/bulkmate/privacy/`, authorized domain `everyday-labs.org`.
 - [ ] **OAuth clients** (iOS, Web) — names like "Bulkmate iOS" / "Bulkmate Supabase" for clarity.
-- [ ] Web client **redirect URI** `https://lylpdnqrguzxoompllsa.supabase.co/auth/v1/callback` —
-      was returning `redirect_uri_mismatch`; add it.
+- [x] Web client **redirect URI** `https://lylpdnqrguzxoompllsa.supabase.co/auth/v1/callback` —
+      added 2026-10-07 (was returning `redirect_uri_mismatch`). Web client ID matches Supabase's
+      Google provider.
 
 ## 5. Other services
 
