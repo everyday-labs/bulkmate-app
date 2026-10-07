@@ -1,33 +1,30 @@
 // Pre-commit gate (run by costco-mobile/.husky/pre-commit from the repo root).
-// Only staged files are formatted/linted; typecheck and tests run for the
-// package the staged files belong to. The full suite runs on pre-push and in CI.
-import path from 'node:path';
+// Staged files are formatted and linted; typecheck and the tests related to
+// the staged files run for the package they belong to. Full suite: pre-push
+// (scripts/check-all.sh) and CI.
+//
+// String commands get the staged files appended as separate, absolute-path
+// arguments by lint-staged — no shell quoting involved. Functions that ignore
+// their argument run once without file arguments.
 
-const MOBILE = 'costco-mobile';
-const FUNCTIONS = 'costco-backend/supabase/functions';
-const bin = (name) => `${MOBILE}/node_modules/.bin/${name}`;
-const rel = (dir, files) => files.map((f) => JSON.stringify(path.relative(dir, f))).join(' ');
-const inMobile = (cmd) => `sh -c ${JSON.stringify(`cd ${MOBILE} && ${cmd}`)}`;
+const MOBILE = 'scripts/in-mobile.sh';
+const DENO = 'scripts/deno.sh';
 
 export default {
-  '*.{ts,tsx,js,mjs,cjs,json,yml,yaml,css,html}': (files) =>
-    `${bin('prettier')} --write --ignore-unknown ${files.map((f) => JSON.stringify(f)).join(' ')}`,
+  '*.{ts,tsx,js,mjs,cjs,json,yml,yaml,css,html}':
+    'costco-mobile/node_modules/.bin/prettier --write --ignore-unknown',
 
-  [`${MOBILE}/**/*.{ts,tsx,js}`]: (files) => [
-    inMobile(
-      `./node_modules/.bin/eslint --fix --max-warnings=0 --no-warn-ignored ${rel(MOBILE, files)}`,
-    ),
-    inMobile('./node_modules/.bin/tsc --noEmit'),
-    inMobile(
-      `CI=1 ./node_modules/.bin/jest --bail --passWithNoTests --findRelatedTests ${rel(MOBILE, files)}`,
-    ),
+  'costco-mobile/**/*.{ts,tsx,js}': [
+    `${MOBILE} ./node_modules/.bin/eslint --fix --max-warnings=0 --no-warn-ignored`,
+    () => `${MOBILE} ./node_modules/.bin/tsc --noEmit`,
+    `${MOBILE} env CI=1 ./node_modules/.bin/jest --bail --passWithNoTests --findRelatedTests`,
   ],
 
-  [`${MOBILE}/constants/colors.ts`]: () => inMobile('node scripts/check-contrast.js'),
+  'costco-mobile/constants/colors.ts': () => `${MOBILE} node scripts/check-contrast.js`,
 
-  [`${FUNCTIONS}/**/*.ts`]: (files) => [
-    `scripts/deno.sh lint ${rel(FUNCTIONS, files)}`,
-    'scripts/deno.sh check .',
-    'scripts/deno.sh test --allow-env',
+  'costco-backend/supabase/functions/**/*.ts': [
+    `${DENO} lint`,
+    () => `${DENO} check .`,
+    () => `${DENO} test --allow-env`,
   ],
 };
