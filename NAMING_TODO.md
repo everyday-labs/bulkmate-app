@@ -113,8 +113,8 @@ Use it in emails, website, and store listing.
       2026-10-06. Note: the 5 walkthrough artifacts are shared by link with a **pinned version**;
       move the share pin to the latest version in each one's Share menu or viewers keep the old copy.
 
-- [ ] **Supabase** project name (dashboard) — "Bulkmate".
-- [ ] **PostHog** organization → "Everyday Labs", project → "Bulkmate".
+- [x] **Supabase** project name (dashboard) — "Bulkmate" (2026-10-07; CLI shows `name=Bulkmate`).
+- [x] **PostHog** organization → "Everyday Labs", project → "Bulkmate" (2026-10-07).
 - [x] **Expo / EAS** project display name → "Bulkmate" (slug stays `costco-app`). Checked
       2026-10-07: comes from `app.json` `expo.name`, already "Bulkmate"; nothing to change.
 - [ ] **RapidAPI** app name → "Bulkmate".
@@ -128,7 +128,9 @@ Use it in emails, website, and store listing.
 - [x] Site repo `everyday-labs/everyday-labs.github.io` — home, `/bulkmate` (5 product pages from the
       Claude walkthrough), `/bulkmate/privacy`, `/bulkmate/support`, `/bulkmate/feedback` (2026-10-06).
 - [ ] Transfer `balajic0623/costco-app` → `everyday-labs/` (maybe rename to `bulkmate`);
-      `git remote set-url origin …` locally.
+      `git remote set-url origin …` locally. GitHub side done 2026-10-07: now
+      `everyday-labs/bulkmate-app`. Still to do: `git remote set-url origin
+      https://github.com/everyday-labs/bulkmate-app.git` in the local checkout.
 - [x] Domain `everyday-labs.org` bought 2026-10-06 → DNS, HTTPS, verified domain done.
       `hello@` forwarding (Cloudflare Email Routing) verified 2026-10-07; contact email switched to it
       in PRIVACY.md (both copies), site `_config.yml` + feedback page, OFF User-Agent. Still to
@@ -139,4 +141,7 @@ Use it in emails, website, and store listing.
       email received. Later: move to `p=quarantine` after ~2 weeks of clean Brevo DMARC reports —
       but not if Gmail will send as `hello@everyday-labs.org` (no domain DKIM → would fail).
 - [ ] Link the website from: README, Profile → About card, App Store listing, Google consent screen,
-      privacy policy, email template footers.
+      privacy policy, email template footers. Done 2026-10-07: README, About card (`everyday-labs.org ↗`
+      pill), privacy policy (app + site copies), price-drop email footer, and all 6 auth templates in
+      `costco-backend/supabase/templates/` — **re-paste those 6 into Supabase → Authentication →
+      Emails** for the link to go live. Still to do: App Store listing, Google consent screen.
