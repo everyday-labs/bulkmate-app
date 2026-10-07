@@ -367,7 +367,7 @@ export default function ReceiptSuccessScreen() {
                   <Text style={styles.warehouseName}>
                     {warehouseSkipped
                       ? 'Saved without a warehouse'
-                      : 'I’m unable to find the correct warehouse from your receipt'}
+                      : 'Bulkmate was unable to find the correct warehouse from your receipt'}
                   </Text>
                   <Text
                     style={
