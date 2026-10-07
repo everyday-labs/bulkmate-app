@@ -9,14 +9,30 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    # Expo SDK 54 pins exact versions of React, React Native, every native
+    # module and its Jest/ESLint presets (and Expo Go must match). Those only
+    # change through a deliberate SDK upgrade: `npx expo install --fix`.
+    # Playwright is pinned to the CI container tag in .github/workflows/ci.yml.
     ignore:
-      # Expo SDK upgrades are deliberate (pinned to SDK 54 for Expo Go) —
-      # run `npx expo install --fix` by hand instead.
       - dependency-name: expo
-        update-types: [version-update:semver-major]
-      - dependency-name: react-native
+      - dependency-name: 'expo-*'
+      - dependency-name: '@expo/*'
+      - dependency-name: '@expo-google-fonts/*'
       - dependency-name: react
       - dependency-name: react-dom
+      - dependency-name: react-test-renderer
+      - dependency-name: react-native
+      - dependency-name: 'react-native-*'
+      - dependency-name: '@react-native-async-storage/*'
+      - dependency-name: '@react-native-community/*'
+      - dependency-name: '@react-native-google-signin/*'
+      - dependency-name: jest
+      - dependency-name: jest-expo
+      - dependency-name: '@types/jest'
+      - dependency-name: '@types/react'
+      - dependency-name: eslint-config-expo
+      - dependency-name: typescript
+      - dependency-name: '@playwright/test'
   - package-ecosystem: github-actions
     directory: /
     schedule:
