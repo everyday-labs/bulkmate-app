@@ -9,7 +9,7 @@ one, consistently. Work through it top to bottom; tick items as you go.
 |---|---|---|
 | **Bulkmate** | The app itself — anything the user sees as "the product" | Home screen icon name, email sender name, push notifications, App Store app name |
 | **Everyday Labs** | The publisher — legal, copyright, "who is responsible" | `© 2026 Everyday Labs`, privacy policy, terms, App Store copyright, GitHub org, website |
-| ~~Tinker~~ | **Retired from public copy (2026-10-06).** All public text is third person, as Everyday Labs | — |
+| ~~Tinker~~ | The developer's personal name. **Not used in public copy (2026-10-06)**: all public text is third person, as Everyday Labs. Tinker logos go on personal profiles only (decided 2026-10-07) | Personal GitHub/dev profiles |
 | **noreply@everyday-labs.org** | Sender address for all outgoing email (send-only, Brevo, DKIM + DMARC) | Supabase Auth SMTP sender, price-drop emails (`_shared/brevo.ts`) |
 | **hello@everyday-labs.org** | The one public contact address (Cloudflare Email Routing → personal Gmail) | Privacy policy, support/feedback pages, site `_config.yml` `email`, store listings, OAuth consent screen |
 
@@ -37,8 +37,10 @@ Use it in emails, website, and store listing.
       titles now "Bulkmate", with a "formerly Costco Companion" note (2026-10-07).
 - [x] `costco-mobile/package.json` `"name": "costco-mobile"` — internal only; decided to leave it
       (2026-10-07) unless the folders get renamed with the repo transfer.
-- [ ] Repo/folder names (`costco-app`, `costco-mobile`, `costco-backend`) — internal, but public if
-      the repo is open source. Decide alongside the GitHub org move (step 6).
+- [x] Repo/folder names (`costco-app`, `costco-mobile`, `costco-backend`) — internal, but public if
+      the repo is open source. Decided 2026-10-07: repo is now `everyday-labs/bulkmate-app`; folder
+      renames **deferred until after the v1 release** (touches ~30 files / ~130 references incl. CI,
+      git hooks, scripts and `config.toml`, and would conflict with every open branch).
 - [ ] Profile → About card (`app/(tabs)/profile.tsx`): now "Everyday Labs" (third person) + footer
       "© 2026 Everyday Labs", plus an `everyday-labs.org ↗` pill linking to the Bulkmate page
       (2026-10-07). Still to do: check it on device (light + dark mode).
@@ -96,13 +98,14 @@ Use it in emails, website, and store listing.
 
 - [x] **Google Cloud project name** — renamed "costco app" → "Bulkmate" (2026-10-07; display name
       only, project ID unchanged).
-- [ ] **Google Auth Platform → Branding**: app name `Bulkmate`, logo, support email, developer
+- [x] **Google Auth Platform → Branding** (done 2026-10-07, logo = Bulkmate icon 120×120; publish
+      out of "Testing" once Google's brand verification clears): app name `Bulkmate`, logo, support email, developer
       contact, app home page + privacy policy URL (website), authorized domain. Required before
       publishing out of "Testing". User support email must be your Google account (Gmail) or a
       Google Group you own — `hello@` is rejected there; use `hello@everyday-labs.org` for
       developer contact. Home `https://everyday-labs.org/bulkmate/`, privacy
       `https://everyday-labs.org/bulkmate/privacy/`, authorized domain `everyday-labs.org`.
-- [ ] **OAuth clients** (iOS, Web) — names like "Bulkmate iOS" / "Bulkmate Supabase" for clarity.
+- [x] **OAuth clients** (iOS, Web) — renamed "Bulkmate iOS" / "Bulkmate Supabase" (2026-10-07).
 - [x] Web client **redirect URI** `https://lylpdnqrguzxoompllsa.supabase.co/auth/v1/callback` —
       added 2026-10-07 (was returning `redirect_uri_mismatch`). Web client ID matches Supabase's
       Google provider.
@@ -120,17 +123,19 @@ Use it in emails, website, and store listing.
 - [x] **RapidAPI** app name → "Bulkmate" (2026-10-07).
 - [x] **Open Food Facts** User-Agent `Bulkmate/1.0 (Everyday Labs; hello@everyday-labs.org)` —
       contact switched + `barcode-lookup` redeployed 2026-10-07.
-- [ ] **USDA FoodData Central** API key registration — app/org name.
+- [x] **USDA FoodData Central** API key registration — app/org name. Decided 2026-10-07: skip.
+      api.data.gov registrations can't be renamed (only re-registered for a new key), and only
+      the developer ever sees the name.
 
 ## 6. Web presence (after the site exists)
 
-- [x] GitHub org `everyday-labs` — display name, description (avatar + website link still open).
+- [x] GitHub org `everyday-labs` — display name, description; avatar (flask mark) + website link
+      `https://everyday-labs.org` done 2026-10-07.
 - [x] Site repo `everyday-labs/everyday-labs.github.io` — home, `/bulkmate` (5 product pages from the
       Claude walkthrough), `/bulkmate/privacy`, `/bulkmate/support`, `/bulkmate/feedback` (2026-10-06).
-- [ ] Transfer `balajic0623/costco-app` → `everyday-labs/` (maybe rename to `bulkmate`);
+- [x] Transfer `balajic0623/costco-app` → `everyday-labs/` (maybe rename to `bulkmate`);
       `git remote set-url origin …` locally. GitHub side done 2026-10-07: now
-      `everyday-labs/bulkmate-app`. Still to do: `git remote set-url origin
-      https://github.com/everyday-labs/bulkmate-app.git` in the local checkout.
+      `everyday-labs/bulkmate-app`; local `origin` updated to it 2026-10-07.
 - [x] Domain `everyday-labs.org` bought 2026-10-06 → DNS, HTTPS, verified domain done.
       `hello@` forwarding (Cloudflare Email Routing) verified 2026-10-07; contact email switched to it
       in PRIVACY.md (both copies), site `_config.yml` + feedback page, OFF User-Agent. Still to
@@ -143,5 +148,5 @@ Use it in emails, website, and store listing.
 - [ ] Link the website from: README, Profile → About card, App Store listing, Google consent screen,
       privacy policy, email template footers. Done 2026-10-07: README, About card (`everyday-labs.org ↗`
       pill), privacy policy (app + site copies), price-drop email footer, and all 6 auth templates in
-      `costco-backend/supabase/templates/` — **re-paste those 6 into Supabase → Authentication →
-      Emails** for the link to go live. Still to do: App Store listing, Google consent screen.
+      `costco-backend/supabase/templates/` (re-pasted into Supabase 2026-10-07), Google consent
+      screen (home + privacy URLs, 2026-10-07). Still to do: App Store listing (with the Apple step).
