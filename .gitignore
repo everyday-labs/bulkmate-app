@@ -18,3 +18,7 @@ playwright-report/
 test-results/
 /deno.lock
 .cov/
+
+# Claude Code: personal settings and session worktrees — never commit
+.claude/settings.local.json
+.claude/worktrees/
