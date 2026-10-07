@@ -5,7 +5,10 @@ import { sendExpoPushNotifications, type ExpoPushMessage } from '../_shared/expo
 import { sendBrevoEmail } from '../_shared/brevo.ts';
 import { buildPriceDropEmail } from '../_shared/alertMessages.ts';
 import { unsubscribeUrl } from '../_shared/notifyLinks.ts';
-import { capturePostHogException } from '../_shared/posthog.ts';
+import { capturePostHogEvent, capturePostHogException } from '../_shared/posthog.ts';
+import { isServiceRole } from '../_shared/auth.ts';
+import { mapWithConcurrency } from '../_shared/concurrency.ts';
+import { alertEmailDailyCap, countEmailsSent, utcDayStart } from '../_shared/emailBudget.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,6 +57,41 @@ type PriceResult = {
 const PRICE_CACHE_TTL_HOURS = 72;
 
 // ---------------------------------------------------------------------------
+// Run limits. Supabase stops a function at 150s wall clock on the free plan
+// (400s paid), and anything not yet sent when that happens is lost for the
+// run — so pricing stops starting new SKUs at PRICE_PHASE_BUDGET_MS and email
+// stops at NOTIFY_DEADLINE_MS. Whatever is cut off has a null delivery stamp
+// and is picked up by the next run.
+// ---------------------------------------------------------------------------
+
+const PRICE_PHASE_BUDGET_MS = 90_000;
+const NOTIFY_DEADLINE_MS = 130_000;
+// Parallel price lookups — fast enough for the budget, gentle on RapidAPI's
+// per-second limit (a 429 just falls back to the OCR ledger).
+const PRICE_CONCURRENCY = 4;
+const EMAIL_CONCURRENCY = 5;
+// RapidAPI is billed per call against a monthly plan quota. Caps cache-miss
+// calls per run; SKUs past the cap are priced from the OCR ledger alone and
+// get a fresh API price on a later run. Set RAPIDAPI_MAX_CALLS_PER_RUN to
+// about (monthly quota − expected barcode scans) / 30.
+const DEFAULT_RAPIDAPI_MAX_CALLS_PER_RUN = 300;
+
+// PostgREST returns at most 1,000 rows per request; page past that.
+const PAGE_SIZE = 1000;
+
+async function fetchAllPages<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await page(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) return rows;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // OCR ledger: median net-paid price from other users' recent receipts.
 // In-store only — no API call. Grows more reliable as user base grows.
 // ---------------------------------------------------------------------------
@@ -86,9 +124,9 @@ async function fetchFromOCRLedger(supabase: SupabaseClient, sku: string): Promis
 // Resolve current price with dual tracking
 //
 // Order:
-//   1. 24h cache hit on products.api_sale_price  → skip API call
+//   1. 72h cache hit on products.api_sale_price  → skip API call
 //   2. OCR ledger (free, in-store)
-//   3. RapidAPI (paid, warehouse + online)
+//   3. RapidAPI (paid, warehouse + online) — only if takeApiCall() grants one
 //
 // On any external hit, updates products with both price tracks and metadata.
 // current_price is always set to the lowest of what we know (api vs ledger).
@@ -98,6 +136,7 @@ async function resolvePrice(
   supabase: SupabaseClient,
   sku: string,
   apiKey: string,
+  takeApiCall: () => boolean,
 ): Promise<PriceResult | null> {
   // 1. Load existing product row
   const { data: product } = await supabase
@@ -140,7 +179,7 @@ async function resolvePrice(
   const ledgerPrice = await fetchFromOCRLedger(supabase, sku);
 
   // 4. API call if cache missed
-  if (!apiResult && apiKey) {
+  if (!apiResult && apiKey && takeApiCall()) {
     apiResult = await fetchFromRapidApi(sku, apiKey);
     apiSource = 'rapidapi';
   }
@@ -238,14 +277,29 @@ async function updateReceiptLedger(supabase: SupabaseClient, sku: string, netPai
 // Main handler
 //
 // Modes:
-//   { receipt_id, user_id }  — inline check after a receipt scan
+//   { receipt_id, user_id }  — inline check after a receipt scan (ingest-receipt)
 //   { sweep: true }           — pg_cron daily 30-day window sweep
+//
+// Both callers use the service-role key. Anyone else is refused: each run can
+// spend RapidAPI calls and Brevo's daily email allowance, and the public anon
+// key alone passes the gateway's JWT check.
 // ---------------------------------------------------------------------------
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 
 export async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+
+  if (!isServiceRole(req)) return json({ error: 'Forbidden' }, 403);
+
+  const startedAt = Date.now();
+  const elapsed = () => Date.now() - startedAt;
 
   try {
     const supabase = createClient(
@@ -265,13 +319,17 @@ export async function handler(req: Request): Promise<Response> {
 
     if (sweep) {
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      const { data, error } = await supabase
-        .from('receipt_items')
-        .select('id, receipt_id, sku, description, unit_price, discount_amount, receipts(user_id)')
-        .gte('transaction_date', since);
-
-      if (error) throw error;
-      items = (data ?? [])
+      const rows = await fetchAllPages<SweepItemRow>((from, to) =>
+        supabase
+          .from('receipt_items')
+          .select(
+            'id, receipt_id, sku, description, unit_price, discount_amount, receipts(user_id)',
+          )
+          .gte('transaction_date', since)
+          .order('id')
+          .range(from, to),
+      );
+      items = rows
         .map((r: SweepItemRow) => ({
           receipt_item_id: r.id,
           receipt_id: r.receipt_id,
@@ -296,14 +354,38 @@ export async function handler(req: Request): Promise<Response> {
         description: r.description ?? r.sku,
         net_paid: Number(r.unit_price) - Number(r.discount_amount ?? 0),
       }));
+
+      // A fresh receipt feeds the ledger. The sweep re-reads the same rows,
+      // so it skips this.
+      for (const item of items) await updateReceiptLedger(supabase, item.sku, item.net_paid);
     } else {
-      return new Response(
-        JSON.stringify({ error: 'Provide receipt_id + user_id, or sweep: true' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 },
-      );
+      return json({ error: 'Provide receipt_id + user_id, or sweep: true' }, 400);
     }
 
     console.log(`price-match-check: ${items.length} items, sweep=${sweep ?? false}`);
+
+    // --- 1. Price each SKU once, a few at a time, within the time budget ----
+    const skus = [...new Set(items.map((i) => i.sku))];
+    const maxApiCalls =
+      Number(Deno.env.get('RAPIDAPI_MAX_CALLS_PER_RUN')) || DEFAULT_RAPIDAPI_MAX_CALLS_PER_RUN;
+    let apiCalls = 0;
+    const takeApiCall = () => {
+      if (apiCalls >= maxApiCalls) return false;
+      apiCalls++;
+      return true;
+    };
+
+    const priced = await mapWithConcurrency(
+      skus,
+      PRICE_CONCURRENCY,
+      (sku) => resolvePrice(supabase, sku, apiKey, takeApiCall),
+      () => elapsed() > PRICE_PHASE_BUDGET_MS,
+    );
+    const prices = new Map<string, PriceResult | null>();
+    skus.forEach((sku, i) => {
+      if (priced[i] !== undefined) prices.set(sku, priced[i]!);
+    });
+    const skusDeferred = skus.length - prices.size;
 
     // Cache notification prefs per user_id to avoid repeat DB lookups in sweep mode
     type NotifyPrefs = { pushToken: string | null; emailAlerts: boolean };
@@ -324,17 +406,17 @@ export async function handler(req: Request): Promise<Response> {
       return prefs;
     };
 
+    // --- 2. Write alerts and collect what still needs delivering ------------
     let alertsCreated = 0;
     let noDataCount = 0;
     const pushMessages: ExpoPushMessage[] = [];
     const notifiedAlertIds: string[] = [];
-    // New drops per user, for one summary email per user per run.
+    // Undelivered drops per user, for one summary email per user per run.
     const emailBatches = new Map<string, { alertIds: string[]; total: number }>();
 
     for (const item of items) {
-      await updateReceiptLedger(supabase, item.sku, item.net_paid);
-
-      const result = await resolvePrice(supabase, item.sku, apiKey);
+      if (!prices.has(item.sku)) continue; // deferred — next run
+      const result = prices.get(item.sku);
 
       if (!result) {
         noDataCount++;
@@ -344,9 +426,8 @@ export async function handler(req: Request): Promise<Response> {
       const delta = item.net_paid - result.current_price;
       if (delta <= 0.01) continue;
 
-      // The daily sweep re-finds every still-valid drop. Only notify when the
-      // drop is new or the price fell further since the last alert — this used
-      // to reset notified_at on every upsert, re-sending the same push daily.
+      // The daily sweep re-finds every still-valid drop. A new or deeper drop
+      // clears the delivery stamps (and any dismissal); a repeat keeps them.
       const { data: existing } = await supabase
         .from('price_alerts')
         .select('delta')
@@ -374,7 +455,7 @@ export async function handler(req: Request): Promise<Response> {
           },
           { onConflict: 'receipt_item_id' },
         )
-        .select('id')
+        .select('id, notified_at, emailed_at, dismissed_at')
         .single();
 
       if (alertError) {
@@ -382,17 +463,25 @@ export async function handler(req: Request): Promise<Response> {
         continue;
       }
 
-      if (!isNewDrop) continue;
+      if (isNewDrop) {
+        alertsCreated++;
+        console.log(
+          `Alert: SKU ${item.sku} paid $${item.net_paid} → now $${result.current_price}` +
+            ` (Δ $${delta.toFixed(2)}) via ${result.source}`,
+        );
+      }
 
-      alertsCreated++;
-      console.log(
-        `Alert: SKU ${item.sku} paid $${item.net_paid} → now $${result.current_price}` +
-          ` (Δ $${delta.toFixed(2)}) via ${result.source}`,
-      );
+      // Deliver on any channel without a stamp yet — not just new drops — so a
+      // run cut short by the time limit, the email cap or a Brevo/Expo outage
+      // catches up next time instead of losing the notification for good.
+      if (alertRow.dismissed_at) continue;
+      const needsPush = !alertRow.notified_at;
+      const needsEmail = !alertRow.emailed_at;
+      if (!needsPush && !needsEmail) continue;
 
       const { pushToken, emailAlerts } = await getNotifyPrefs(item.user_id);
 
-      if (emailAlerts) {
+      if (needsEmail && emailAlerts) {
         const batch = emailBatches.get(item.user_id) ?? { alertIds: [], total: 0 };
         batch.alertIds.push(alertRow.id);
         batch.total += delta;
@@ -400,7 +489,7 @@ export async function handler(req: Request): Promise<Response> {
       }
 
       // Queue a push notification if the user has a token
-      if (pushToken) {
+      if (needsPush && pushToken) {
         // Truncate long product names to fit notification body
         const name =
           item.description.length > 60 ? item.description.slice(0, 57) + '…' : item.description;
@@ -421,7 +510,7 @@ export async function handler(req: Request): Promise<Response> {
       }
     }
 
-    // Send all pushes in batch, then stamp notified_at
+    // --- 3. Push: one batched send, then stamp notified_at ------------------
     if (pushMessages.length > 0) {
       await sendExpoPushNotifications(pushMessages);
 
@@ -434,59 +523,88 @@ export async function handler(req: Request): Promise<Response> {
       console.log(`Sent ${pushMessages.length} push notifications`);
     }
 
-    // One email per user per run, summing their new drops. Failures are logged
-    // and leave emailed_at null; they never fail the run.
-    let emailsSent = 0;
-    for (const [uid, batch] of emailBatches) {
-      const { data: userData } = await supabase.auth.admin.getUserById(uid);
-      const to = userData?.user?.email;
-      if (!to) continue;
-
-      const unsub = await unsubscribeUrl(uid);
-      const { subject, html, text } = buildPriceDropEmail(
-        batch.alertIds.length,
-        batch.total,
-        unsub,
-      );
-      const sent = await sendBrevoEmail({
-        to,
-        subject,
-        html,
-        text,
-        tags: ['price-drop'],
-        // One-click unsubscribe (RFC 8058) — Gmail/Yahoo show an Unsubscribe
-        // button for it, and require it of bulk senders.
-        headers: {
-          'List-Unsubscribe': `<${unsub}>`,
-          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-        },
-      });
-      if (sent) {
-        emailsSent++;
-        await supabase
+    // --- 4. Email: one per user, within today's share of the Brevo quota ----
+    // Failures and anything past the cap or deadline keep emailed_at null and
+    // are retried next run; they never fail the run.
+    let emailBudget = 0;
+    if (emailBatches.size > 0) {
+      const sentToday = await fetchAllPages<{ user_id: string; emailed_at: string }>((from, to) =>
+        supabase
           .from('price_alerts')
-          .update({ emailed_at: new Date().toISOString() })
-          .in('id', batch.alertIds);
-      }
+          .select('user_id, emailed_at')
+          .gte('emailed_at', utcDayStart())
+          .order('id')
+          .range(from, to),
+      );
+      emailBudget = Math.max(0, alertEmailDailyCap() - countEmailsSent(sentToday));
     }
 
-    return new Response(
-      JSON.stringify({
-        checked: items.length,
-        alerts_created: alertsCreated,
-        pushes_sent: pushMessages.length,
-        emails_sent: emailsSent,
-        no_data: noDataCount,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+    let emailsSent = 0;
+    let emailsAttempted = 0;
+    await mapWithConcurrency(
+      [...emailBatches],
+      EMAIL_CONCURRENCY,
+      async ([uid, batch]) => {
+        emailsAttempted++;
+        const { data: userData } = await supabase.auth.admin.getUserById(uid);
+        const to = userData?.user?.email;
+        if (!to) return;
+
+        const unsub = await unsubscribeUrl(uid);
+        const { subject, html, text } = buildPriceDropEmail(
+          batch.alertIds.length,
+          batch.total,
+          unsub,
+        );
+        const sent = await sendBrevoEmail({
+          to,
+          subject,
+          html,
+          text,
+          tags: ['price-drop'],
+          // One-click unsubscribe (RFC 8058) — Gmail/Yahoo show an Unsubscribe
+          // button for it, and require it of bulk senders.
+          headers: {
+            'List-Unsubscribe': `<${unsub}>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          },
+        });
+        if (sent) {
+          emailsSent++;
+          await supabase
+            .from('price_alerts')
+            .update({ emailed_at: new Date().toISOString() })
+            .in('id', batch.alertIds);
+        }
+      },
+      () => emailsAttempted >= emailBudget || elapsed() > NOTIFY_DEADLINE_MS,
     );
+    const emailsDeferred = emailBatches.size - emailsAttempted;
+
+    const summary = {
+      checked: items.length,
+      skus_priced: prices.size,
+      skus_deferred: skusDeferred,
+      rapidapi_calls: apiCalls,
+      alerts_created: alertsCreated,
+      pushes_sent: pushMessages.length,
+      emails_sent: emailsSent,
+      emails_deferred: emailsDeferred,
+      no_data: noDataCount,
+      ms: elapsed(),
+    };
+    console.log('price-match-check summary:', JSON.stringify(summary));
+
+    // Make a run that hit a limit visible in PostHog, not just function logs.
+    if (skusDeferred > 0 || emailsDeferred > 0 || apiCalls >= maxApiCalls) {
+      await capturePostHogEvent('price_match_run_limited', { ...summary, sweep: !!sweep });
+    }
+
+    return json(summary);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unexpected error';
     console.error('price-match-check error:', message);
     await capturePostHogException(err, { functionName: 'price-match-check' });
-    return new Response(JSON.stringify({ error: message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return json({ error: message }, 500);
   }
 }

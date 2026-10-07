@@ -7,6 +7,9 @@
 
 const RAPIDAPI_HOST = 'costco-live-data.p.rapidapi.com';
 
+// A hung request must not stall barcode-lookup or eat the sweep's time budget.
+const TIMEOUT_MS = 8_000;
+
 export type RapidApiProduct = {
   sku: string;
   name: string;
@@ -41,6 +44,7 @@ export async function fetchFromRapidApi(
         'x-rapidapi-host': RAPIDAPI_HOST,
         'x-rapidapi-key': apiKey,
       },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
 
     if (!res.ok) {

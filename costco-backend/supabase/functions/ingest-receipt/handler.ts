@@ -3,6 +3,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { awardCheckIn } from '../_shared/checkInRewards.ts';
 import { extractTextFromImage } from '../_shared/googleVision.ts';
 import { capturePostHogException } from '../_shared/posthog.ts';
+import { getCallerUserId } from '../_shared/auth.ts';
 import { parseReceiptText } from './parser.ts';
 
 // Warehouses seeded from Google Places (scripts/seed-warehouses-from-google-places.mjs)
@@ -100,11 +101,6 @@ export async function handler(req: Request): Promise<Response> {
     const body = await req.json();
     console.log('1. Request body:', JSON.stringify(body));
     const { imagePath } = body;
-    userId = body.userId;
-
-    if (!imagePath || !userId) {
-      return errorResponse('imagePath and userId are required', 400);
-    }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -119,6 +115,16 @@ export async function handler(req: Request): Promise<Response> {
     );
 
     const supabase = createClient(supabaseUrl!, serviceKey!);
+
+    // The receipt belongs to whoever is signed in — never to a userId taken on
+    // trust from the body. Otherwise the public anon key alone could run paid
+    // Vision OCR and file receipts into any account, using any stored image.
+    userId = (await getCallerUserId(supabase, req)) ?? undefined;
+    if (!userId) return errorResponse('Unauthorized', 401);
+    if (body.userId && body.userId !== userId) return errorResponse('Forbidden', 403);
+    if (!imagePath) return errorResponse('imagePath is required', 400);
+    // Uploads live at <user id>/<file> (lib/receiptUpload.ts).
+    if (!String(imagePath).startsWith(`${userId}/`)) return errorResponse('Forbidden', 403);
 
     // 1. Download image from Storage
     console.log('3. Downloading image:', imagePath);
