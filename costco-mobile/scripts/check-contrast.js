@@ -34,9 +34,7 @@ function loadPalettes() {
   const source = fs.readFileSync(COLORS_PATH, 'utf8');
   const lightLiteral = extractObjectLiteral(source, 'export const LightColors');
   const darkLiteral = extractObjectLiteral(source, 'export const DarkColors');
-  // eslint-disable-next-line no-new-func
   const LightColors = new Function(`return ${lightLiteral};`)();
-  // eslint-disable-next-line no-new-func
   const DarkColors = new Function(`return ${darkLiteral};`)();
   return { LightColors, DarkColors };
 }
