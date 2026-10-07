@@ -116,7 +116,7 @@ if delta > $0.01 → create/upsert price_alerts row
 ```
 Alerts are keyed by `receipt_item_id` (upsert, so re-checking the same item doesn't duplicate). Each channel has its own stamp (`notified_at` for push, `emailed_at` for email). A repeat finding by the daily sweep keeps those stamps, so it doesn't re-notify; a deeper drop clears them (and any dismissal) so it notifies again. Delivery goes to every channel whose stamp is still empty (and not dismissed), so a run cut off by the time budget, the daily email cap (`ALERT_EMAIL_DAILY_CAP`, default 200) or a provider outage catches up on the next run instead of dropping the notification. Until 2026-10-06 every upsert reset `notified_at`, which would have re-pushed the same drop daily — and the daily sweep itself had never run until `pg_net` was enabled that day.
 
-Push copy example: *"Price Drop — You may be owed $X.XX. [Item] dropped from $Y to $Z. You may qualify for a price adjustment."*
+Push copy example: *"Price drop: you could get $X.XX back. [Item] dropped from $Y to $Z. You may qualify for a price adjustment."*
 
 Email: one per user per check, subject *"Price drop: you could get $X back"*, body = total savings across the new drops + a **View in Bulkmate** button (universal link `https://everyday-labs.org/alerts`, opens the app's Alerts screen) + one-click unsubscribe.
 

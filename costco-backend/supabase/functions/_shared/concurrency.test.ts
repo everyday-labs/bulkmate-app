@@ -24,11 +24,16 @@ Deno.test('mapWithConcurrency: never exceeds the limit', async () => {
 
 Deno.test('mapWithConcurrency: stops starting new work, leaves the rest undefined', async () => {
   let started = 0;
-  const out = await mapWithConcurrency([1, 2, 3, 4, 5], 1, async (n) => {
-    started++;
-    await tick();
-    return n;
-  }, () => started >= 2);
+  const out = await mapWithConcurrency(
+    [1, 2, 3, 4, 5],
+    1,
+    async (n) => {
+      started++;
+      await tick();
+      return n;
+    },
+    () => started >= 2,
+  );
   assertEquals(out, [1, 2, undefined, undefined, undefined]);
 });
 

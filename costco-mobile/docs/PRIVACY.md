@@ -11,7 +11,8 @@ It is written to be specific rather than reassuring — if something is stored, 
 
 ## Who is responsible
 
-Bulkmate is published by **Everyday Labs**, an independent studio, which is responsible for
+Bulkmate is published by **Everyday Labs** ([everyday-labs.org](https://everyday-labs.org)), an
+independent studio, which is responsible for
 the data described in this policy. For any privacy question or request, contact
 **hello@everyday-labs.org**.
 

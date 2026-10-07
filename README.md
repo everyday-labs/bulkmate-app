@@ -117,19 +117,31 @@ Scan the QR code in the **Expo Go** app on your phone to run it instantly.
 
 You'll need a Supabase project with the migrations in `costco-backend/supabase/migrations/` applied, and the Edge Functions in `costco-backend/supabase/functions/` deployed.
 
-### Tests
+### Quality checks & tests
+
+One command runs everything CI runs — formatting, lint, types, tests and coverage gates:
 
 ```bash
-# Mobile (costco-mobile/)
-npx tsc --noEmit
-npm test                     # Jest unit tests
-npm run check:contrast       # WCAG contrast check of the color palette
-
-# Edge Functions (costco-backend/supabase/functions/) — needs Deno 2, or prefix with `npx`
-deno check . && deno lint && deno test --allow-env
+./scripts/check-all.sh
 ```
 
-CI runs all of these on every pull request (`.github/workflows/ci.yml`). Device-only behaviour (camera, GPS, push, sign-in) is covered by the manual checklist in `TEST_PLAN.md`.
+| Layer | Tool | Command (from `costco-mobile/` unless noted) |
+|---|---|---|
+| Formatting | Prettier (repo-wide, `.prettierrc.json`) | `npm run format` / `npm run format:check` |
+| Lint | ESLint (`eslint-config-expo`), `deno lint` | `npm run lint` |
+| Types | `tsc`, `deno check` | `npm run typecheck` |
+| Unit & screen tests | Jest + React Native Testing Library | `npm test` / `npm run test:coverage` |
+| Edge Function tests | `deno test` with a fake Supabase (`_testing/fakeSupabase.ts`) | `./scripts/deno-coverage.sh` (repo root) |
+| Accessibility | WCAG contrast of the palette | `npm run check:contrast` |
+| Visual regression | Playwright screenshots of the Expo web build | `npm run build:web && npm run test:visual` |
+
+**Coverage gates** (CI fails below them): mobile ≥ 80% lines/statements, 75% functions, 65% branches (`jest.coverageThreshold` in `package.json`); Edge Functions ≥ 90% lines across *every* source file (`scripts/deno-coverage.sh`).
+
+**Git hooks** (Husky, installed by `npm install` in `costco-mobile/`): *pre-commit* formats and lints the staged files, typechecks, and runs the tests related to them; *pre-push* runs `./scripts/check-all.sh`. `git commit --no-verify` skips them in an emergency — CI still runs everything.
+
+**CI** (`.github/workflows/ci.yml`) runs on every pull request and push to `main`: lint & types, mobile tests, Edge Function tests, and visual regression, then a single **CI passed** status. Visual baselines are Linux images rendered in a pinned Playwright container; when a UI change is intended, CI uploads the new screenshots as the `visual-baselines` artifact — review and commit them under `costco-mobile/e2e/__screenshots__/`.
+
+Device-only behaviour (camera, GPS, push, sign-in) is covered by the manual checklist in `TEST_PLAN.md`.
 
 ```bash
 # Backend — the Supabase CLI works; deploys do not need the dashboard

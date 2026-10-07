@@ -32,6 +32,8 @@ export async function getCallerUserId(
 ): Promise<string | null> {
   const token = bearerToken(req);
   if (!token) return null;
-  const { data: { user } } = await supabase.auth.getUser(token);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser(token);
   return user?.id ?? null;
 }
