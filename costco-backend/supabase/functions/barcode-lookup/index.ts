@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import {
   classifyFromOpenFoodFacts,
@@ -64,7 +64,7 @@ const CACHE_TTL_HOURS = 72;
 // OCR ledger price history for this SKU across all receipts
 // ---------------------------------------------------------------------------
 
-async function fetchOCRHistory(supabase: ReturnType<typeof createClient>, sku: string) {
+async function fetchOCRHistory(supabase: SupabaseClient, sku: string) {
   const { data } = await supabase
     .from('receipt_items')
     .select('unit_price, discount_amount, transaction_date')
@@ -76,7 +76,10 @@ async function fetchOCRHistory(supabase: ReturnType<typeof createClient>, sku: s
     return { count: 0, min_price: null, max_price: null, avg_price: null, last_seen: null };
   }
 
-  const netPrices = data.map((r: any) => Number(r.unit_price) - Number(r.discount_amount ?? 0));
+  const netPrices = data.map(
+    (r: { unit_price: number; discount_amount: number | null }) =>
+      Number(r.unit_price) - Number(r.discount_amount ?? 0),
+  );
   const min_price = Math.min(...netPrices);
   const max_price = Math.max(...netPrices);
   const avg_price = netPrices.reduce((s, v) => s + v, 0) / netPrices.length;
@@ -141,10 +144,22 @@ function publicIngredients(result: IngredientsResult): ProductResponse['ingredie
   };
 }
 
+// The subset of a `products` row resolveIngredients reads from the cache.
+type CachedIngredientsRow = {
+  name: string | null;
+  brand: string | null;
+  ingredients_text: string | null;
+  ingredients_json: { items?: unknown; productFlags?: unknown } | unknown[] | null;
+  ingredients_source: string | null;
+  ingredients_updated_at: string | null;
+  nova_group: number | null;
+  nutriscore_grade: string | null;
+};
+
 async function resolveIngredients(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   sku: string,
-  cached: any,
+  cached: CachedIngredientsRow | null,
   fdcApiKey: string,
 ): Promise<IngredientsResult> {
   // 1. Cache hit
@@ -278,7 +293,7 @@ async function resolveIngredients(
 
 // Record the lookup for the requesting user — non-blocking, best-effort
 async function recordLookup(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   req: Request,
   product: { sku: string; name: string; brand: string | null; image_url: string | null; sale_price: number | null },
 ) {

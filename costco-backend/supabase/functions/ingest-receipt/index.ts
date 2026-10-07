@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { awardCheckIn } from '../_shared/checkInRewards.ts';
 import { extractTextFromImage } from '../_shared/googleVision.ts';
@@ -36,7 +36,7 @@ import { parseReceiptText } from './parser.ts';
 // non-blank OCR lines) — scanning the whole receipt risks false hits inside
 // long barcode/transaction-number digit runs lower down.
 async function matchWarehouseByReceiptHeader(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   rawText: string,
 ): Promise<{ id: string; warehouse_code: string } | null> {
   // Joined with spaces, not newlines — OCR sometimes splits a multi-token
