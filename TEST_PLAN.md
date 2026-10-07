@@ -12,7 +12,7 @@ Run on every PR by CI (`.github/workflows/ci.yml`); see README → Tests for loc
 | Suite | Where | Covers |
 |---|---|---|
 | Receipt parser regression (16) | `costco-backend/supabase/functions/ingest-receipt/parser.test.ts` | Header fields, CRV deposits, batched / partial-batch layouts, instant savings, multi-buy merge, fuzzy Member line, street-address fallback, 3-digit SKUs, trailing-price recovery |
-| Edge Function helpers (22) | `costco-backend/supabase/functions/_shared/*.test.ts` | Price-drop email + weekly SMS copy (≤160 chars, ASCII), signed unsubscribe links (tamper/rotation), Brevo email/SMS payloads and failure handling, ingredient classification (OFF + keyword fallback), fan tier thresholds |
+| Edge Function helpers (32) | `costco-backend/supabase/functions/_shared/*.test.ts` | Caller checks (service role), bounded concurrency + stop, daily email budget, price-drop email + weekly SMS copy (≤160 chars, ASCII), signed unsubscribe links (tamper/rotation), Brevo email/SMS payloads and failure handling, ingredient classification (OFF + keyword fallback), fan tier thresholds |
 | Mobile unit tests (14) | `costco-mobile/lib/__tests__/` | Placeholder names, offline receipt queue, Google sign-in wrapper (unavailable / cancel / in-progress / success / errors) |
 | Static checks | CI | Mobile `tsc` + WCAG contrast; Edge Functions `deno check` + `deno lint` |
 
@@ -30,7 +30,7 @@ The feature list these sections test is in `APP_OVERVIEW.md` → Features (each 
 
 ## Current testing status
 
-**Tally (2026-10-07):** 156 manual cases across 23 features — 8 ✅ pass, 2 ⏸ skipped while SMS is paused, 146 ⬜ pending, 0 ❌.
+**Tally (2026-10-07):** 163 manual cases across 23 features — 8 ✅ pass, 2 ⏸ skipped while SMS is paused, 153 ⬜ pending, 0 ❌.
 
 *Snapshot from 2026-08-11:*
 
@@ -138,7 +138,7 @@ The feature list these sections test is in `APP_OVERVIEW.md` → Features (each 
 | 7.2 | Alert created | Product's current price < what you paid | Row in `price_alerts` table with correct delta | ⬜ |
 | 7.3 | Alert card on Home | Return to Home | Price alert card shown with refund amount | ⬜ |
 | 7.4 | Dismiss alert | Tap ✕ on alert card | Alert disappears from UI; `dismissed_at` set in DB | ⬜ |
-| 7.5 | pg_cron sweep | POST `{ sweep: true }` to Edge Function | All items in last 30 days checked; alerts for price drops | ⬜ |
+| 7.5 | pg_cron sweep | POST `{ "sweep": true }` to `price-match-check` with the **service-role** key | All items in last 30 days checked; response lists `checked`, `skus_priced`, `skus_deferred`, `rapidapi_calls`, `emails_sent`, `emails_deferred`, `ms` | ⬜ |
 | 7.6 | No data graceful | SKU not in API and no ledger data | No alert created, no crash | ⬜ |
 | 7.7 | Daily sweep runs | Check `cron.job_run_details` after 08:00 UTC | `daily-price-match-sweep` status `succeeded` (it failed every run until pg_net was enabled 2026-10-06) | ✅ 2026-10-07 (0 items in window) |
 | 7.8 | No repeat alerts | Same drop found by two sweeps | One push / one email total | ⬜ |
@@ -146,6 +146,10 @@ The feature list these sections test is in `APP_OVERVIEW.md` → Features (each 
 | 7.10 | Price-drop email | New drop for a user with email alerts on | Email "Price drop: you could get $X back"; View in Bulkmate opens the app on Alerts | ⬜ |
 | 7.11 | Email unsubscribe | Tap "Stop price-drop emails" in the email | Confirmation page; Profile → Price-Drop Emails shows off | ⬜ |
 | 7.12 | Email toggle | Turn Price-Drop Emails off in Profile | No email on the next drop; push unaffected | ⬜ |
+| 7.13 | Daily email cap | Set secret `ALERT_EMAIL_DAILY_CAP=1`; two users with new drops; run the sweep | 1 email, `emails_deferred: 1`; with the cap reset, the next run emails the second user. Unset the secret afterwards | ⬜ |
+| 7.14 | Catch-up after a failed send | Unset `BREVO_API_KEY`, run a sweep that finds a drop; restore the key, run again | First run: alert saved, `emailed_at` null. Second run: the email goes out once | ⬜ |
+| 7.15 | RapidAPI cap per run | Set `RAPIDAPI_MAX_CALLS_PER_RUN=1` with 2+ uncached SKUs; run the sweep | `rapidapi_calls: 1`; other SKUs priced from the ledger or `no_data`; `price_match_run_limited` event in PostHog. Unset afterwards | ⬜ |
+| 7.16 | Over 1,000 items | (Load test DB only) 1,200 `receipt_items` in the window | `checked: 1200` — the sweep pages past PostgREST's 1,000-row limit | ⬜ |
 
 ---
 
@@ -178,6 +182,7 @@ The feature list these sections test is in `APP_OVERVIEW.md` → Features (each 
 | 9.11 | Ingredients — both sources down | Simulate failures for both OFF and FDC (or unset `USDA_FDC_API_KEY`) | Rest of product detail (price, OCR history) still loads normally; no ingredients card, no error surfaced | ⬜ |
 | 9.12 | Partial hit — RapidAPI has no match, ingredients do | Scan a real UPC/EAN (RapidAPI's search frequently doesn't recognize 12-13 digit barcodes even when OFF/FDC do — confirmed against multiple real UPCs) | Product screen still opens (`source: 'partial'`), shows name/brand from OFF/FDC + ingredients card; no price section, no crash — not a 404 | ⬜ |
 | 9.13 | Nutri-Score badge contrast | View a product with each Nutri-Score grade (A-E) in both light and dark mode | Letter is legible against its badge color for every grade — a real contrast bug (white text on B/C/D) was caught and fixed before shipping | ⬜ |
+| 9.14 | Ingredient data credit | Product with an Open Food Facts match; then one matched only by USDA | OFF: "Ingredient data © Open Food Facts contributors…" under the card, tapping opens openfoodfacts.org. USDA: "Ingredient data: USDA FoodData Central" | ⬜ |
 
 ---
 
@@ -372,3 +377,5 @@ Skip 22.2–22.3 until `SMS_ALERTS_ENABLED` is turned on (`costco-mobile/lib/fea
 | X.5 | Price alert delta ≤ $0.01 | No alert created (noise filter) | ⬜ |
 | X.6 | Check-in with no warehouses seeded | "No warehouses found" 500 error handled gracefully | ⬜ |
 | X.7 | USDA FDC key missing (OFF still primary, needs no key) | Barcode lookup still returns price/OCR data normally; ingredients come from Open Food Facts if it has a match, otherwise no ingredients section | ⬜ |
+| X.8 | Paid functions refuse the public key: `curl` `price-match-check`, `barcode-lookup`, `ingest-receipt` with only the anon key | 403, 401, 401 — no RapidAPI/Vision call in the logs | ⬜ |
+| X.9 | Users can't reach others' data: with a user's JWT, call `price-match-check`, and `ingest-receipt` with another user's `imagePath` or `userId` | 403 both times | ⬜ |

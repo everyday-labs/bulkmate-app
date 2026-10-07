@@ -8,6 +8,9 @@
 // See ../../../EXTERNAL_APIS.md for details.
 
 const API = 'https://api.brevo.com/v3';
+// A slow send must not eat the sweep's time budget; the alert keeps its null
+// delivery stamp and goes out on the next run.
+const TIMEOUT_MS = 10_000;
 
 function apiKey(): string | null {
   return Deno.env.get('BREVO_API_KEY') ?? null;
@@ -50,6 +53,7 @@ export async function sendBrevoEmail(email: BrevoEmail): Promise<boolean> {
         headers: email.headers,
         tags: email.tags,
       }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) {
       console.error(`Brevo email failed: HTTP ${res.status} ${await res.text()}`);
@@ -89,6 +93,7 @@ export async function sendBrevoSms(recipient: string, content: string, tag: stri
         content,
         tag,
       }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) {
       console.error(`Brevo SMS failed: HTTP ${res.status} ${await res.text()}`);

@@ -461,6 +461,23 @@ function IngredientsCard({
           <Text style={styles.ingLegendText}>Avoid</Text>
         </View>
       </View>
+
+      {/* Open Food Facts data is licensed under the ODbL, which requires
+          crediting the source wherever it's shown. */}
+      {ingredients.source === 'off' && (
+        <Pressable
+          onPress={() => Linking.openURL('https://world.openfoodfacts.org')}
+          accessibilityRole="link"
+          hitSlop={8}
+        >
+          <Text style={styles.ingSource}>
+            Ingredient data © Open Food Facts contributors, available under the Open Database License
+          </Text>
+        </Pressable>
+      )}
+      {ingredients.source === 'fdc' && (
+        <Text style={styles.ingSource}>Ingredient data: USDA FoodData Central</Text>
+      )}
     </View>
   );
 }
@@ -648,6 +665,7 @@ const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
   },
   ingLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   ingLegendText: { fontSize: 10.5, color: Colors.gray[400], fontWeight: '600' },
+  ingSource: { fontSize: fontSize.xs, color: Colors.gray[500], lineHeight: 17, marginTop: spacing.sm },
 
   // Price card
   priceCard: {

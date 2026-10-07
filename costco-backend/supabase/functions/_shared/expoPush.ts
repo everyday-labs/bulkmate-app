@@ -6,6 +6,9 @@
 //
 // See ../../../EXTERNAL_APIS.md for details.
 
+// Per 100-message batch; a stuck batch is skipped, not retried.
+const TIMEOUT_MS = 15_000;
+
 export type ExpoPushMessage = {
   to: string;
   title: string;
@@ -41,6 +44,7 @@ export async function sendExpoPushNotifications(messages: ExpoPushMessage[]): Pr
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(chunk),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (!res.ok) {
         console.warn('Expo Push API error:', res.status, await res.text());
