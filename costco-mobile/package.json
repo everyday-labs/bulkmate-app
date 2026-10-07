@@ -36,6 +36,7 @@
     "react-native-worklets": "0.5.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^29.5.14",
     "@types/react": "~19.1.10",
@@ -62,7 +63,10 @@
     "test:coverage": "jest --coverage",
     "prepare": "cd .. && husky costco-mobile/.husky",
     "format": "prettier --write .. --ignore-path ../.prettierignore --ignore-path ../.gitignore",
-    "format:check": "prettier --check .. --ignore-path ../.prettierignore --ignore-path ../.gitignore --log-level warn"
+    "format:check": "prettier --check .. --ignore-path ../.prettierignore --ignore-path ../.gitignore --log-level warn",
+    "build:web": "EXPO_NO_DOTENV=1 EXPO_PUBLIC_SUPABASE_URL=https://visual-test.invalid EXPO_PUBLIC_SUPABASE_ANON_KEY=visual-test expo export --platform web --clear",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots"
   },
   "private": true,
   "jest": {

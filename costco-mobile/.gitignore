@@ -7,3 +7,9 @@ dist/
 .DS_Store
 ios/
 android/
+
+# Playwright: only Linux (CI) visual baselines are committed
+e2e/__screenshots__/**/*-darwin.png
+e2e/__screenshots__/**/*-win32.png
+playwright-report/
+test-results/

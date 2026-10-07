@@ -17,4 +17,7 @@ echo "▶ Edge Functions: check, lint, tests + coverage"
 "$root/scripts/deno.sh" lint
 "$root/scripts/deno-coverage.sh"
 
+echo "▶ Visual regression (needs a web build; skipped if dist/ is missing)"
+if [ -d "$root/costco-mobile/dist" ]; then (cd "$root/costco-mobile" && npx playwright test --update-snapshots=missing); else echo "  skipped — run: (cd costco-mobile && npm run build:web) to include it"; fi
+
 echo "✔ All checks passed"

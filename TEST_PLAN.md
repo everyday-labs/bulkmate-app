@@ -7,14 +7,19 @@
 
 ## Automated tests (added 2026-10-07)
 
-Run on every PR by CI (`.github/workflows/ci.yml`); see README → Tests for local commands.
+Run on every PR by CI (`.github/workflows/ci.yml`) and locally by `./scripts/check-all.sh` (also the pre-push hook). See README → Quality checks & tests.
 
 | Suite | Where | Covers |
 |---|---|---|
-| Receipt parser regression (16) | `costco-backend/supabase/functions/ingest-receipt/parser.test.ts` | Header fields, CRV deposits, batched / partial-batch layouts, instant savings, multi-buy merge, fuzzy Member line, street-address fallback, 3-digit SKUs, trailing-price recovery |
-| Edge Function helpers (22) | `costco-backend/supabase/functions/_shared/*.test.ts` | Price-drop email + weekly SMS copy (≤160 chars, ASCII), signed unsubscribe links (tamper/rotation), Brevo email/SMS payloads and failure handling, ingredient classification (OFF + keyword fallback), fan tier thresholds |
-| Mobile unit tests (14) | `costco-mobile/lib/__tests__/` | Placeholder names, offline receipt queue, Google sign-in wrapper (unavailable / cancel / in-progress / success / errors) |
-| Static checks | CI | Mobile `tsc` + WCAG contrast; Edge Functions `deno check` + `deno lint` |
+| Screen tests (RN Testing Library) | `costco-mobile/__tests__/screens/` | Login, register, forgot-password, home, receipts, receipt detail (edit/delete/warehouse picker/notification prompt), profile (alerts toggles, theme, delete account), alerts, analytics, edit profile, history (3 tabs + barcode/check-in history), scan + check-in modals, product detail, root layout auth gate |
+| Mobile unit tests | `costco-mobile/lib/__tests__/`, `hooks/__tests__/` | Receipt upload + offline queue drain, push token, Google sign-in wrapper, placeholder names, GPS check-in hook |
+| Edge Function handler tests | `costco-backend/supabase/functions/*/handler.test.ts` | All 8 functions against a fake Supabase + external APIs: check-in (radius, cooldown, badges, receipt linking), ingest-receipt (OCR → parse → store, duplicates, warehouse fallback), price-match-check (drops, dedupe, ledger median, push/email), barcode-lookup (cache, RapidAPI, OFF/USDA fallback), delete-account, email-unsubscribe, phone-verification, weekly-price-texts |
+| Receipt parser regression (16) | `ingest-receipt/parser.test.ts` | Every layout/bug in `PARSER_DECISIONS.md` |
+| Shared helpers | `_shared/*.test.ts` | Alert copy, signed links, Brevo, ingredient rules, fan tiers |
+| Visual regression | `costco-mobile/e2e/` (Playwright) | Login, register, forgot-password in light + dark mode |
+| Static checks | CI | Prettier, ESLint, `tsc`, `deno check`/`deno lint`, WCAG contrast |
+
+Coverage gates: mobile ≥ 80% lines (currently ~83%), Edge Functions ≥ 90% lines over every source file (currently ~95%).
 
 Everything below is **manual** — it needs a device, camera, GPS or live services.
 

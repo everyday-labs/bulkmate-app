@@ -1,0 +1,26 @@
+# Weekly dependency updates, grouped so minor/patch bumps arrive as one PR.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /costco-mobile
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Expo SDK upgrades are deliberate (pinned to SDK 54 for Expo Go) —
+      # run `npx expo install --fix` by hand instead.
+      - dependency-name: expo
+        update-types: [version-update:semver-major]
+      - dependency-name: react-native
+      - dependency-name: react
+      - dependency-name: react-dom
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
