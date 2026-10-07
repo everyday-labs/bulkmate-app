@@ -62,32 +62,96 @@ function codeForPlace(placeId) {
 const API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 if (!API_KEY) {
   console.error('GOOGLE_PLACES_API_KEY is required.');
-  console.error('Enable the "Places API" at https://console.cloud.google.com/apis/library/places-backend.googleapis.com, then create a key at https://console.cloud.google.com/apis/credentials');
+  console.error(
+    'Enable the "Places API" at https://console.cloud.google.com/apis/library/places-backend.googleapis.com, then create a key at https://console.cloud.google.com/apis/credentials',
+  );
   process.exit(1);
 }
 
 const US_STATES = [
-  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut',
-  'Delaware', 'District of Columbia', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois',
-  'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts',
-  'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada',
-  'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota',
-  'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina',
-  'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
-  'West Virginia', 'Wisconsin', 'Wyoming', 'Puerto Rico',
+  'Alabama',
+  'Alaska',
+  'Arizona',
+  'Arkansas',
+  'California',
+  'Colorado',
+  'Connecticut',
+  'Delaware',
+  'District of Columbia',
+  'Florida',
+  'Georgia',
+  'Hawaii',
+  'Idaho',
+  'Illinois',
+  'Indiana',
+  'Iowa',
+  'Kansas',
+  'Kentucky',
+  'Louisiana',
+  'Maine',
+  'Maryland',
+  'Massachusetts',
+  'Michigan',
+  'Minnesota',
+  'Mississippi',
+  'Missouri',
+  'Montana',
+  'Nebraska',
+  'Nevada',
+  'New Hampshire',
+  'New Jersey',
+  'New Mexico',
+  'New York',
+  'North Carolina',
+  'North Dakota',
+  'Ohio',
+  'Oklahoma',
+  'Oregon',
+  'Pennsylvania',
+  'Rhode Island',
+  'South Carolina',
+  'South Dakota',
+  'Tennessee',
+  'Texas',
+  'Utah',
+  'Vermont',
+  'Virginia',
+  'Washington',
+  'West Virginia',
+  'Wisconsin',
+  'Wyoming',
+  'Puerto Rico',
 ];
 
 const CANADA_PROVINCES = [
-  'Alberta', 'British Columbia', 'Manitoba', 'New Brunswick', 'Newfoundland and Labrador',
-  'Nova Scotia', 'Ontario', 'Prince Edward Island', 'Quebec', 'Saskatchewan',
+  'Alberta',
+  'British Columbia',
+  'Manitoba',
+  'New Brunswick',
+  'Newfoundland and Labrador',
+  'Nova Scotia',
+  'Ontario',
+  'Prince Edward Island',
+  'Quebec',
+  'Saskatchewan',
 ];
 
 // Countries small enough that one query (≤60 results) reliably covers them.
 // Extend this list for any country not yet covered — check Costco's own
 // "find a warehouse by country" list for what's missing.
 const OTHER_COUNTRIES = [
-  'United Kingdom', 'Japan', 'South Korea', 'Taiwan', 'Australia', 'Mexico',
-  'Spain', 'France', 'Iceland', 'China', 'New Zealand', 'Sweden',
+  'United Kingdom',
+  'Japan',
+  'South Korea',
+  'Taiwan',
+  'Australia',
+  'Mexico',
+  'Spain',
+  'France',
+  'Iceland',
+  'China',
+  'New Zealand',
+  'Sweden',
 ];
 
 // Regions confirmed (2026-08) to hit Google's next_page_token INVALID_REQUEST
@@ -100,29 +164,49 @@ const OTHER_COUNTRIES = [
 const SPLIT_REGIONS = {
   'Arizona, USA': ['Phoenix, Arizona', 'Tucson, Arizona', 'Mesa, Arizona'],
   'California, USA': [
-    'Los Angeles, California', 'San Diego, California', 'Sacramento, California',
-    'Fresno, California', 'Bakersfield, California', 'San Francisco Bay Area, California',
-    'Orange County, California', 'Inland Empire, California',
+    'Los Angeles, California',
+    'San Diego, California',
+    'Sacramento, California',
+    'Fresno, California',
+    'Bakersfield, California',
+    'San Francisco Bay Area, California',
+    'Orange County, California',
+    'Inland Empire, California',
   ],
   'Florida, USA': ['Miami, Florida', 'Orlando, Florida', 'Tampa, Florida', 'Jacksonville, Florida'],
   'Illinois, USA': ['Chicago, Illinois', 'Springfield, Illinois'],
   'New Jersey, USA': ['North Jersey, New Jersey', 'South Jersey, New Jersey'],
   'Texas, USA': [
-    'Houston, Texas', 'Dallas, Texas', 'Fort Worth, Texas', 'Austin, Texas',
-    'San Antonio, Texas', 'El Paso, Texas',
+    'Houston, Texas',
+    'Dallas, Texas',
+    'Fort Worth, Texas',
+    'Austin, Texas',
+    'San Antonio, Texas',
+    'El Paso, Texas',
   ],
   'Washington, USA': ['Seattle, Washington', 'Spokane, Washington', 'Vancouver, Washington'],
   'United Kingdom': [
-    'London, United Kingdom', 'Manchester, United Kingdom', 'Birmingham, United Kingdom',
-    'Glasgow, United Kingdom', 'Watford, United Kingdom',
+    'London, United Kingdom',
+    'Manchester, United Kingdom',
+    'Birmingham, United Kingdom',
+    'Glasgow, United Kingdom',
+    'Watford, United Kingdom',
   ],
-  'Japan': [
-    'Tokyo, Japan', 'Osaka, Japan', 'Fukuoka, Japan', 'Sendai, Japan',
-    'Nagoya, Japan', 'Sapporo, Japan',
+  Japan: [
+    'Tokyo, Japan',
+    'Osaka, Japan',
+    'Fukuoka, Japan',
+    'Sendai, Japan',
+    'Nagoya, Japan',
+    'Sapporo, Japan',
   ],
-  'Mexico': [
-    'Ciudad de Mexico, Mexico', 'Guadalajara, Mexico', 'Monterrey, Mexico',
-    'Tijuana, Mexico', 'Puebla, Mexico', 'Merida, Mexico',
+  Mexico: [
+    'Ciudad de Mexico, Mexico',
+    'Guadalajara, Mexico',
+    'Monterrey, Mexico',
+    'Tijuana, Mexico',
+    'Puebla, Mexico',
+    'Merida, Mexico',
   ],
 };
 
@@ -142,21 +226,34 @@ const ALL_REGION_QUERIES = [
 // came back truncated last time, without paying for a full global sweep
 // again. Omit it to run everything, same as before.
 const regionFilter = (process.env.REGION_FILTER ?? '')
-  .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
 
-const REGION_QUERIES = regionFilter.length === 0
-  ? ALL_REGION_QUERIES
-  : ALL_REGION_QUERIES.filter((q) => regionFilter.some((f) => q.toLowerCase().includes(f)));
+const REGION_QUERIES =
+  regionFilter.length === 0
+    ? ALL_REGION_QUERIES
+    : ALL_REGION_QUERIES.filter((q) => regionFilter.some((f) => q.toLowerCase().includes(f)));
 
 if (regionFilter.length > 0) {
-  console.log(`REGION_FILTER active — running ${REGION_QUERIES.length} of ${ALL_REGION_QUERIES.length} region queries:`);
+  console.log(
+    `REGION_FILTER active — running ${REGION_QUERIES.length} of ${ALL_REGION_QUERIES.length} region queries:`,
+  );
   console.log(REGION_QUERIES.map((q) => `  - ${q}`).join('\n'));
 }
 
 // Places sometimes lists a warehouse's gas station, pharmacy, tire center,
 // or business center as a separate result with "Costco" in the name —
 // exclude those so they don't get seeded as their own warehouse.
-const EXCLUDE_KEYWORDS = ['gas', 'fuel', 'pharmacy', 'tire', 'business center', 'car wash', 'optical'];
+const EXCLUDE_KEYWORDS = [
+  'gas',
+  'fuel',
+  'pharmacy',
+  'tire',
+  'business center',
+  'car wash',
+  'optical',
+];
 
 function looksLikeWarehouse(place) {
   const name = (place.name ?? '').toLowerCase();
@@ -178,10 +275,14 @@ async function fetchPageWithRetry(pagetoken, query) {
   const delays = [3000, 4000, 5000]; // total up to ~12s worst case, only paid when needed
   for (let attempt = 0; attempt < delays.length; attempt++) {
     await new Promise((r) => setTimeout(r, delays[attempt]));
-    const json = await fetchJson(`https://maps.googleapis.com/maps/api/place/textsearch/json?pagetoken=${pagetoken}&key=${API_KEY}`);
+    const json = await fetchJson(
+      `https://maps.googleapis.com/maps/api/place/textsearch/json?pagetoken=${pagetoken}&key=${API_KEY}`,
+    );
     if (json.status === 'OK' || json.status === 'ZERO_RESULTS') return json;
     if (attempt === delays.length - 1) {
-      console.warn(`  ! "${query}" page 2+: ${json.status} ${json.error_message ?? ''} (gave up after ${delays.length} attempts)`);
+      console.warn(
+        `  ! "${query}" page 2+: ${json.status} ${json.error_message ?? ''} (gave up after ${delays.length} attempts)`,
+      );
       return null;
     }
     console.warn(`  … "${query}" page 2+: ${json.status}, retrying with a longer wait`);
@@ -191,7 +292,9 @@ async function fetchPageWithRetry(pagetoken, query) {
 
 async function textSearch(query) {
   const results = [];
-  let json = await fetchJson(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${API_KEY}`);
+  let json = await fetchJson(
+    `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${API_KEY}`,
+  );
 
   for (let page = 0; page < 3; page++) {
     if (!json || (json.status !== 'OK' && json.status !== 'ZERO_RESULTS')) {
@@ -212,11 +315,11 @@ async function textSearch(query) {
 // UK) is preferred over the generic digit-run fallback used for everywhere
 // else (US, Australia, Spain, France, South Korea, Taiwan, China, Iceland...).
 const POSTAL_CODE_PATTERNS = [
-  /\b[A-Z]\d[A-Z]\s?\d[A-Z]\d\b/,           // Canada: K2G 5W5
-  /\b[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}\b/,  // UK: SW1A 1AA
-  /\b\d{3}-\d{4}\b/,                        // Japan: 135-0063
-  /\b\d{5}-\d{4}\b/,                        // US ZIP+4
-  /\b\d{4,6}\b/,                            // generic fallback
+  /\b[A-Z]\d[A-Z]\s?\d[A-Z]\d\b/, // Canada: K2G 5W5
+  /\b[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}\b/, // UK: SW1A 1AA
+  /\b\d{3}-\d{4}\b/, // Japan: 135-0063
+  /\b\d{5}-\d{4}\b/, // US ZIP+4
+  /\b\d{4,6}\b/, // generic fallback
 ];
 
 function extractPostalCode(segment) {
@@ -235,7 +338,10 @@ function extractPostalCode(segment) {
 // was tuned against — postal code extraction itself is more robust since
 // it's pattern-based, not position-based).
 function parseAddress(formatted) {
-  const parts = (formatted ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+  const parts = (formatted ?? '')
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
   const lastSegment = parts[parts.length - 1] ?? '';
 
   // Taiwan has no state/province segment at all — Google's format is
@@ -315,7 +421,10 @@ async function main() {
   const rareCutoff = Math.ceil(n * 0.25); // top 5% + next 20%
 
   for (const [i, s] of scored.entries()) {
-    if (s.score === 0) { s.tier = 'Common'; continue; } // no data — don't guess
+    if (s.score === 0) {
+      s.tier = 'Common';
+      continue;
+    } // no data — don't guess
     if (i < legendaryCutoff) s.tier = 'Legendary';
     else if (i < rareCutoff) s.tier = 'Rare';
     else s.tier = 'Common';
@@ -329,9 +438,11 @@ async function main() {
     const lat = place.geometry?.location?.lat;
     const lng = place.geometry?.location?.lng;
 
-    return `  (${sqlString(code)}, ${sqlString(place.name)}, ${sqlString(place.formatted_address)}, ` +
+    return (
+      `  (${sqlString(code)}, ${sqlString(place.name)}, ${sqlString(place.formatted_address)}, ` +
       `${sqlString(city)}, ${sqlString(state)}, ${sqlString(country)}, ${sqlString(postalCode)}, ${lat}, ${lng}, ` +
-      `'${tier}', ${sqlString(place.place_id)}, ${rating || 'NULL'}, ${count || 'NULL'})`;
+      `'${tier}', ${sqlString(place.place_id)}, ${rating || 'NULL'}, ${count || 'NULL'})`
+    );
   });
 
   const sql = [
@@ -342,15 +453,15 @@ async function main() {
     '-- pattern <14-digit-timestamp>_name.sql or it silently skips the migration) —',
     '-- review the contents below, then apply as-is.',
     '--',
-    '-- ⚠️  warehouse_code is a SYNTHETIC placeholder (GP-######), not Costco\'s',
-    '-- real internal store number — see the script\'s header comment for what',
+    "-- ⚠️  warehouse_code is a SYNTHETIC placeholder (GP-######), not Costco's",
+    "-- real internal store number — see the script's header comment for what",
     '-- this means for receipt auto-matching.',
     '--',
     '-- tier is derived from rating * ln(review_count + 1): top 5% = Legendary,',
     '-- next 20% = Rare, rest = Common. Review a sample of city/state/country/',
     '-- postal_code before applying — address parsing is a best-effort heuristic.',
-    '-- postal_code feeds ingest-receipt\'s warehouse-matching fallback (see',
-    '-- PARSER_DECISIONS.md) — it\'s the main thing worth spot-checking closely,',
+    "-- postal_code feeds ingest-receipt's warehouse-matching fallback (see",
+    "-- PARSER_DECISIONS.md) — it's the main thing worth spot-checking closely,",
     '-- since a wrong postal code means a receipt silently fails to link.',
     '',
     'INSERT INTO warehouses (warehouse_code, name, address, city, state, country, postal_code, latitude, longitude, tier, google_place_id, google_rating, google_rating_count)',
@@ -379,10 +490,14 @@ async function main() {
     .filter(Boolean)
     .map(BigInt);
   const nowTs = BigInt(new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14));
-  const latestExisting = existingTimestamps.length ? existingTimestamps.reduce((a, b) => (b > a ? b : a)) : 0n;
+  const latestExisting = existingTimestamps.length
+    ? existingTimestamps.reduce((a, b) => (b > a ? b : a))
+    : 0n;
   const ts = (nowTs > latestExisting ? nowTs : latestExisting + 1n).toString();
 
-  const outPath = fileURLToPath(new URL(`../supabase/migrations/${ts}_warehouses_global_seed.sql`, import.meta.url));
+  const outPath = fileURLToPath(
+    new URL(`../supabase/migrations/${ts}_warehouses_global_seed.sql`, import.meta.url),
+  );
   writeFileSync(outPath, sql);
 
   const tierCounts = { Legendary: 0, Rare: 0, Common: 0 };
@@ -391,10 +506,12 @@ async function main() {
   console.log(`\nWrote ${rows.length} warehouses to:\n  ${outPath}`);
   console.log('Tier breakdown:', tierCounts);
   console.log('\nNext steps:');
-  console.log('  1. Spot-check the generated file — especially city/state/country/postal_code parsing.');
+  console.log(
+    '  1. Spot-check the generated file — especially city/state/country/postal_code parsing.',
+  );
   console.log('  2. Run it via the Supabase SQL editor, same as every other migration here.');
   console.log('  3. warehouse_code corrects itself as real receipts get scanned at each');
-  console.log('     warehouse (see ingest-receipt\'s postal-code/city fallback matching) —');
+  console.log("     warehouse (see ingest-receipt's postal-code/city fallback matching) —");
   console.log('     no manual per-row correction needed.');
 }
 

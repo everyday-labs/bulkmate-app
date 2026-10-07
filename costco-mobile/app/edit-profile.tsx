@@ -27,18 +27,20 @@ export default function EditProfileScreen() {
   const Colors = useThemeColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName]   = useState('');
-  const [phone, setPhone]         = useState('');
-  const [focused, setFocused]     = useState<Field | null>(null);
-  const [loading, setLoading]     = useState(true);
-  const [saving, setSaving]       = useState(false);
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [focused, setFocused] = useState<Field | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const lastRef  = useRef<TextInput>(null);
+  const lastRef = useRef<TextInput>(null);
   const phoneRef = useRef<TextInput>(null);
 
   useEffect(() => {
     async function fetch() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) return;
       const { data } = await supabase
         .from('profiles')
@@ -47,8 +49,8 @@ export default function EditProfileScreen() {
         .single();
       if (data) {
         setFirstName(data.first_name ?? '');
-        setLastName(data.last_name  ?? '');
-        setPhone(data.phone_number  ?? '');
+        setLastName(data.last_name ?? '');
+        setPhone(data.phone_number ?? '');
       }
       setLoading(false);
     }
@@ -58,15 +60,17 @@ export default function EditProfileScreen() {
   async function save() {
     setSaving(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) return;
 
       const { error } = await supabase
         .from('profiles')
         .update({
-          first_name:   firstName.trim() || null,
-          last_name:    lastName.trim()  || null,
-          phone_number: phone.trim()     || null,
+          first_name: firstName.trim() || null,
+          last_name: lastName.trim() || null,
+          phone_number: phone.trim() || null,
           display_name: [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || null,
         })
         .eq('id', session.user.id);
@@ -110,10 +114,11 @@ export default function EditProfileScreen() {
           hitSlop={8}
           style={({ pressed }) => [styles.headerSave, pressed && !saving && { opacity: 0.6 }]}
         >
-          {saving
-            ? <ActivityIndicator size="small" color={Colors.costcoRed} />
-            : <Text style={styles.headerSaveText}>Save</Text>
-          }
+          {saving ? (
+            <ActivityIndicator size="small" color={Colors.costcoRed} />
+          ) : (
+            <Text style={styles.headerSaveText}>Save</Text>
+          )}
         </Pressable>
       </View>
 
@@ -189,145 +194,153 @@ export default function EditProfileScreen() {
           <View style={styles.phoneNote}>
             <Text style={styles.phoneNoteIcon}>🔒</Text>
             <Text style={styles.phoneNoteText}>
-              Optional. Bulkmate doesn't send texts yet, and your number is never shared with anyone.
+              Optional. Bulkmate doesn't send texts yet, and your number is never shared with
+              anyone.
             </Text>
           </View>
         </View>
 
         {/* Save button (also accessible from header but surfaced here for convenience) */}
         <Pressable
-          style={({ pressed }) => [styles.saveBtn, pressed && styles.saveBtnPressed, saving && { opacity: 0.6 }]}
+          style={({ pressed }) => [
+            styles.saveBtn,
+            pressed && styles.saveBtnPressed,
+            saving && { opacity: 0.6 },
+          ]}
           onPress={save}
           disabled={saving}
         >
-          {saving
-            ? <ActivityIndicator color={Colors.white} />
-            : <Text style={styles.saveBtnText}>Save Changes</Text>
-          }
+          {saving ? (
+            <ActivityIndicator color={Colors.white} />
+          ) : (
+            <Text style={styles.saveBtnText}>Save Changes</Text>
+          )}
         </Pressable>
 
         <Text style={styles.privacyNote}>
-          Your information is stored securely and only used to personalise your experience in this app.
+          Your information is stored securely and only used to personalise your experience in this
+          app.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+const makeStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: Colors.background },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerBack:     { minWidth: 60 },
-  headerBackText: { fontSize: fontSize.md, color: Colors.gray[500], fontWeight: '500' },
-  headerTitle:    { fontSize: fontSize.lg, fontWeight: '700', color: Colors.gray[900] },
-  headerSave:     { minWidth: 60, alignItems: 'flex-end' },
-  headerSaveText: { fontSize: fontSize.md, color: Colors.costcoRed, fontWeight: '700' },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.lg,
+      backgroundColor: Colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    headerBack: { minWidth: 60 },
+    headerBackText: { fontSize: fontSize.md, color: Colors.gray[500], fontWeight: '500' },
+    headerTitle: { fontSize: fontSize.lg, fontWeight: '700', color: Colors.gray[900] },
+    headerSave: { minWidth: 60, alignItems: 'flex-end' },
+    headerSaveText: { fontSize: fontSize.md, color: Colors.costcoRed, fontWeight: '700' },
 
-  scroll: { padding: spacing['2xl'], gap: spacing.lg },
+    scroll: { padding: spacing['2xl'], gap: spacing.lg },
 
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: radius['2xl'],
-    padding: spacing.xl,
-    gap: spacing.lg,
-    ...shadow.sm,
-  },
-  cardTitle: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-  },
+    card: {
+      backgroundColor: Colors.surface,
+      borderRadius: radius['2xl'],
+      padding: spacing.xl,
+      gap: spacing.lg,
+      ...shadow.sm,
+    },
+    cardTitle: {
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+      color: Colors.gray[400],
+      letterSpacing: letterSpacing.caps,
+    },
 
-  row: { flexDirection: 'row', gap: spacing.md },
+    row: { flexDirection: 'row', gap: spacing.md },
 
-  field: { gap: spacing.xs },
-  label: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-  },
-  input: {
-    backgroundColor: Colors.gray[100],
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    fontSize: fontSize.md,
-    color: Colors.gray[900],
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  inputFocused: {
-    backgroundColor: Colors.surface,
-    borderColor: Colors.executiveNavy,
-  },
+    field: { gap: spacing.xs },
+    label: {
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+      color: Colors.gray[400],
+      letterSpacing: letterSpacing.caps,
+    },
+    input: {
+      backgroundColor: Colors.gray[100],
+      borderRadius: radius.lg,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      fontSize: fontSize.md,
+      color: Colors.gray[900],
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+    },
+    inputFocused: {
+      backgroundColor: Colors.surface,
+      borderColor: Colors.executiveNavy,
+    },
 
-  phoneTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  optionalBadge: {
-    backgroundColor: Colors.goldStarSubtle,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  optionalText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: Colors.goldStarAccent,
-    letterSpacing: letterSpacing.caps,
-  },
+    phoneTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    optionalBadge: {
+      backgroundColor: Colors.goldStarSubtle,
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+    },
+    optionalText: {
+      fontSize: 9,
+      fontWeight: '800',
+      color: Colors.goldStarAccent,
+      letterSpacing: letterSpacing.caps,
+    },
 
-  phoneNote: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    backgroundColor: Colors.executiveNavySubtle,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    alignItems: 'flex-start',
-  },
-  phoneNoteIcon: { fontSize: 14, marginTop: 1 },
-  phoneNoteText: {
-    flex: 1,
-    fontSize: fontSize.xs,
-    color: Colors.executiveNavy,
-    lineHeight: 17,
-    fontWeight: '500',
-  },
+    phoneNote: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      backgroundColor: Colors.executiveNavySubtle,
+      borderRadius: radius.lg,
+      padding: spacing.md,
+      alignItems: 'flex-start',
+    },
+    phoneNoteIcon: { fontSize: 14, marginTop: 1 },
+    phoneNoteText: {
+      flex: 1,
+      fontSize: fontSize.xs,
+      color: Colors.executiveNavy,
+      lineHeight: 17,
+      fontWeight: '500',
+    },
 
-  saveBtn: {
-    backgroundColor: Colors.costcoRedSolid,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    ...shadow.sm,
-  },
-  saveBtnPressed: { backgroundColor: Colors.costcoRedDark },
-  saveBtnText: {
-    color: Colors.white,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    letterSpacing: letterSpacing.wide,
-  },
+    saveBtn: {
+      backgroundColor: Colors.costcoRedSolid,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.lg,
+      alignItems: 'center',
+      ...shadow.sm,
+    },
+    saveBtnPressed: { backgroundColor: Colors.costcoRedDark },
+    saveBtnText: {
+      color: Colors.white,
+      fontSize: fontSize.lg,
+      fontWeight: '700',
+      letterSpacing: letterSpacing.wide,
+    },
 
-  privacyNote: {
-    fontSize: fontSize.xs,
-    color: Colors.gray[400],
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-});
+    privacyNote: {
+      fontSize: fontSize.xs,
+      color: Colors.gray[400],
+      textAlign: 'center',
+      lineHeight: 18,
+    },
+  });

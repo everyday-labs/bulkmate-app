@@ -9,9 +9,10 @@ import { ScanFAB } from '../../components/ScanFAB';
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
 function tabIcon(filled: IoniconsName, outline: IoniconsName) {
-  return ({ color, focused }: { color: string; focused: boolean }) => (
-    <Ionicons name={focused ? filled : outline} size={24} color={color} />
-  );
+  function TabIcon({ color, focused }: { color: string; focused: boolean }) {
+    return <Ionicons name={focused ? filled : outline} size={24} color={color} />;
+  }
+  return TabIcon;
 }
 
 export default function TabsLayout() {
@@ -58,10 +59,7 @@ export default function TabsLayout() {
             tabBarIcon: tabIcon('home', 'home-outline'),
           }}
         />
-        <Tabs.Screen
-          name="scan"
-          options={{ href: null }}
-        />
+        <Tabs.Screen name="scan" options={{ href: null }} />
         <Tabs.Screen
           name="analytics"
           options={{

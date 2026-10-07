@@ -20,10 +20,12 @@ export async function extractTextFromImage(base64Image: string): Promise<string>
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      requests: [{
-        image: { content: base64Image },
-        features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
-      }],
+      requests: [
+        {
+          image: { content: base64Image },
+          features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
+        },
+      ],
     }),
   });
 

@@ -9,9 +9,15 @@ async function hmacHex(message: string): Promise<string> {
   const secret = Deno.env.get('NOTIFY_LINK_SECRET');
   if (!secret) throw new Error('NOTIFY_LINK_SECRET not set');
   const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
   );
-  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(`unsubscribe:${message}`)));
+  const sig = new Uint8Array(
+    await crypto.subtle.sign('HMAC', key, encoder.encode(`unsubscribe:${message}`)),
+  );
   return Array.from(sig, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 

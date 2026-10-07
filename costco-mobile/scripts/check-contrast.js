@@ -34,9 +34,7 @@ function loadPalettes() {
   const source = fs.readFileSync(COLORS_PATH, 'utf8');
   const lightLiteral = extractObjectLiteral(source, 'export const LightColors');
   const darkLiteral = extractObjectLiteral(source, 'export const DarkColors');
-  // eslint-disable-next-line no-new-func
   const LightColors = new Function(`return ${lightLiteral};`)();
-  // eslint-disable-next-line no-new-func
   const DarkColors = new Function(`return ${darkLiteral};`)();
   return { LightColors, DarkColors };
 }
@@ -78,7 +76,12 @@ function pairings(C) {
     ['white on navySolid (avatar/active pill)', C.white, C.navySolid, 4.5],
     ['white on darkSolid (FAB speed-dial)', C.white, C.darkSolid, 4.5],
     ['white on successSolid (celebration stamp)', C.white, C.successSolid, 4.5],
-    ['executiveNavy on executiveNavySubtle (chip text)', C.executiveNavy, C.executiveNavySubtle, 4.5],
+    [
+      'executiveNavy on executiveNavySubtle (chip text)',
+      C.executiveNavy,
+      C.executiveNavySubtle,
+      4.5,
+    ],
     ['costcoRed on costcoRedSubtle (chip text)', C.costcoRed, C.costcoRedSubtle, 3.0],
     ['goldStarDark on goldStarSubtle (chip text)', C.goldStarDark, C.goldStarSubtle, 3.0],
     ['successText on successBg', C.successText, C.successBg, 4.5],
