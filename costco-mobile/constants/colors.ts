@@ -13,7 +13,7 @@ export const LightColors = {
   executiveNavyDark: '#12203A',
   executiveNavyLight: '#3D4F75',
   goldStarAccent: '#C9A84C',
-  goldStarDark: '#A28438',     // darkened from #A98A3A: 3:1 on goldStarSubtle chips
+  goldStarDark: '#A28438', // darkened from #A98A3A: 3:1 on goldStarSubtle chips
   goldStarLight: '#E0C67A',
 
   // Solid navy fill for opaque decorative blocks (avatars, active pills) that
@@ -39,12 +39,12 @@ export const LightColors = {
   black: '#0A0A0A',
 
   // === Brand subtle backgrounds (for icon wells, card accents) ===
-  costcoRedSubtle:      '#F4D7D7',
-  executiveNavySubtle:  '#E6EAF1',
-  goldStarSubtle:       '#F7EED3',
+  costcoRedSubtle: '#F4D7D7',
+  executiveNavySubtle: '#E6EAF1',
+  goldStarSubtle: '#F7EED3',
 
   // === Surfaces (warm cream, not cold) ===
-  background: '#FDFAF3',     // warehouse cream
+  background: '#FDFAF3', // warehouse cream
   surface: '#FFFFFF',
   surfaceSunken: '#F0E6D6',
   border: '#E8E0D4',
@@ -52,11 +52,11 @@ export const LightColors = {
 
   // === Warm Gray Scale ===
   gray: {
-    50:  '#FAFAF8',
+    50: '#FAFAF8',
     100: '#F4F2EE',
     200: '#E8E5DF',
     300: '#D4D0C8',
-    400: '#958F84',   // darkened from #A8A39A: 3:1 muted text on background/surface
+    400: '#958F84', // darkened from #A8A39A: 3:1 muted text on background/surface
     500: '#78726A',
     600: '#57534D',
     700: '#3D3935',
@@ -67,7 +67,7 @@ export const LightColors = {
   // === Semantic ===
   success: '#2D8A6E',
   successBg: '#E3F3EE',
-  successText: '#237A5F',      // = successSolid; #2D8A6E was 3.68:1 on successBg
+  successText: '#237A5F', // = successSolid; #2D8A6E was 3.68:1 on successBg
   savings: '#2D8A6E',
   savingsBg: '#E3F3EE',
   warning: '#D4842A',
@@ -101,9 +101,9 @@ export const DarkColors: typeof LightColors = {
   black: '#0A0A0A',
 
   // === Brand subtle backgrounds (for icon wells, card accents) ===
-  costcoRedSubtle:      '#3D2020',
-  executiveNavySubtle:  '#232A3D',
-  goldStarSubtle:       '#3A3120',
+  costcoRedSubtle: '#3D2020',
+  executiveNavySubtle: '#232A3D',
+  goldStarSubtle: '#3A3120',
 
   // === Surfaces ===
   background: '#17140F',
@@ -114,7 +114,7 @@ export const DarkColors: typeof LightColors = {
 
   // === Warm Gray Scale — light scale reversed ===
   gray: {
-    50:  '#1A1714',
+    50: '#1A1714',
     100: '#292520',
     200: '#3D3935',
     300: '#57534D',

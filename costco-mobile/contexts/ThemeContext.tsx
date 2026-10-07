@@ -36,10 +36,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, next);
   };
 
-  const resolvedScheme: ResolvedScheme = mode === 'system' ? (systemScheme === 'dark' ? 'dark' : 'light') : mode;
+  const resolvedScheme: ResolvedScheme =
+    mode === 'system' ? (systemScheme === 'dark' ? 'dark' : 'light') : mode;
   const colors = resolvedScheme === 'dark' ? DarkColors : LightColors;
 
-  const value = useMemo(() => ({ mode, resolvedScheme, colors, setMode }), [mode, resolvedScheme, colors]);
+  const value = useMemo(
+    () => ({ mode, resolvedScheme, colors, setMode }),
+    [mode, resolvedScheme, colors],
+  );
 
   // Avoid a light->dark flash before the persisted preference loads.
   if (!loaded) return null;

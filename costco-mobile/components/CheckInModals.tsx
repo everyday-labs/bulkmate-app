@@ -26,13 +26,24 @@ const TIER_LABEL: Record<string, string> = {
 };
 
 const TIER_EMOJI: Record<string, string> = {
-  KirklandCadet: '🛒', WholesaleWanderer: '🗺', BulkBuyer: '📦',
-  GoldStarGuru: '🌟', ExecutiveExplorer: '👑',
+  KirklandCadet: '🛒',
+  WholesaleWanderer: '🗺',
+  BulkBuyer: '📦',
+  GoldStarGuru: '🌟',
+  ExecutiveExplorer: '👑',
 };
 
 export function TooFarModal({
-  miles, warehouse, onClose, Colors,
-}: { miles: string; warehouse: string; onClose: () => void; Colors: ColorScheme }) {
+  miles,
+  warehouse,
+  onClose,
+  Colors,
+}: {
+  miles: string;
+  warehouse: string;
+  onClose: () => void;
+  Colors: ColorScheme;
+}) {
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -63,7 +74,8 @@ export function TooFarModal({
           <Text style={styles.tooFarWarehouse}>{warehouse}</Text>
 
           <Text style={styles.modalSubtext}>
-            You're not quite in range yet. Head over to the warehouse and check in once you're inside — your star is waiting!
+            You're not quite in range yet. Head over to the warehouse and check in once you're
+            inside — your star is waiting!
           </Text>
 
           <Pressable
@@ -79,8 +91,14 @@ export function TooFarModal({
 }
 
 export function CheckInModal({
-  result, onClose, Colors,
-}: { result: CheckInResult; onClose: () => void; Colors: ColorScheme }) {
+  result,
+  onClose,
+  Colors,
+}: {
+  result: CheckInResult;
+  onClose: () => void;
+  Colors: ColorScheme;
+}) {
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -114,8 +132,18 @@ export function CheckInModal({
               </StampBounceIn>
               {result.warehouse.tier === 'Legendary' && (
                 <>
-                  <Sparkle size={12} color={Colors.goldStarAccent} delay={500} style={styles.sparkleTL} />
-                  <Sparkle size={9} color={Colors.goldStarAccent} delay={780} style={styles.sparkleBR} />
+                  <Sparkle
+                    size={12}
+                    color={Colors.goldStarAccent}
+                    delay={500}
+                    style={styles.sparkleTL}
+                  />
+                  <Sparkle
+                    size={9}
+                    color={Colors.goldStarAccent}
+                    delay={780}
+                    style={styles.sparkleBR}
+                  />
                 </>
               )}
             </View>
@@ -128,7 +156,9 @@ export function CheckInModal({
           <Text style={styles.modalWarehouse}>{result.warehouse.name}</Text>
           <Text style={styles.modalCity}>
             {result.warehouse.city} · {result.warehouse.tier}
-            {!isAlreadyIn ? ` · verified ${Math.round(result.warehouse.distance_metres)}m from center` : ''}
+            {!isAlreadyIn
+              ? ` · verified ${Math.round(result.warehouse.distance_metres)}m from center`
+              : ''}
           </Text>
 
           {isAlreadyIn ? (
@@ -141,7 +171,9 @@ export function CheckInModal({
                 <View style={styles.starsAwardedRow}>
                   {Array.from({ length: result.stars_earned }).map((_, i) => (
                     <StarToss key={i} index={i} baseDelay={420}>
-                      <Twinkle><Text style={styles.starsAwardedIcon}>⭐</Text></Twinkle>
+                      <Twinkle>
+                        <Text style={styles.starsAwardedIcon}>⭐</Text>
+                      </Twinkle>
                     </StarToss>
                   ))}
                 </View>
@@ -207,174 +239,179 @@ export function CheckInModal({
   );
 }
 
-const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing['2xl'],
-  },
-  modalSheet: {
-    width: '100%',
-    backgroundColor: Colors.surface,
-    borderRadius: radius['3xl'],
-    padding: spacing['3xl'],
-    alignItems: 'center',
-    gap: spacing.lg,
-    ...shadow.md,
-  },
-  modalStar: { fontSize: 64, marginBottom: spacing.xs },
-  checkInIconWrap: {
-    width: 72,
-    height: 72,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  },
-  checkInStamp: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.pill,
-    backgroundColor: Colors.successSolid,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sparkleTL: { position: 'absolute', top: 2, left: 6 },
-  sparkleBR: { position: 'absolute', bottom: 4, right: 2 },
-  starsAwardedRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: -spacing.xs,
-  },
-  starsAwardedIcon: { fontSize: 22 },
-  modalTitle: {
-    fontSize: fontSize['3xl'],
-    fontWeight: '800',
-    color: Colors.gray[900],
-    letterSpacing: letterSpacing.tight,
-  },
-  modalWarehouse: {
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: Colors.gray[800],
-    textAlign: 'center',
-  },
-  modalCity: { fontSize: fontSize.sm, color: Colors.gray[400], textAlign: 'center' },
-  modalSubtext: {
-    fontSize: fontSize.sm,
-    color: Colors.gray[400],
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  modalStatsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-    borderRadius: radius.xl,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing['2xl'],
-    gap: spacing.xl,
-    marginVertical: spacing.xs,
-  },
-  modalStat: { alignItems: 'center', flex: 1 },
-  modalStatValue: {
-    fontSize: fontSize['3xl'],
-    fontWeight: '800',
-    color: Colors.gray[900],
-    letterSpacing: letterSpacing.tight,
-  },
-  modalStatLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-    marginTop: 2,
-  },
-  modalStatDivider: { width: 1, height: 40, backgroundColor: Colors.border },
+const makeStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing['2xl'],
+    },
+    modalSheet: {
+      width: '100%',
+      backgroundColor: Colors.surface,
+      borderRadius: radius['3xl'],
+      padding: spacing['3xl'],
+      alignItems: 'center',
+      gap: spacing.lg,
+      ...shadow.md,
+    },
+    modalStar: { fontSize: 64, marginBottom: spacing.xs },
+    checkInIconWrap: {
+      width: 72,
+      height: 72,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.xs,
+    },
+    checkInStamp: {
+      width: 64,
+      height: 64,
+      borderRadius: radius.pill,
+      backgroundColor: Colors.successSolid,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sparkleTL: { position: 'absolute', top: 2, left: 6 },
+    sparkleBR: { position: 'absolute', bottom: 4, right: 2 },
+    starsAwardedRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginTop: -spacing.xs,
+    },
+    starsAwardedIcon: { fontSize: 22 },
+    modalTitle: {
+      fontSize: fontSize['3xl'],
+      fontWeight: '800',
+      color: Colors.gray[900],
+      letterSpacing: letterSpacing.tight,
+    },
+    modalWarehouse: {
+      fontSize: fontSize.lg,
+      fontWeight: '700',
+      color: Colors.gray[800],
+      textAlign: 'center',
+    },
+    modalCity: { fontSize: fontSize.sm, color: Colors.gray[400], textAlign: 'center' },
+    modalSubtext: {
+      fontSize: fontSize.sm,
+      color: Colors.gray[400],
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    modalStatsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: Colors.background,
+      borderRadius: radius.xl,
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing['2xl'],
+      gap: spacing.xl,
+      marginVertical: spacing.xs,
+    },
+    modalStat: { alignItems: 'center', flex: 1 },
+    modalStatValue: {
+      fontSize: fontSize['3xl'],
+      fontWeight: '800',
+      color: Colors.gray[900],
+      letterSpacing: letterSpacing.tight,
+    },
+    modalStatLabel: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: Colors.gray[400],
+      letterSpacing: letterSpacing.caps,
+      marginTop: 2,
+    },
+    modalStatDivider: { width: 1, height: 40, backgroundColor: Colors.border },
 
-  // Too far modal
-  tooFarDistanceRow: {
-    backgroundColor: Colors.costcoRedSubtle,
-    borderRadius: radius.xl,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing['3xl'],
-    alignItems: 'center',
-    width: '100%',
-  },
-  tooFarMiles: {
-    fontSize: fontSize['4xl'],
-    fontWeight: '800',
-    color: Colors.costcoRed,
-    letterSpacing: letterSpacing.tight,
-  },
-  tooFarLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.costcoRed,
-    letterSpacing: letterSpacing.caps,
-    marginTop: 2,
-    opacity: 0.7,
-  },
-  tooFarWarehouse: {
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: Colors.gray[800],
-    textAlign: 'center',
-  },
-  tierUpgradeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    borderWidth: 1.5,
-    borderRadius: radius.xl,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    width: '100%',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  tierUpgradeEmoji: { fontSize: 28 },
-  tierUpgradeTitle: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-  },
-  tierUpgradeName: { fontSize: fontSize.lg, fontWeight: '800', letterSpacing: letterSpacing.tight },
-  newBadgesSection: { width: '100%', gap: spacing.sm },
-  newBadgesLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-  },
-  newBadgesList: { gap: spacing.xs },
-  newBadgeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: Colors.goldStarLight + '30',
-    borderRadius: radius.lg,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-  },
-  newBadgeIcon: { fontSize: 18 },
-  newBadgeName: { fontSize: fontSize.sm, fontWeight: '700', color: Colors.gray[800] },
-  modalDoneBtn: {
-    backgroundColor: Colors.costcoRedSolid,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.lg,
-    width: '100%',
-    alignItems: 'center',
-    marginTop: spacing.xs,
-    ...shadow.sm,
-  },
-  modalDoneBtnPressed: { backgroundColor: Colors.costcoRedDark },
-  modalDoneBtnText: {
-    color: Colors.white,
-    fontSize: fontSize.md,
-    fontWeight: '700',
-    letterSpacing: letterSpacing.wide,
-  },
-});
+    // Too far modal
+    tooFarDistanceRow: {
+      backgroundColor: Colors.costcoRedSubtle,
+      borderRadius: radius.xl,
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing['3xl'],
+      alignItems: 'center',
+      width: '100%',
+    },
+    tooFarMiles: {
+      fontSize: fontSize['4xl'],
+      fontWeight: '800',
+      color: Colors.costcoRed,
+      letterSpacing: letterSpacing.tight,
+    },
+    tooFarLabel: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: Colors.costcoRed,
+      letterSpacing: letterSpacing.caps,
+      marginTop: 2,
+      opacity: 0.7,
+    },
+    tooFarWarehouse: {
+      fontSize: fontSize.lg,
+      fontWeight: '700',
+      color: Colors.gray[800],
+      textAlign: 'center',
+    },
+    tierUpgradeBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      borderWidth: 1.5,
+      borderRadius: radius.xl,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      width: '100%',
+      overflow: 'hidden',
+      position: 'relative',
+    },
+    tierUpgradeEmoji: { fontSize: 28 },
+    tierUpgradeTitle: {
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+      color: Colors.gray[400],
+      letterSpacing: letterSpacing.caps,
+    },
+    tierUpgradeName: {
+      fontSize: fontSize.lg,
+      fontWeight: '800',
+      letterSpacing: letterSpacing.tight,
+    },
+    newBadgesSection: { width: '100%', gap: spacing.sm },
+    newBadgesLabel: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: Colors.gray[400],
+      letterSpacing: letterSpacing.caps,
+    },
+    newBadgesList: { gap: spacing.xs },
+    newBadgeChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: Colors.goldStarLight + '30',
+      borderRadius: radius.lg,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+    },
+    newBadgeIcon: { fontSize: 18 },
+    newBadgeName: { fontSize: fontSize.sm, fontWeight: '700', color: Colors.gray[800] },
+    modalDoneBtn: {
+      backgroundColor: Colors.costcoRedSolid,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.lg,
+      width: '100%',
+      alignItems: 'center',
+      marginTop: spacing.xs,
+      ...shadow.sm,
+    },
+    modalDoneBtnPressed: { backgroundColor: Colors.costcoRedDark },
+    modalDoneBtnText: {
+      color: Colors.white,
+      fontSize: fontSize.md,
+      fontWeight: '700',
+      letterSpacing: letterSpacing.wide,
+    },
+  });

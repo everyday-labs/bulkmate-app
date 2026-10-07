@@ -34,7 +34,7 @@ type ReceiptItemRow = {
 type SweepItemRow = ReceiptItemRow & { receipt_id: string; receipts: unknown };
 
 type PriceResult = {
-  current_price: number;   // best price to compare against (lowest of API + ledger)
+  current_price: number; // best price to compare against (lowest of API + ledger)
   api_sale_price: number | null;
   api_list_price: number | null;
   api_online_price: number | null;
@@ -59,10 +59,7 @@ const PRICE_CACHE_TTL_HOURS = 72;
 // In-store only — no API call. Grows more reliable as user base grows.
 // ---------------------------------------------------------------------------
 
-async function fetchFromOCRLedger(
-  supabase: SupabaseClient,
-  sku: string,
-): Promise<number | null> {
+async function fetchFromOCRLedger(supabase: SupabaseClient, sku: string): Promise<number | null> {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const { data } = await supabase
@@ -76,15 +73,14 @@ async function fetchFromOCRLedger(
   if (!data || data.length < 3) return null; // need at least 3 data points to be meaningful
 
   const netPrices = data
-    .map((r: { unit_price: number; discount_amount: number | null }) =>
-      Number(r.unit_price) - Number(r.discount_amount ?? 0)
+    .map(
+      (r: { unit_price: number; discount_amount: number | null }) =>
+        Number(r.unit_price) - Number(r.discount_amount ?? 0),
     )
     .sort((a: number, b: number) => a - b);
 
   const mid = Math.floor(netPrices.length / 2);
-  return netPrices.length % 2 === 0
-    ? (netPrices[mid - 1] + netPrices[mid]) / 2
-    : netPrices[mid];
+  return netPrices.length % 2 === 0 ? (netPrices[mid - 1] + netPrices[mid]) / 2 : netPrices[mid];
 }
 
 // ---------------------------------------------------------------------------
@@ -180,10 +176,10 @@ async function resolvePrice(
     }
 
     // Enrich metadata if returned
-    if (apiResult.brand)     updatePayload.brand     = apiResult.brand;
+    if (apiResult.brand) updatePayload.brand = apiResult.brand;
     if (apiResult.image_url) updatePayload.image_url = apiResult.image_url;
-    if (apiResult.pdp_url)   updatePayload.pdp_url   = apiResult.pdp_url;
-    if (apiResult.rating)    updatePayload.rating    = apiResult.rating;
+    if (apiResult.pdp_url) updatePayload.pdp_url = apiResult.pdp_url;
+    if (apiResult.rating) updatePayload.rating = apiResult.rating;
   }
 
   if (ledgerPrice != null) {
@@ -203,9 +199,8 @@ async function resolvePrice(
     api_list_price: apiResult?.list_price ?? null,
     api_online_price: apiResult?.online_price ?? null,
     lowest_receipt_price: ledgerPrice,
-    source: ledgerPrice != null && ledgerPrice <= (apiSalePrice ?? Infinity)
-      ? 'ocr_ledger'
-      : apiSource,
+    source:
+      ledgerPrice != null && ledgerPrice <= (apiSalePrice ?? Infinity) ? 'ocr_ledger' : apiSource,
     brand: apiResult?.brand,
     image_url: apiResult?.image_url,
     pdp_url: apiResult?.pdp_url,
@@ -218,11 +213,7 @@ async function resolvePrice(
 // Called during receipt ingestion so the ledger is always up-to-date.
 // ---------------------------------------------------------------------------
 
-async function updateReceiptLedger(
-  supabase: SupabaseClient,
-  sku: string,
-  netPaid: number,
-) {
+async function updateReceiptLedger(supabase: SupabaseClient, sku: string, netPaid: number) {
   const now = new Date().toISOString();
   const { data: product } = await supabase
     .from('products')
@@ -230,8 +221,7 @@ async function updateReceiptLedger(
     .eq('sku', sku)
     .maybeSingle();
 
-  const prev =
-    product?.lowest_receipt_price != null ? Number(product.lowest_receipt_price) : null;
+  const prev = product?.lowest_receipt_price != null ? Number(product.lowest_receipt_price) : null;
 
   if (prev == null || netPaid < prev) {
     await supabase
@@ -292,7 +282,6 @@ serve(async (req) => {
           net_paid: Number(r.unit_price) - Number(r.discount_amount ?? 0),
         }))
         .filter((i: ItemToCheck) => i.user_id);
-
     } else if (receipt_id && user_id) {
       const { data, error } = await supabase
         .from('receipt_items')
@@ -308,7 +297,6 @@ serve(async (req) => {
         description: r.description ?? r.sku,
         net_paid: Number(r.unit_price) - Number(r.discount_amount ?? 0),
       }));
-
     } else {
       return new Response(
         JSON.stringify({ error: 'Provide receipt_id + user_id, or sweep: true' }),
@@ -400,7 +388,7 @@ serve(async (req) => {
       alertsCreated++;
       console.log(
         `Alert: SKU ${item.sku} paid $${item.net_paid} → now $${result.current_price}` +
-        ` (Δ $${delta.toFixed(2)}) via ${result.source}`,
+          ` (Δ $${delta.toFixed(2)}) via ${result.source}`,
       );
 
       const { pushToken, emailAlerts } = await getNotifyPrefs(item.user_id);
@@ -415,9 +403,8 @@ serve(async (req) => {
       // Queue a push notification if the user has a token
       if (pushToken) {
         // Truncate long product names to fit notification body
-        const name = item.description.length > 60
-          ? item.description.slice(0, 57) + '…'
-          : item.description;
+        const name =
+          item.description.length > 60 ? item.description.slice(0, 57) + '…' : item.description;
 
         pushMessages.push({
           to: pushToken,
@@ -457,7 +444,11 @@ serve(async (req) => {
       if (!to) continue;
 
       const unsub = await unsubscribeUrl(uid);
-      const { subject, html, text } = buildPriceDropEmail(batch.alertIds.length, batch.total, unsub);
+      const { subject, html, text } = buildPriceDropEmail(
+        batch.alertIds.length,
+        batch.total,
+        unsub,
+      );
       const sent = await sendBrevoEmail({
         to,
         subject,
@@ -490,14 +481,13 @@ serve(async (req) => {
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
     );
-
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unexpected error';
     console.error('price-match-check error:', message);
     await capturePostHogException(err, { functionName: 'price-match-check' });
-    return new Response(
-      JSON.stringify({ error: message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 },
-    );
+    return new Response(JSON.stringify({ error: message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
   }
 });

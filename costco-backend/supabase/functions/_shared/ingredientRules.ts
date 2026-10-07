@@ -83,16 +83,21 @@ const NUTRIENT_LEVEL_LABELS: Record<string, string> = {
   'salt-in-high-quantity': 'High in Salt',
 };
 
-export function classifyFromOpenFoodFacts(
-  off: OffProduct,
-): { items: ClassifiedIngredient[]; productFlags: ProductFlag[]; tally: IngredientTally } {
+export function classifyFromOpenFoodFacts(off: OffProduct): {
+  items: ClassifiedIngredient[];
+  productFlags: ProductFlag[];
+  tally: IngredientTally;
+} {
   // Per-ingredient: split the label text, then flag any token whose text
   // contains a detected additive's common name (e.g. OFF told us "e330" is
   // present, additiveDatabase says that's "Citric Acid" — if the label
   // literally says "citric acid," highlight that exact token).
   const detectedAdditives = off.additives
     .map((code) => ({ code, entry: lookupAdditive(code) }))
-    .filter((a): a is { code: string; entry: NonNullable<ReturnType<typeof lookupAdditive>> } => a.entry != null);
+    .filter(
+      (a): a is { code: string; entry: NonNullable<ReturnType<typeof lookupAdditive>> } =>
+        a.entry != null,
+    );
 
   const rawTokens = off.ingredientsText ? splitIngredients(off.ingredientsText) : [];
   const items: ClassifiedIngredient[] = rawTokens.map((token) => {
@@ -100,7 +105,11 @@ export function classifyFromOpenFoodFacts(
     const match = detectedAdditives.find((a) => upper.includes(a.entry.name.toUpperCase()));
     if (match) return { name: token, flag: match.entry.flag, reason: match.entry.reason };
     if (off.palmOil === 'yes' && upper.includes('PALM OIL')) {
-      return { name: token, flag: 'avoid', reason: 'Linked to deforestation; look for RSPO-certified sourcing on the label.' };
+      return {
+        name: token,
+        flag: 'avoid',
+        reason: 'Linked to deforestation; look for RSPO-certified sourcing on the label.',
+      };
     }
     return { name: token, flag: 'good', reason: null };
   });
@@ -115,10 +124,18 @@ export function classifyFromOpenFoodFacts(
   const productFlags: ProductFlag[] = [];
 
   for (const a of unmatchedAdditives) {
-    productFlags.push({ key: `additive-${a.code}`, label: a.entry.name, flag: a.entry.flag, reason: a.entry.reason });
+    productFlags.push({
+      key: `additive-${a.code}`,
+      label: a.entry.name,
+      flag: a.entry.flag,
+      reason: a.entry.reason,
+    });
   }
 
-  if (off.palmOil === 'yes' && !items.some((i) => i.flag === 'avoid' && i.name.toUpperCase().includes('PALM OIL'))) {
+  if (
+    off.palmOil === 'yes' &&
+    !items.some((i) => i.flag === 'avoid' && i.name.toUpperCase().includes('PALM OIL'))
+  ) {
     productFlags.push({
       key: 'palm-oil',
       label: 'Contains Palm Oil',
@@ -144,7 +161,8 @@ export function classifyFromOpenFoodFacts(
       key: 'nova-4',
       label: 'Ultra-Processed (NOVA 4)',
       flag: 'watch',
-      reason: 'Industrially formulated with ingredients rarely used in home cooking. Not inherently unsafe, worth moderating.',
+      reason:
+        'Industrially formulated with ingredients rarely used in home cooking. Not inherently unsafe, worth moderating.',
     });
   }
 
@@ -153,7 +171,8 @@ export function classifyFromOpenFoodFacts(
       key: 'nutriscore',
       label: `Nutri-Score ${off.nutriscoreGrade.toUpperCase()}`,
       flag: 'watch',
-      reason: 'Lower end of the Nutri-Score scale (A best, E worst) — based on sugar, fat, salt, fiber, and protein content.',
+      reason:
+        'Lower end of the Nutri-Score scale (A best, E worst) — based on sugar, fat, salt, fiber, and protein content.',
     });
   }
 
@@ -167,33 +186,77 @@ export function classifyFromOpenFoodFacts(
 type FlagRule = { match: string; reason: string };
 
 const AVOID_RULES: FlagRule[] = [
-  { match: 'PARTIALLY HYDROGENATED', reason: 'A source of artificial trans fat, linked to heart disease risk.' },
-  { match: 'HIGH FRUCTOSE CORN SYRUP', reason: 'Highly processed sweetener linked to metabolic concerns in excess.' },
-  { match: 'PALM OIL', reason: 'Linked to deforestation; look for RSPO-certified sourcing on the label.' },
+  {
+    match: 'PARTIALLY HYDROGENATED',
+    reason: 'A source of artificial trans fat, linked to heart disease risk.',
+  },
+  {
+    match: 'HIGH FRUCTOSE CORN SYRUP',
+    reason: 'Highly processed sweetener linked to metabolic concerns in excess.',
+  },
+  {
+    match: 'PALM OIL',
+    reason: 'Linked to deforestation; look for RSPO-certified sourcing on the label.',
+  },
   { match: 'SODIUM NITRITE', reason: 'Preservative linked to processed-meat health concerns.' },
   { match: 'SODIUM NITRATE', reason: 'Preservative linked to processed-meat health concerns.' },
-  { match: 'POTASSIUM BROMATE', reason: 'Flour treatment banned in the EU and several other countries.' },
-  { match: 'RED 40', reason: 'Synthetic dye under scrutiny for links to hyperactivity in children.' },
-  { match: 'YELLOW 5', reason: 'Synthetic dye under scrutiny for links to hyperactivity in children.' },
-  { match: 'YELLOW 6', reason: 'Synthetic dye under scrutiny for links to hyperactivity in children.' },
+  {
+    match: 'POTASSIUM BROMATE',
+    reason: 'Flour treatment banned in the EU and several other countries.',
+  },
+  {
+    match: 'RED 40',
+    reason: 'Synthetic dye under scrutiny for links to hyperactivity in children.',
+  },
+  {
+    match: 'YELLOW 5',
+    reason: 'Synthetic dye under scrutiny for links to hyperactivity in children.',
+  },
+  {
+    match: 'YELLOW 6',
+    reason: 'Synthetic dye under scrutiny for links to hyperactivity in children.',
+  },
   { match: 'BLUE 1', reason: 'Synthetic dye; some sensitivity concerns reported.' },
-  { match: 'BHA', reason: 'Preservative flagged as a possible carcinogen by some health agencies.' },
-  { match: 'BHT', reason: 'Preservative flagged as a possible carcinogen by some health agencies.' },
+  {
+    match: 'BHA',
+    reason: 'Preservative flagged as a possible carcinogen by some health agencies.',
+  },
+  {
+    match: 'BHT',
+    reason: 'Preservative flagged as a possible carcinogen by some health agencies.',
+  },
   { match: 'TBHQ', reason: 'Synthetic preservative; linked to concerns at high intake levels.' },
-  { match: 'ASPARTAME', reason: 'Artificial sweetener some people choose to avoid; generally recognized as safe in moderation.' },
+  {
+    match: 'ASPARTAME',
+    reason:
+      'Artificial sweetener some people choose to avoid; generally recognized as safe in moderation.',
+  },
 ];
 
 const WATCH_RULES: FlagRule[] = [
   { match: 'SUGAR', reason: 'Added sugar — fine occasionally, worth tracking daily total.' },
   { match: 'CORN SYRUP', reason: 'Added sugar — fine occasionally, worth tracking daily total.' },
   { match: 'DEXTROSE', reason: 'A form of added sugar.' },
-  { match: 'MALTODEXTRIN', reason: 'Highly processed starch, often used as a filler or thickener.' },
-  { match: 'NATURAL FLAVOR', reason: 'Broad legal term — can mean many different compounds, not always disclosed.' },
+  {
+    match: 'MALTODEXTRIN',
+    reason: 'Highly processed starch, often used as a filler or thickener.',
+  },
+  {
+    match: 'NATURAL FLAVOR',
+    reason: 'Broad legal term — can mean many different compounds, not always disclosed.',
+  },
   { match: 'ARTIFICIAL FLAVOR', reason: 'Synthetic flavoring compound, not naturally derived.' },
-  { match: 'CARRAGEENAN', reason: 'Thickener with some digestive-sensitivity reports in research.' },
+  {
+    match: 'CARRAGEENAN',
+    reason: 'Thickener with some digestive-sensitivity reports in research.',
+  },
   { match: 'MONOSODIUM GLUTAMATE', reason: 'Flavor enhancer some people are sensitive to.' },
   { match: 'MSG', reason: 'Flavor enhancer some people are sensitive to.' },
-  { match: 'SODIUM BENZOATE', reason: 'Preservative; generally recognized as safe but worth noting for sodium-conscious diets.' },
+  {
+    match: 'SODIUM BENZOATE',
+    reason:
+      'Preservative; generally recognized as safe but worth noting for sodium-conscious diets.',
+  },
 ];
 
 function classifyToken(token: string): ClassifiedIngredient {
@@ -207,7 +270,10 @@ function classifyToken(token: string): ClassifiedIngredient {
   return { name: token, flag: 'good', reason: null };
 }
 
-export function classifyByKeyword(rawText: string): { items: ClassifiedIngredient[]; tally: IngredientTally } {
+export function classifyByKeyword(rawText: string): {
+  items: ClassifiedIngredient[];
+  tally: IngredientTally;
+} {
   const items = splitIngredients(rawText).map(classifyToken);
   return { items, tally: tally(items) };
 }

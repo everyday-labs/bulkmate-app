@@ -34,9 +34,10 @@ serve(async (req) => {
     );
 
     const authHeader = req.headers.get('Authorization') ?? '';
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', ''),
-    );
+    const {
+      data: { user },
+      error: authErr,
+    } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
 
     // The account deleted is always the caller's own, taken from the verified
     // JWT. There is deliberately no user_id parameter — accepting one would
@@ -54,9 +55,7 @@ serve(async (req) => {
       .filter((p): p is string => !!p);
 
     if (imagePaths.length > 0) {
-      const { error: storageErr } = await supabase.storage
-        .from('receipts')
-        .remove(imagePaths);
+      const { error: storageErr } = await supabase.storage.from('receipts').remove(imagePaths);
       // Orphaned images are a cleanup problem, not a reason to strand the user
       // with an account they asked to delete.
       if (storageErr) {

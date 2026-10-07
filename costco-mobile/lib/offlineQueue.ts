@@ -25,5 +25,5 @@ export async function getQueue(): Promise<QueuedReceipt[]> {
 
 export async function removeFromQueue(id: string): Promise<void> {
   const existing = await getQueue();
-  await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(existing.filter(i => i.id !== id)));
+  await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(existing.filter((i) => i.id !== id)));
 }

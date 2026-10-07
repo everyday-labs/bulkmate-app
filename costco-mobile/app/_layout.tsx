@@ -55,16 +55,13 @@ function RootLayoutInner() {
 
     if (identifiedUserIdRef.current === user.id) return;
 
-    posthog?.identify(
-      user.id,
-      user.email ? { email: user.email } : undefined,
-    );
+    posthog?.identify(user.id, user.email ? { email: user.email } : undefined);
     identifiedUserIdRef.current = user.id;
   }, [loading, session]);
 
   // Offline queue drain on reconnect
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
       if (state.isConnected) drainQueue();
     });
     return () => unsubscribe();
@@ -94,7 +91,8 @@ function RootLayoutInner() {
     // User tapped a notification — route to the relevant screen
     responseListenerRef.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
-        const data = response.notification.request.content.data as Record<string, string> | undefined;
+        const data = response.notification.request.content.data as
+          Record<string, string> | undefined;
         if (data?.receiptId) {
           router.push(`/receipt-success?receiptId=${data.receiptId}`);
         }

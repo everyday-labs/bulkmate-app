@@ -43,9 +43,12 @@ type SortKey = (typeof SORT_OPTIONS)[number]['key'];
 function sortCheckIns(rows: CheckInRow[], sortBy: SortKey): CheckInRow[] {
   const list = [...rows];
   switch (sortBy) {
-    case 'date_desc': return list.sort((a, b) => b.checked_in_at.localeCompare(a.checked_in_at));
-    case 'date_asc': return list.sort((a, b) => a.checked_in_at.localeCompare(b.checked_in_at));
-    case 'stars_desc': return list.sort((a, b) => b.stars_earned - a.stars_earned);
+    case 'date_desc':
+      return list.sort((a, b) => b.checked_in_at.localeCompare(a.checked_in_at));
+    case 'date_asc':
+      return list.sort((a, b) => a.checked_in_at.localeCompare(b.checked_in_at));
+    case 'stars_desc':
+      return list.sort((a, b) => b.stars_earned - a.stars_earned);
   }
 }
 
@@ -68,8 +71,7 @@ export default function CheckinHistoryScreen() {
     if (!q) return rows;
     return rows.filter(
       (r) =>
-        r.warehouse_name?.toLowerCase().includes(q) ||
-        r.warehouse_city?.toLowerCase().includes(q),
+        r.warehouse_name?.toLowerCase().includes(q) || r.warehouse_city?.toLowerCase().includes(q),
     );
   }, [rows, query]);
 
@@ -166,7 +168,9 @@ export default function CheckinHistoryScreen() {
           style={({ pressed }) => [styles.controlPill, pressed && { opacity: 0.7 }]}
           onPress={() => setSortMenuOpen((o) => !o)}
         >
-          <Text style={styles.controlPillText}>{SORT_OPTIONS.find((o) => o.key === sortBy)!.label} ▾</Text>
+          <Text style={styles.controlPillText}>
+            {SORT_OPTIONS.find((o) => o.key === sortBy)!.label} ▾
+          </Text>
         </Pressable>
       </View>
 
@@ -176,9 +180,17 @@ export default function CheckinHistoryScreen() {
             <Pressable
               key={opt.key}
               style={({ pressed }) => [styles.dropdownItem, pressed && { opacity: 0.7 }]}
-              onPress={() => { setSortBy(opt.key); setSortMenuOpen(false); }}
+              onPress={() => {
+                setSortBy(opt.key);
+                setSortMenuOpen(false);
+              }}
             >
-              <Text style={[styles.dropdownItemText, sortBy === opt.key && styles.dropdownItemTextActive]}>
+              <Text
+                style={[
+                  styles.dropdownItemText,
+                  sortBy === opt.key && styles.dropdownItemTextActive,
+                ]}
+              >
                 {opt.label}
               </Text>
               {sortBy === opt.key && <Text style={styles.dropdownCheck}>✓</Text>}
@@ -190,7 +202,10 @@ export default function CheckinHistoryScreen() {
       {error ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.7 }]} onPress={() => load(false)}>
+          <Pressable
+            style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.7 }]}
+            onPress={() => load(false)}
+          >
             <Text style={styles.retryText}>Try again</Text>
           </Pressable>
         </View>
@@ -199,13 +214,22 @@ export default function CheckinHistoryScreen() {
           data={sorted}
           keyExtractor={(item) => item.id}
           contentContainerStyle={sorted.length === 0 ? styles.emptyContainer : styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={Colors.costcoRed} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => load(true)}
+              tintColor={Colors.costcoRed}
+            />
+          }
           renderItem={({ item }) => {
             const date = new Date(item.checked_in_at).toLocaleDateString('en-US', {
-              month: 'short', day: 'numeric', year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
             });
             const time = new Date(item.checked_in_at).toLocaleTimeString('en-US', {
-              hour: 'numeric', minute: '2-digit',
+              hour: 'numeric',
+              minute: '2-digit',
             });
             return (
               <View style={styles.card}>
@@ -214,25 +238,40 @@ export default function CheckinHistoryScreen() {
                 </View>
                 <View style={styles.cardBody}>
                   <View style={styles.cardTopRow}>
-                    <Text style={styles.cardWarehouse} numberOfLines={1}>{item.warehouse_name ?? 'Costco Warehouse'}</Text>
+                    <Text style={styles.cardWarehouse} numberOfLines={1}>
+                      {item.warehouse_name ?? 'Costco Warehouse'}
+                    </Text>
                     {item.warehouse_tier && (
-                      <View style={[styles.tierChip, { backgroundColor: tierColor(Colors, item.warehouse_tier) + '22' }]}>
+                      <View
+                        style={[
+                          styles.tierChip,
+                          { backgroundColor: tierColor(Colors, item.warehouse_tier) + '22' },
+                        ]}
+                      >
                         {item.warehouse_tier === 'Legendary' && (
                           <Sparkle size={7} color={tierColor(Colors, item.warehouse_tier)} />
                         )}
-                        <Text style={[styles.tierChipText, { color: tierColor(Colors, item.warehouse_tier) }]}>
+                        <Text
+                          style={[
+                            styles.tierChipText,
+                            { color: tierColor(Colors, item.warehouse_tier) },
+                          ]}
+                        >
                           {item.warehouse_tier}
                         </Text>
                       </View>
                     )}
                   </View>
                   <Text style={styles.cardMeta}>
-                    {item.warehouse_city ? `${item.warehouse_city} · ` : ''}{date} · {time}
+                    {item.warehouse_city ? `${item.warehouse_city} · ` : ''}
+                    {date} · {time}
                   </Text>
                 </View>
                 <View style={styles.starsWrap}>
                   <Text style={styles.starsText}>+{item.stars_earned}</Text>
-                  <Twinkle><Text style={styles.starsIcon}>⭐</Text></Twinkle>
+                  <Twinkle>
+                    <Text style={styles.starsIcon}>⭐</Text>
+                  </Twinkle>
                 </View>
               </View>
             );
@@ -241,13 +280,17 @@ export default function CheckinHistoryScreen() {
           ListEmptyComponent={
             query.trim() ? (
               <View style={styles.emptyInner}>
-                <FloatView><Text style={styles.emptyIcon}>🔍</Text></FloatView>
+                <FloatView>
+                  <Text style={styles.emptyIcon}>🔍</Text>
+                </FloatView>
                 <Text style={styles.emptyTitle}>No results</Text>
                 <Text style={styles.emptySubtitle}>Nothing found for "{query.trim()}".</Text>
               </View>
             ) : (
               <View style={styles.emptyInner}>
-                <FloatView><Text style={styles.emptyIcon}>📍</Text></FloatView>
+                <FloatView>
+                  <Text style={styles.emptyIcon}>📍</Text>
+                </FloatView>
                 <Text style={styles.emptyTitle}>No check-ins yet</Text>
                 <Text style={styles.emptySubtitle}>
                   Check in at a Costco warehouse to start earning stars.
@@ -261,128 +304,165 @@ export default function CheckinHistoryScreen() {
   );
 }
 
-const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['2xl'] },
+const makeStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.background },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['2xl'] },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.xl,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  backButton: { width: 60 },
-  backText: { fontSize: fontSize.xl, color: Colors.costcoRed, fontWeight: '500' },
-  title: { fontSize: fontSize.xl, fontWeight: '700', color: Colors.gray[900], letterSpacing: letterSpacing.tight },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingBottom: spacing.md,
+      paddingHorizontal: spacing.xl,
+      backgroundColor: Colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    backButton: { width: 60 },
+    backText: { fontSize: fontSize.xl, color: Colors.costcoRed, fontWeight: '500' },
+    title: {
+      fontSize: fontSize.xl,
+      fontWeight: '700',
+      color: Colors.gray[900],
+      letterSpacing: letterSpacing.tight,
+    },
 
-  searchRow: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md - 2,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.gray[100],
-    borderRadius: radius.xl,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 1,
-    gap: spacing.sm,
-  },
-  searchIcon: { fontSize: 14 },
-  searchInput: { flex: 1, fontSize: fontSize.md, color: Colors.gray[900], padding: 0 },
+    searchRow: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md - 2,
+      backgroundColor: Colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    searchBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: Colors.gray[100],
+      borderRadius: radius.xl,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + 1,
+      gap: spacing.sm,
+    },
+    searchIcon: { fontSize: 14 },
+    searchInput: { flex: 1, fontSize: fontSize.md, color: Colors.gray[900], padding: 0 },
 
-  controlsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xs,
-    backgroundColor: Colors.surface,
-  },
-  controlPill: {
-    backgroundColor: Colors.gray[100],
-    borderRadius: radius.pill,
-    paddingVertical: spacing.xs + 1,
-    paddingHorizontal: spacing.md,
-  },
-  controlPillText: { fontSize: fontSize.xs, fontWeight: '700', color: Colors.gray[700] },
-  dropdownMenu: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.xs,
-    backgroundColor: Colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-    ...shadow.sm,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  dropdownItemText: { fontSize: fontSize.sm, color: Colors.gray[700] },
-  dropdownItemTextActive: { color: Colors.costcoRed, fontWeight: '700' },
-  dropdownCheck: { fontSize: fontSize.sm, color: Colors.costcoRed, fontWeight: '700' },
+    controlsRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.xs,
+      backgroundColor: Colors.surface,
+    },
+    controlPill: {
+      backgroundColor: Colors.gray[100],
+      borderRadius: radius.pill,
+      paddingVertical: spacing.xs + 1,
+      paddingHorizontal: spacing.md,
+    },
+    controlPillText: { fontSize: fontSize.xs, fontWeight: '700', color: Colors.gray[700] },
+    dropdownMenu: {
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.xs,
+      backgroundColor: Colors.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: Colors.border,
+      overflow: 'hidden',
+      ...shadow.sm,
+    },
+    dropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    dropdownItemText: { fontSize: fontSize.sm, color: Colors.gray[700] },
+    dropdownItemTextActive: { color: Colors.costcoRed, fontWeight: '700' },
+    dropdownCheck: { fontSize: fontSize.sm, color: Colors.costcoRed, fontWeight: '700' },
 
-  listContent: { paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, gap: 2 },
-  emptyContainer: { flex: 1 },
+    listContent: { paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, gap: 2 },
+    emptyContainer: { flex: 1 },
 
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    gap: spacing.md,
-    ...shadow.sm,
-    marginVertical: 3,
-  },
-  cardIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.lg,
-    backgroundColor: Colors.goldStarSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardIconText: { fontSize: 20 },
-  cardBody: { flex: 1 },
-  cardTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 3 },
-  cardWarehouse: { fontSize: fontSize.md, fontWeight: '700', color: Colors.gray[900], flexShrink: 1 },
-  tierChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  tierChipText: { fontSize: 9, fontWeight: '800', letterSpacing: letterSpacing.caps },
-  cardMeta: { fontSize: fontSize.sm, color: Colors.gray[400] },
-  starsWrap: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  starsText: { fontSize: fontSize.md, fontWeight: '800', color: Colors.goldStarDark },
-  starsIcon: { fontSize: 14 },
-  separator: { height: 0 },
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing.lg,
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      gap: spacing.md,
+      ...shadow.sm,
+      marginVertical: 3,
+    },
+    cardIconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: radius.lg,
+      backgroundColor: Colors.goldStarSubtle,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cardIconText: { fontSize: 20 },
+    cardBody: { flex: 1 },
+    cardTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 3 },
+    cardWarehouse: {
+      fontSize: fontSize.md,
+      fontWeight: '700',
+      color: Colors.gray[900],
+      flexShrink: 1,
+    },
+    tierChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+    },
+    tierChipText: { fontSize: 9, fontWeight: '800', letterSpacing: letterSpacing.caps },
+    cardMeta: { fontSize: fontSize.sm, color: Colors.gray[400] },
+    starsWrap: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    starsText: { fontSize: fontSize.md, fontWeight: '800', color: Colors.goldStarDark },
+    starsIcon: { fontSize: 14 },
+    separator: { height: 0 },
 
-  emptyInner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['4xl'] },
-  emptyIcon: { fontSize: 52, marginBottom: spacing.xl },
-  emptyTitle: { fontSize: fontSize['3xl'], fontWeight: '700', color: Colors.gray[800], marginBottom: spacing.sm, letterSpacing: letterSpacing.tight },
-  emptySubtitle: { fontSize: fontSize.md, color: Colors.gray[400], textAlign: 'center', lineHeight: 22 },
+    emptyInner: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: spacing['4xl'],
+    },
+    emptyIcon: { fontSize: 52, marginBottom: spacing.xl },
+    emptyTitle: {
+      fontSize: fontSize['3xl'],
+      fontWeight: '700',
+      color: Colors.gray[800],
+      marginBottom: spacing.sm,
+      letterSpacing: letterSpacing.tight,
+    },
+    emptySubtitle: {
+      fontSize: fontSize.md,
+      color: Colors.gray[400],
+      textAlign: 'center',
+      lineHeight: 22,
+    },
 
-  errorText: { fontSize: fontSize.md, color: Colors.gray[700], textAlign: 'center', marginBottom: spacing.lg },
-  retryButton: { paddingVertical: spacing.md, paddingHorizontal: spacing['2xl'], backgroundColor: Colors.costcoRedSolid, borderRadius: radius.lg },
-  retryText: { color: Colors.white, fontWeight: '700', fontSize: fontSize.md },
-});
+    errorText: {
+      fontSize: fontSize.md,
+      color: Colors.gray[700],
+      textAlign: 'center',
+      marginBottom: spacing.lg,
+    },
+    retryButton: {
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing['2xl'],
+      backgroundColor: Colors.costcoRedSolid,
+      borderRadius: radius.lg,
+    },
+    retryText: { color: Colors.white, fontWeight: '700', fontSize: fontSize.md },
+  });

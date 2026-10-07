@@ -58,11 +58,16 @@ describe('with client IDs configured', () => {
   it('configures the native module with both client IDs', () => {
     const native = mockNativeModule(jest.fn());
     expect(load().googleSignInAvailable).toBe(true);
-    expect(native.configure).toHaveBeenCalledWith({ webClientId: 'web-client', iosClientId: 'ios-client' });
+    expect(native.configure).toHaveBeenCalledWith({
+      webClientId: 'web-client',
+      iosClientId: 'ios-client',
+    });
   });
 
   it('returns the ID token on success', async () => {
-    mockNativeModule(jest.fn().mockResolvedValue({ type: 'success', data: { idToken: 'id-token' } }));
+    mockNativeModule(
+      jest.fn().mockResolvedValue({ type: 'success', data: { idToken: 'id-token' } }),
+    );
     await expect(load().getGoogleIdToken()).resolves.toBe('id-token');
   });
 

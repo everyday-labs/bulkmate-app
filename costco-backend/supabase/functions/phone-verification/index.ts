@@ -36,7 +36,8 @@ serve(async (req) => {
 
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
-      status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   try {
@@ -46,17 +47,21 @@ serve(async (req) => {
     );
 
     const authHeader = req.headers.get('Authorization') ?? '';
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', ''),
-    );
+    const {
+      data: { user },
+      error: authErr,
+    } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (authErr || !user) return json({ error: 'Unauthorized' }, 401);
 
-    const body = await req.json() as { action?: string; phone?: string; code?: string };
+    const body = (await req.json()) as { action?: string; phone?: string; code?: string };
 
     if (body.action === 'send') {
       const phone = (body.phone ?? '').replace(/[\s()-]/g, '');
       if (!E164.test(phone)) {
-        return json({ error: 'Enter the number with its country code, e.g. +1 555 123 4567.' }, 400);
+        return json(
+          { error: 'Enter the number with its country code, e.g. +1 555 123 4567.' },
+          400,
+        );
       }
 
       const { data: pending } = await supabase
@@ -65,8 +70,8 @@ serve(async (req) => {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      const windowFresh = pending &&
-        Date.now() - new Date(pending.window_started_at).getTime() < 24 * 60 * 60 * 1000;
+      const windowFresh =
+        pending && Date.now() - new Date(pending.window_started_at).getTime() < 24 * 60 * 60 * 1000;
       const sendsInWindow = windowFresh ? pending.sends_in_window : 0;
       if (sendsInWindow >= MAX_SENDS_PER_DAY) {
         return json({ error: 'Too many codes requested. Try again tomorrow.' }, 429);
@@ -78,7 +83,11 @@ serve(async (req) => {
         `Bulkmate code: ${code}. Enter it in the app to turn on weekly price-drop texts. Not you? Ignore this message.`,
         'phone-verification',
       );
-      if (!sent) return json({ error: "Couldn't send a text to that number right now. Try again later." }, 502);
+      if (!sent)
+        return json(
+          { error: "Couldn't send a text to that number right now. Try again later." },
+          502,
+        );
 
       await supabase.from('phone_verifications').upsert({
         user_id: user.id,
@@ -106,7 +115,7 @@ serve(async (req) => {
       if (pending.attempts >= MAX_ATTEMPTS) {
         return json({ error: 'Too many attempts. Request a new code.' }, 429);
       }
-      if (await sha256Hex(`${user.id}:${code}`) !== pending.code_hash) {
+      if ((await sha256Hex(`${user.id}:${code}`)) !== pending.code_hash) {
         await supabase
           .from('phone_verifications')
           .update({ attempts: pending.attempts + 1 })

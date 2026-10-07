@@ -102,7 +102,9 @@ export default function AlertsScreen() {
 
       const { data } = await supabase
         .from('price_alerts')
-        .select('id, sku, paid_price, current_price, delta, dismissed_at, receipt_items(description, receipt_id, transaction_date)')
+        .select(
+          'id, sku, paid_price, current_price, delta, dismissed_at, receipt_items(description, receipt_id, transaction_date)',
+        )
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
@@ -133,7 +135,8 @@ export default function AlertsScreen() {
     // Optimistic move from Active to Claimed
     const moved = active.find((a) => a.id === alertId);
     setActive((prev) => prev.filter((a) => a.id !== alertId));
-    if (moved) setClaimed((prev) => [{ ...moved, dismissed_at: new Date().toISOString() }, ...prev]);
+    if (moved)
+      setClaimed((prev) => [{ ...moved, dismissed_at: new Date().toISOString() }, ...prev]);
 
     const { error } = await supabase
       .from('price_alerts')
@@ -174,8 +177,17 @@ export default function AlertsScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={Colors.costcoRed} />}
+        contentContainerStyle={{
+          padding: spacing.lg,
+          paddingBottom: insets.bottom + spacing['2xl'],
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => load(true)}
+            tintColor={Colors.costcoRed}
+          />
+        }
         showsVerticalScrollIndicator={false}
       >
         {/* Total potential savings hero */}
@@ -183,7 +195,8 @@ export default function AlertsScreen() {
           <Text style={styles.heroLabel}>YOU MAY BE OWED</Text>
           <Text style={styles.heroValue}>${totalOwed.toFixed(2)}</Text>
           <Text style={styles.heroSub}>
-            Across {activeGroups.length} {activeGroups.length === 1 ? 'item' : 'items'} from the last {CLAIM_WINDOW_DAYS} days
+            Across {activeGroups.length} {activeGroups.length === 1 ? 'item' : 'items'} from the
+            last {CLAIM_WINDOW_DAYS} days
           </Text>
         </View>
 
@@ -191,14 +204,17 @@ export default function AlertsScreen() {
           <View style={styles.howToCard}>
             <Text style={styles.howToIcon}>🧾</Text>
             <Text style={styles.howToText}>
-              Bring the receipt to the Membership counter at Costco to claim your refund — tap "View Receipt" below to pull it up.
+              Bring the receipt to the Membership counter at Costco to claim your refund — tap "View
+              Receipt" below to pull it up.
             </Text>
           </View>
         )}
 
         {active.length === 0 && claimed.length === 0 ? (
           <View style={styles.emptyCard}>
-            <FloatView><Text style={styles.emptyIcon}>🏷</Text></FloatView>
+            <FloatView>
+              <Text style={styles.emptyIcon}>🏷</Text>
+            </FloatView>
             <Text style={styles.emptyTitle}>No price drops yet</Text>
             <Text style={styles.emptySubtitle}>
               We'll notify you the moment something you bought goes on sale.
@@ -230,7 +246,12 @@ export default function AlertsScreen() {
                 <Text style={styles.sectionLabel}>CLAIMED</Text>
                 <View style={styles.list}>
                   {claimed.map((alert) => (
-                    <ClaimedAlertRow key={alert.id} alert={alert} onPress={() => goToReceipt(alert.receipt_id)} styles={styles} />
+                    <ClaimedAlertRow
+                      key={alert.id}
+                      alert={alert}
+                      onPress={() => goToReceipt(alert.receipt_id)}
+                      styles={styles}
+                    />
                   ))}
                 </View>
               </View>
@@ -245,7 +266,12 @@ export default function AlertsScreen() {
 type Styles = ReturnType<typeof makeStyles>;
 
 function ItemGroupCard({
-  group, claimingId, onPressReceipt, onMarkClaimed, styles, Colors,
+  group,
+  claimingId,
+  onPressReceipt,
+  onMarkClaimed,
+  styles,
+  Colors,
 }: {
   group: AlertGroup;
   claimingId: string | null;
@@ -254,7 +280,8 @@ function ItemGroupCard({
   styles: Styles;
   Colors: ColorScheme;
 }) {
-  const name = group.description.length > 60 ? group.description.slice(0, 57) + '…' : group.description;
+  const name =
+    group.description.length > 60 ? group.description.slice(0, 57) + '…' : group.description;
   const multi = group.alerts.length > 1;
 
   return (
@@ -264,10 +291,10 @@ function ItemGroupCard({
           <Text style={styles.alertIcon}>🏷</Text>
         </View>
         <View style={styles.alertBody}>
-          <Text style={styles.alertName} numberOfLines={2}>{name}</Text>
-          {multi && (
-            <Text style={styles.groupSub}>{group.alerts.length} receipts</Text>
-          )}
+          <Text style={styles.alertName} numberOfLines={2}>
+            {name}
+          </Text>
+          {multi && <Text style={styles.groupSub}>{group.alerts.length} receipts</Text>}
         </View>
         <View style={styles.alertRight}>
           <Text style={styles.alertDelta}>+${group.totalDelta.toFixed(2)}</Text>
@@ -294,7 +321,13 @@ function ItemGroupCard({
 }
 
 function AlertReceiptRow({
-  alert, showDelta, claiming, onPress, onMarkClaimed, styles, Colors,
+  alert,
+  showDelta,
+  claiming,
+  onPress,
+  onMarkClaimed,
+  styles,
+  Colors,
 }: {
   alert: AlertRow;
   showDelta: boolean;
@@ -306,7 +339,10 @@ function AlertReceiptRow({
 }) {
   const daysLeft = daysLeftToClaim(alert.transaction_date);
   const dateLabel = alert.transaction_date
-    ? new Date(`${alert.transaction_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    ? new Date(`${alert.transaction_date}T00:00:00`).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      })
     : 'Unknown date';
 
   return (
@@ -325,7 +361,9 @@ function AlertReceiptRow({
           </Text>
           {daysLeft != null && (
             <Text style={styles.daysLeft}>
-              {daysLeft > 0 ? `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left to claim` : 'Claim window closing'}
+              {daysLeft > 0
+                ? `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left to claim`
+                : 'Claim window closing'}
             </Text>
           )}
         </View>
@@ -351,18 +389,28 @@ function AlertReceiptRow({
           onPress={onMarkClaimed}
           disabled={claiming}
         >
-          {claiming
-            ? <ActivityIndicator size="small" color={Colors.success} />
-            : <Text style={styles.markClaimedLinkText}>Mark as claimed</Text>
-          }
+          {claiming ? (
+            <ActivityIndicator size="small" color={Colors.success} />
+          ) : (
+            <Text style={styles.markClaimedLinkText}>Mark as claimed</Text>
+          )}
         </Pressable>
       </View>
     </View>
   );
 }
 
-function ClaimedAlertRow({ alert, onPress, styles }: { alert: AlertRow; onPress: () => void; styles: Styles }) {
-  const name = alert.description.length > 50 ? alert.description.slice(0, 47) + '…' : alert.description;
+function ClaimedAlertRow({
+  alert,
+  onPress,
+  styles,
+}: {
+  alert: AlertRow;
+  onPress: () => void;
+  styles: Styles;
+}) {
+  const name =
+    alert.description.length > 50 ? alert.description.slice(0, 47) + '…' : alert.description;
   const claimedDate = alert.dismissed_at
     ? new Date(alert.dismissed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : null;
@@ -377,7 +425,9 @@ function ClaimedAlertRow({ alert, onPress, styles }: { alert: AlertRow; onPress:
         <Text style={styles.claimedIcon}>✓</Text>
       </View>
       <View style={styles.claimedBody}>
-        <Text style={styles.claimedName} numberOfLines={1}>{name}</Text>
+        <Text style={styles.claimedName} numberOfLines={1}>
+          {name}
+        </Text>
         {claimedDate && <Text style={styles.claimedDate}>Claimed {claimedDate}</Text>}
       </View>
       <Text style={styles.claimedDelta}>+${alert.delta.toFixed(2)}</Text>
@@ -386,178 +436,226 @@ function ClaimedAlertRow({ alert, onPress, styles }: { alert: AlertRow; onPress:
   );
 }
 
-const makeStyles = (Colors: ColorScheme) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
+const makeStyles = (Colors: ColorScheme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.background },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: Colors.background,
+    },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.xl,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  backButton: { width: 60 },
-  backText: { fontSize: fontSize.xl, color: Colors.costcoRed, fontWeight: '500' },
-  title: { fontSize: fontSize.xl, fontWeight: '700', color: Colors.gray[900], letterSpacing: letterSpacing.tight },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingBottom: spacing.md,
+      paddingHorizontal: spacing.xl,
+      backgroundColor: Colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    backButton: { width: 60 },
+    backText: { fontSize: fontSize.xl, color: Colors.costcoRed, fontWeight: '500' },
+    title: {
+      fontSize: fontSize.xl,
+      fontWeight: '700',
+      color: Colors.gray[900],
+      letterSpacing: letterSpacing.tight,
+    },
 
-  // Hero
-  heroCard: {
-    backgroundColor: Colors.navySolid,
-    borderRadius: radius['2xl'],
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
-    ...shadow.md,
-  },
-  heroLabel: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.7)',
-    letterSpacing: letterSpacing.caps,
-  },
-  heroValue: {
-    fontSize: fontSize.display,
-    fontWeight: '800',
-    color: Colors.goldStarAccent,
-    marginTop: spacing.xs,
-    letterSpacing: letterSpacing.tight,
-  },
-  heroSub: {
-    fontSize: fontSize.sm,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: spacing.xs,
-  },
+    // Hero
+    heroCard: {
+      backgroundColor: Colors.navySolid,
+      borderRadius: radius['2xl'],
+      padding: spacing.xl,
+      marginBottom: spacing.xl,
+      ...shadow.md,
+    },
+    heroLabel: {
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+      color: 'rgba(255,255,255,0.7)',
+      letterSpacing: letterSpacing.caps,
+    },
+    heroValue: {
+      fontSize: fontSize.display,
+      fontWeight: '800',
+      color: Colors.goldStarAccent,
+      marginTop: spacing.xs,
+      letterSpacing: letterSpacing.tight,
+    },
+    heroSub: {
+      fontSize: fontSize.sm,
+      color: 'rgba(255,255,255,0.8)',
+      marginTop: spacing.xs,
+    },
 
-  // "How to claim" hint
-  howToCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    backgroundColor: Colors.executiveNavySubtle,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  howToIcon: { fontSize: 16, marginTop: 1 },
-  howToText: { flex: 1, fontSize: fontSize.xs, color: Colors.executiveNavy, lineHeight: 17, fontWeight: '500' },
+    // "How to claim" hint
+    howToCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+      backgroundColor: Colors.executiveNavySubtle,
+      borderRadius: radius.lg,
+      padding: spacing.md,
+      marginBottom: spacing.xl,
+    },
+    howToIcon: { fontSize: 16, marginTop: 1 },
+    howToText: {
+      flex: 1,
+      fontSize: fontSize.xs,
+      color: Colors.executiveNavy,
+      lineHeight: 17,
+      fontWeight: '500',
+    },
 
-  section: { marginBottom: spacing.xl },
-  sectionLabel: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: Colors.gray[400],
-    letterSpacing: letterSpacing.caps,
-    marginBottom: spacing.md,
-    paddingLeft: spacing.xs,
-  },
-  list: { gap: spacing.md },
+    section: { marginBottom: spacing.xl },
+    sectionLabel: {
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+      color: Colors.gray[400],
+      letterSpacing: letterSpacing.caps,
+      marginBottom: spacing.md,
+      paddingLeft: spacing.xs,
+    },
+    list: { gap: spacing.md },
 
-  // Item group card (one item, one or more receipt occurrences)
-  groupCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    overflow: 'hidden',
-    ...shadow.sm,
-  },
-  groupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.lg,
-    backgroundColor: Colors.savingsBg,
-  },
-  groupSub: { fontSize: fontSize.xs, color: Colors.gray[500], marginTop: 1 },
-  groupDivider: { height: 1, backgroundColor: Colors.border, marginLeft: spacing.lg },
+    // Item group card (one item, one or more receipt occurrences)
+    groupCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      overflow: 'hidden',
+      ...shadow.sm,
+    },
+    groupHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      padding: spacing.lg,
+      backgroundColor: Colors.savingsBg,
+    },
+    groupSub: { fontSize: fontSize.xs, color: Colors.gray[500], marginTop: 1 },
+    groupDivider: { height: 1, backgroundColor: Colors.border, marginLeft: spacing.lg },
 
-  receiptRowWrap: {},
-  receiptRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-  },
-  receiptRowBody: { flex: 1, gap: 2 },
-  receiptRowDate: { fontSize: fontSize.xs, fontWeight: '700', color: Colors.gray[600], letterSpacing: letterSpacing.wide },
-  receiptRowDelta: { fontSize: fontSize.sm, fontWeight: '700', color: Colors.savings },
-  receiptChevron: { fontSize: 20, color: Colors.gray[300], fontWeight: '300' },
+    receiptRowWrap: {},
+    receiptRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+    },
+    receiptRowBody: { flex: 1, gap: 2 },
+    receiptRowDate: {
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+      color: Colors.gray[600],
+      letterSpacing: letterSpacing.wide,
+    },
+    receiptRowDelta: { fontSize: fontSize.sm, fontWeight: '700', color: Colors.savings },
+    receiptChevron: { fontSize: 20, color: Colors.gray[300], fontWeight: '300' },
 
-  alertIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.lg,
-    backgroundColor: Colors.savingsBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  alertIcon: { fontSize: 18 },
-  alertBody: { flex: 1, gap: 2 },
-  alertName: { fontSize: fontSize.sm, fontWeight: '700', color: Colors.gray[800], lineHeight: 18 },
-  alertPrices: { fontSize: fontSize.xs, color: Colors.gray[400] },
-  alertPricePaid: { color: Colors.gray[500], textDecorationLine: 'line-through' },
-  alertPriceNow: { color: Colors.savings, fontWeight: '600' },
-  daysLeft: { fontSize: 10, fontWeight: '700', color: Colors.warning, letterSpacing: letterSpacing.caps, marginTop: 2 },
-  alertRight: { alignItems: 'flex-end' },
-  alertDelta: { fontSize: fontSize.lg, fontWeight: '800', color: Colors.savings, letterSpacing: letterSpacing.tight },
-  alertRefund: { fontSize: fontSize.xs, color: Colors.savings, fontWeight: '600', letterSpacing: letterSpacing.wide },
+    alertIconWrap: {
+      width: 38,
+      height: 38,
+      borderRadius: radius.lg,
+      backgroundColor: Colors.savingsBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    alertIcon: { fontSize: 18 },
+    alertBody: { flex: 1, gap: 2 },
+    alertName: {
+      fontSize: fontSize.sm,
+      fontWeight: '700',
+      color: Colors.gray[800],
+      lineHeight: 18,
+    },
+    alertPrices: { fontSize: fontSize.xs, color: Colors.gray[400] },
+    alertPricePaid: { color: Colors.gray[500], textDecorationLine: 'line-through' },
+    alertPriceNow: { color: Colors.savings, fontWeight: '600' },
+    daysLeft: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: Colors.warning,
+      letterSpacing: letterSpacing.caps,
+      marginTop: 2,
+    },
+    alertRight: { alignItems: 'flex-end' },
+    alertDelta: {
+      fontSize: fontSize.lg,
+      fontWeight: '800',
+      color: Colors.savings,
+      letterSpacing: letterSpacing.tight,
+    },
+    alertRefund: {
+      fontSize: fontSize.xs,
+      color: Colors.savings,
+      fontWeight: '600',
+      letterSpacing: letterSpacing.wide,
+    },
 
-  rowActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  viewReceiptBtn: {
-    flex: 1,
-    backgroundColor: Colors.navySolid,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm + 2,
-    alignItems: 'center',
-  },
-  viewReceiptText: { color: Colors.white, fontSize: fontSize.sm, fontWeight: '700' },
-  markClaimedLink: {
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.sm,
-  },
-  markClaimedLinkText: { color: Colors.success, fontSize: fontSize.xs, fontWeight: '600' },
+    rowActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.md,
+    },
+    viewReceiptBtn: {
+      flex: 1,
+      backgroundColor: Colors.navySolid,
+      borderRadius: radius.md,
+      paddingVertical: spacing.sm + 2,
+      alignItems: 'center',
+    },
+    viewReceiptText: { color: Colors.white, fontSize: fontSize.sm, fontWeight: '700' },
+    markClaimedLink: {
+      paddingVertical: spacing.sm + 2,
+      paddingHorizontal: spacing.sm,
+    },
+    markClaimedLinkText: { color: Colors.success, fontSize: fontSize.xs, fontWeight: '600' },
 
-  // Claimed row
-  claimedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: Colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    ...shadow.sm,
-  },
-  claimedIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.pill,
-    backgroundColor: Colors.successBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  claimedIcon: { fontSize: 15, color: Colors.success, fontWeight: '700' },
-  claimedBody: { flex: 1 },
-  claimedName: { fontSize: fontSize.sm, fontWeight: '600', color: Colors.gray[600] },
-  claimedDate: { fontSize: fontSize.xs, color: Colors.gray[400], marginTop: 1 },
-  claimedDelta: { fontSize: fontSize.sm, fontWeight: '700', color: Colors.gray[400] },
+    // Claimed row
+    claimedRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: Colors.surface,
+      borderRadius: radius.lg,
+      padding: spacing.md,
+      ...shadow.sm,
+    },
+    claimedIconWrap: {
+      width: 32,
+      height: 32,
+      borderRadius: radius.pill,
+      backgroundColor: Colors.successBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    claimedIcon: { fontSize: 15, color: Colors.success, fontWeight: '700' },
+    claimedBody: { flex: 1 },
+    claimedName: { fontSize: fontSize.sm, fontWeight: '600', color: Colors.gray[600] },
+    claimedDate: { fontSize: fontSize.xs, color: Colors.gray[400], marginTop: 1 },
+    claimedDelta: { fontSize: fontSize.sm, fontWeight: '700', color: Colors.gray[400] },
 
-  // Empty state
-  emptyCard: {
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing['3xl'],
-    ...shadow.sm,
-  },
-  emptyIcon: { fontSize: 44, marginBottom: spacing.md },
-  emptyTitle: { fontSize: fontSize.lg, fontWeight: '700', color: Colors.gray[900], marginBottom: spacing.xs },
-  emptySubtitle: { fontSize: fontSize.sm, color: Colors.gray[400], textAlign: 'center' },
-});
+    // Empty state
+    emptyCard: {
+      alignItems: 'center',
+      backgroundColor: Colors.surface,
+      borderRadius: radius.xl,
+      padding: spacing['3xl'],
+      ...shadow.sm,
+    },
+    emptyIcon: { fontSize: 44, marginBottom: spacing.md },
+    emptyTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: '700',
+      color: Colors.gray[900],
+      marginBottom: spacing.xs,
+    },
+    emptySubtitle: { fontSize: fontSize.sm, color: Colors.gray[400], textAlign: 'center' },
+  });

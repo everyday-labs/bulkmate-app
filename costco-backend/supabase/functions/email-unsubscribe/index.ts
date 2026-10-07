@@ -27,7 +27,8 @@ function page(title: string, message: string, status = 200): Response {
 }
 
 serve(async (req) => {
-  if (req.method !== 'GET' && req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+  if (req.method !== 'GET' && req.method !== 'POST')
+    return new Response('Method not allowed', { status: 405 });
 
   try {
     const url = new URL(req.url);
@@ -35,7 +36,11 @@ serve(async (req) => {
     const token = url.searchParams.get('t') ?? '';
 
     if (!userId || !token || !(await verifyUnsubscribeToken(userId, token))) {
-      return page('Link not valid', 'This unsubscribe link is invalid or incomplete. You can turn off price-drop emails in the app under Profile → Preferences.', 400);
+      return page(
+        'Link not valid',
+        'This unsubscribe link is invalid or incomplete. You can turn off price-drop emails in the app under Profile → Preferences.',
+        400,
+      );
     }
 
     const supabase = createClient(
@@ -56,6 +61,10 @@ serve(async (req) => {
   } catch (err: unknown) {
     console.error('email-unsubscribe error:', err instanceof Error ? err.message : err);
     await capturePostHogException(err, { functionName: 'email-unsubscribe' });
-    return page('Something went wrong', 'Please try again, or turn off price-drop emails in the app under Profile → Preferences.', 500);
+    return page(
+      'Something went wrong',
+      'Please try again, or turn off price-drop emails in the app under Profile → Preferences.',
+      500,
+    );
   }
 });
