@@ -83,6 +83,10 @@ export default function AlertsScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      // useAuth resolves the session asynchronously, so the first focus fires
+      // with no user. Loading then would query id '' and race the real load —
+      // if it lands last it wipes the data (Home showed the placeholder name).
+      if (!session?.user.id) return;
       load(false);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [session?.user.id]),

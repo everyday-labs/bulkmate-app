@@ -1,6 +1,6 @@
 # Bulkmate
 
-An open-source, gamified warehouse-club companion app for iOS and Android. Built as a personal side project to solve real pain points — receipt tracking, price-match alerts, and making warehouse visits a little more fun.
+An open-source, gamified warehouse-club companion app for iOS and Android, by **[Everyday Labs](https://everyday-labs.org)**. Built as a side project to solve real pain points — receipt tracking, price-match alerts, and making warehouse visits a little more fun.
 
 > **Naming note:** this app was called "Costco Companion" during early development and was renamed to **Bulkmate** before beta distribution. An app named and branded as Costco implies an affiliation that doesn't exist — an App Review rejection trigger and a trademark exposure. Factual references to Costco throughout the app and these docs are deliberate: it genuinely reads Costco receipts, and describing that is nominative use. Only the app's *own* branding changed.
 
@@ -155,18 +155,18 @@ Real traps hit while building this — worth knowing before you dig into the cod
 
 ## About this project
 
-I go by **Tinker** — a tech enthusiast and developer who builds side projects in my spare time. (Yes, named after the Dota 2 hero. Seemed fitting.) This app started as a personal tool: I was tired of manually tracking Costco receipts, missing price-match windows, and forgetting which warehouse I'd visited. So I built something to fix that.
+Bulkmate is built and published by **[Everyday Labs](https://everyday-labs.org)**, an independent, non-commercial studio for small, useful, open-source apps.
 
-I share projects like this publicly because I believe in building tools that solve real problems and letting others use, learn from, and improve them.
+It started as a practical fix for everyday annoyances: manually tracking Costco receipts, missing price-match windows, and forgetting which warehouse was visited.
 
-**What I'm not doing:**
-- This is not a commercial product.
-- I am not affiliated with, endorsed by, or partnered with Costco Wholesale Corporation in any way.
+**What this project is not:**
+- A commercial product.
+- Affiliated with, endorsed by, or partnered with Costco Wholesale Corporation in any way.
 
-**What I am doing:**
-- Building something useful for myself and sharing it.
-- Learning by building real things, not toy demos.
-- Open-sourcing everything so others can benefit and contribute.
+**What it is:**
+- A useful tool, shared openly.
+- Real software built to learn from, not a toy demo.
+- Open source, so others can use it, learn from it, and contribute.
 
 ---
 
@@ -185,13 +185,13 @@ This app is an **independent, community-built tool** and is **not affiliated wit
 
 Pricing and inventory data is sourced from third-party APIs and crowdsourced receipt scans — not from Costco's internal systems. Data accuracy is not guaranteed. Use this app to assist your own decisions, not as a source of financial truth.
 
-**This software is provided "as is," without warranty of any kind.** The author accepts no liability for decisions made based on information displayed in this app. See the [LICENSE](./LICENSE) for full terms.
+**This software is provided "as is," without warranty of any kind.** Everyday Labs accepts no liability for decisions made based on information displayed in this app. See the [LICENSE](./LICENSE) for full terms.
 
 ---
 
 ## License
 
-MIT — free to use, modify, and distribute. See [LICENSE](./LICENSE).
+MIT — free to use, modify, and distribute. © 2026 Everyday Labs. See [LICENSE](./LICENSE).
 
 ---
 

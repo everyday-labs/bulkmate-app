@@ -1,6 +1,7 @@
 {
   "name": "costco-mobile",
   "version": "1.0.0",
+  "author": "Everyday Labs",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",

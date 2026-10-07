@@ -40,6 +40,15 @@ export default function LoginScreen() {
     }
     setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error?.code === 'email_not_confirmed') {
+      // Signed up but never entered the code — send a fresh one and finish
+      // verification instead of leaving them stuck on a dead-end error.
+      posthog?.capture('sign_in_failed', { sign_in_method: 'email', error: error.message });
+      await supabase.auth.resend({ type: 'signup', email: email.trim() });
+      setLoading(false);
+      router.push({ pathname: '/(auth)/register', params: { verifyEmail: email.trim() } });
+      return;
+    }
     if (error) {
       posthog?.capture('sign_in_failed', { sign_in_method: 'email', error: error.message });
       Alert.alert('Sign in failed', error.message);
