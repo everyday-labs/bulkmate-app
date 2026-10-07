@@ -57,7 +57,10 @@
     "test": "jest",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "prepare": "cd .. && husky costco-mobile/.husky",
+    "format": "prettier --write .. --ignore-path ../.prettierignore --ignore-path ../.gitignore",
+    "format:check": "prettier --check .. --ignore-path ../.prettierignore --ignore-path ../.gitignore --log-level warn"
   },
   "private": true,
   "jest": {
