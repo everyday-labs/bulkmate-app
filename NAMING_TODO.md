@@ -54,14 +54,14 @@ Pick one pattern (e.g. "Bulkmate by Everyday Labs") and use it in emails, websit
       `costco-backend/supabase/templates/confirm-signup.html`. Subject → `Your Bulkmate code: {{ .Token }}`.
 - [x] **Reset password** template — re-paste `templates/reset-password.html`; subject
       `Your Bulkmate password reset code`.
-- [ ] **Other templates still on Supabase defaults** — unused by the app, but three can still be
+- [x] **Other templates still on Supabase defaults** — unused by the app, but three can still be
       triggered (Magic Link by anyone with the anon key; Change Email + Reauthentication by any
       signed-in user via the API; Invite is service-role only). Branded code-based versions written
-      2026-10-07 — **paste into the dashboard** (template body + subject):
-  - [ ] Magic Link ← `templates/magic-link.html`, subject `Your Bulkmate sign-in code: {{ .Token }}`
-  - [ ] Change Email Address ← `templates/change-email.html`, subject `Confirm your new Bulkmate email`
-  - [ ] Invite User ← `templates/invite.html`, subject `You're invited to Bulkmate`
-  - [ ] Reauthentication ← `templates/reauthentication.html`, subject `Your Bulkmate confirmation code`
+      2026-10-07 and pasted into the dashboard (template body + subject):
+  - [x] Magic Link ← `templates/magic-link.html`, subject `Your Bulkmate sign-in code: {{ .Token }}`
+  - [x] Change Email Address ← `templates/change-email.html`, subject `Confirm your new Bulkmate email`
+  - [x] Invite User ← `templates/invite.html`, subject `You're invited to Bulkmate`
+  - [x] Reauthentication ← `templates/reauthentication.html`, subject `Your Bulkmate confirmation code`
 - [x] **Site URL** — set to `bulkmate://` 2026-10-06 (could point at everyday-labs.org instead).
 - [ ] **Gmail account display name** for balajic0623@gmail.com — shows in some clients next to the
       address. Set it to match (Gmail → Settings → Accounts → "Send mail as").
