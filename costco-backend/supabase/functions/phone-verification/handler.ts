@@ -25,9 +25,17 @@ async function sha256Hex(input: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Uniform 000000–999999. A plain `random % 1_000_000` over-represents the
+// low codes (2^32 isn't a multiple of 10^6), so draws above the largest
+// multiple are rejected and redrawn — at most ~0.02% of draws.
+const CODE_SPACE = 1_000_000;
+const UNBIASED_LIMIT = Math.floor(2 ** 32 / CODE_SPACE) * CODE_SPACE;
+
 function sixDigitCode(): string {
-  const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000;
-  return n.toString().padStart(6, '0');
+  const buf = new Uint32Array(1);
+  do crypto.getRandomValues(buf);
+  while (buf[0] >= UNBIASED_LIMIT);
+  return (buf[0] % CODE_SPACE).toString().padStart(6, '0');
 }
 
 export async function handler(req: Request): Promise<Response> {

@@ -198,3 +198,24 @@ Deno.test('phone-verification: a failed profile update is a server error', async
   assertEquals(res.status, 200);
   await res.body?.cancel();
 });
+
+Deno.test('phone-verification: codes are uniform 6-digit strings', async () => {
+  // Statistical smoke test: with modulo bias the low codes would be favoured;
+  // with rejection sampling, the first digit is ~uniform.
+  const { api, done } = setup();
+  const firstDigits = new Array(10).fill(0);
+  try {
+    for (let i = 0; i < 400; i++) {
+      await call({ action: 'send', phone: '+15551234567' });
+    }
+    for (const c of api.calls(SMS)) {
+      const code = (c.body as { content: string }).content.match(/code: (\d+)/)![1];
+      assertEquals(code.length, 6);
+      firstDigits[Number(code[0])]++;
+    }
+  } finally {
+    done();
+  }
+  // Each digit expected ~40 times out of 400; allow wide statistical slack.
+  for (const n of firstDigits) assertEquals(n > 10 && n < 80, true, `digit counts ${firstDigits}`);
+});
