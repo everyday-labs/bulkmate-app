@@ -97,7 +97,7 @@ export default function ForgotPasswordScreen() {
       Alert.alert('Could not update password', error.message);
       return;
     }
-    posthog?.identify(data.user.id, data.user.email ? { email: data.user.email } : undefined);
+    posthog?.identify(data.user.id);
     posthog?.capture('password_reset_completed');
     router.replace('/(tabs)');
   }

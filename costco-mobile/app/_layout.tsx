@@ -55,7 +55,7 @@ function RootLayoutInner() {
 
     if (identifiedUserIdRef.current === user.id) return;
 
-    posthog?.identify(user.id, user.email ? { email: user.email } : undefined);
+    posthog?.identify(user.id);
     identifiedUserIdRef.current = user.id;
   }, [loading, session]);
 

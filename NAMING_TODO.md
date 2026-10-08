@@ -83,9 +83,11 @@ Use it in emails, website, and store listing.
 
 - [ ] **App Store Connect → App Information**: name `Bulkmate`, subtitle, category.
 - [ ] **Copyright** field (App Store → version page): `© 2026 Everyday Labs`.
-- [ ] **Seller / developer name**: comes from the Developer Program enrollment. Individual
+- [x] **Seller / developer name**: comes from the Developer Program enrollment. Individual
       enrollment shows your legal name; "Everyday Labs" needs an organization enrollment (legal
-      entity + D-U-N-S). Decide whether that matters to you — it's fine to ship as an individual.
+      entity + D-U-N-S). Decided 2026-10-07: **ship as an individual**. Everyday Labs stays the
+      copyright holder and appears in the description. All App Store Connect text is drafted in
+      `APP_STORE.md`.
 - [ ] **Privacy Policy URL** + **Support URL** → `https://everyday-labs.org/bulkmate/privacy/` and
       `https://everyday-labs.org/bulkmate/support/` (both live 2026-10-07).
 - [ ] **App Review contact info** — name/email consistent with the above.
