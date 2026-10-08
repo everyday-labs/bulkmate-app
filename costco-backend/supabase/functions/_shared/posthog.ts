@@ -17,6 +17,8 @@
 
 const projectToken = Deno.env.get('POSTHOG_PROJECT_TOKEN');
 const host = Deno.env.get('POSTHOG_HOST');
+// Analytics must never hold up the response it's reporting on.
+const TIMEOUT_MS = 5_000;
 
 type EventProperties = Record<string, unknown>;
 
@@ -45,6 +47,7 @@ export async function capturePostHogEvent(
         distinct_id: distinctId ?? 'costco-backend',
         properties: { ...properties, $lib: 'costco-backend-edge-function' },
       }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) {
       console.warn(`PostHog capture "${event}" returned ${res.status}:`, await res.text());

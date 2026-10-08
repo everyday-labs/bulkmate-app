@@ -80,6 +80,21 @@ describe('ProductDetailScreen', () => {
     expect(openURL).toHaveBeenCalledWith('https://www.costco.com/p.html');
   });
 
+  it('credits Open Food Facts for its ingredient data', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    respond(200, product);
+    await renderWithProviders(<ProductDetailScreen />);
+    fireEvent.press(await screen.findByText(/Open Food Facts contributors/));
+    expect(openURL).toHaveBeenCalledWith('https://world.openfoodfacts.org');
+  });
+
+  it('credits USDA when the ingredients came from FoodData Central', async () => {
+    respond(200, { ...product, ingredients: { ...product.ingredients, source: 'fdc' } });
+    await renderWithProviders(<ProductDetailScreen />);
+    expect(await screen.findByText('Ingredient data: USDA FoodData Central')).toBeTruthy();
+    expect(screen.queryByText(/Open Food Facts contributors/)).toBeNull();
+  });
+
   it('renders a sparse product without prices, history or ingredients', async () => {
     respond(200, {
       ...product,
