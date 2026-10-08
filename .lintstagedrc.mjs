@@ -9,6 +9,7 @@
 
 const MOBILE = 'scripts/in-mobile.sh';
 const DENO = 'scripts/deno.sh';
+const OPT = 'scripts/optional-tool.sh';
 
 export default {
   '*.{ts,tsx,js,mjs,cjs,json,yml,yaml,css,html}':
@@ -21,6 +22,16 @@ export default {
   ],
 
   'costco-mobile/constants/colors.ts': () => `${MOBILE} node scripts/check-contrast.js`,
+
+  // GitHub Actions: syntax/expressions (actionlint) and security (zizmor).
+  '.github/workflows/*.{yml,yaml}': [
+    () => `${OPT} actionlint`,
+    () => `${OPT} zizmor --no-progress --min-severity=low .github/workflows`,
+  ],
+
+  // Shell scripts and git hooks.
+  'scripts/*.sh': `${OPT} shellcheck`,
+  'costco-mobile/.husky/pre-*': `${OPT} shellcheck --shell=sh`,
 
   'costco-backend/supabase/functions/**/*.ts': [
     `${DENO} lint`,

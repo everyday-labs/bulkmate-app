@@ -22,3 +22,7 @@ test-results/
 # Claude Code: personal settings and session worktrees — never commit
 .claude/settings.local.json
 .claude/worktrees/
+
+# Supabase CLI cache
+supabase/.temp/
+costco-backend/supabase/.temp/

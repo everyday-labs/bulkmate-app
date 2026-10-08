@@ -1,0 +1,74 @@
+# gitleaks configuration — secret scanning for commits (pre-commit hook) and
+# the full git history (CI "Security" job). Extends gitleaks' ~200 built-in
+# rules with the gaps that matter for this project.
+#
+#   gitleaks git --staged --pre-commit   # what the pre-commit hook runs
+#   gitleaks git . --log-opts=--all      # what CI runs (every commit, every branch)
+#
+# A finding that is a known, revoked false alarm goes in .gitleaksignore by
+# fingerprint — never weaken a rule to silence one.
+
+title = "bulkmate gitleaks config"
+
+[extend]
+useDefault = true
+
+# The built-in gcp-api-key rule requires a quote/space/newline right after the
+# key, so it misses keys inside JSON-escaped strings (\"AIza...\") — exactly
+# how Claude Code stores a command in .claude/settings.local.json. A real key
+# leaked that way on 2026-08-11. No trailing boundary here.
+[[rules]]
+id = "google-api-key-any-context"
+description = "Google API key (any surrounding characters, incl. JSON-escaped)"
+regex = '''AIza[0-9A-Za-z_\-]{35}'''
+keywords = ["aiza"]
+
+# Supabase's newer secret API keys (service-level, bypass RLS).
+[[rules]]
+id = "supabase-secret-key"
+description = "Supabase secret API key"
+regex = '''sb_secret_[0-9A-Za-z_\-]{20,}'''
+keywords = ["sb_secret_"]
+
+# RapidAPI keys are 50-char tokens with no prefix; catch them by header name.
+[[rules]]
+id = "rapidapi-key"
+description = "RapidAPI key in an x-rapidapi-key header or RAPIDAPI_KEY assignment"
+regex = '''(?i)(?:x-rapidapi-key|rapidapi_key)['"\\]*\s*[:=]\s*\\?['"]?([0-9a-z]{40,60})'''
+secretGroup = 1
+entropy = 3.5
+keywords = ["rapidapi"]
+
+# KEY=value / "KEY": "value" for anything named like a credential, including
+# shell-style env prefixes saved in tool settings (FOO_API_KEY="..." cmd).
+[[rules]]
+id = "credential-assignment"
+description = "High-entropy value assigned to a *_KEY / *_SECRET / *_TOKEN / *_PASSWORD name"
+regex = '''(?i)\b[A-Z0-9_]*(?:API_KEY|SECRET|TOKEN|PASSWORD|PRIVATE_KEY)\b\s*[:=]\s*\\?["']?([A-Za-z0-9_\-+/=.]{20,})'''
+secretGroup = 1
+entropy = 4.0
+keywords = ["key", "secret", "token", "password"]
+
+# Reading a secret from the environment is the right pattern, not a leak.
+[[rules.allowlists]]
+regexes = ['''^(?:process\.env|Deno\.env|import\.meta\.env|os\.environ|env\.|ENV\[)''']
+
+# Files that must never be committed, whatever they contain.
+[[rules]]
+id = "forbidden-file"
+description = "File type that must never be committed (env file, signing key, local tool settings)"
+path = '''(?i)(?:^|/)(?:\.env(?:\.local|\.production|\.development)?|.+\.p8|.+\.p12|.+\.pem|.+\.mobileprovision|.+\.keystore|google-services\.json|GoogleService-Info\.plist|settings\.local\.json|serviceAccount.*\.json)$'''
+
+[allowlist]
+description = "Fixtures and generated files"
+paths = [
+  '''(?:^|/)node_modules/''',
+  '''(?:^|/)package-lock\.json$''',
+  '''(?:^|/)deno\.lock$''',
+  '''(?:^|/)\.env\.example$''',
+  '''\.png$''',
+]
+# Obvious placeholders used in docs and tests.
+regexes = [
+  '''(?i)(?:test|fake|dummy|example|placeholder|xxx+|your[-_]?key|changeme)''',
+]
