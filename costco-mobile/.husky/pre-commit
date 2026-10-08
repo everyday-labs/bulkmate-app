@@ -1,3 +1,6 @@
-# Runs from the repo root. Formats + lints staged files, then typechecks and
-# runs the tests related to what's staged. Full suite: pre-push / CI.
+# Runs from the repo root.
+# 1. Secrets: block the commit if a staged change contains a credential.
+scripts/secret-scan.sh --staged
+# 2. Format + lint staged files, then typecheck and run the related tests.
+#    Full suite: pre-push / CI.
 costco-mobile/node_modules/.bin/lint-staged --config .lintstagedrc.mjs
