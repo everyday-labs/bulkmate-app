@@ -1,12 +1,6 @@
 import { assertEquals } from 'jsr:@std/assert@1';
 import { handler } from './handler.ts';
-import {
-  errorResponse,
-  fakeSupabase,
-  quiet,
-  request,
-  setFunctionEnv,
-} from '../_testing/fakeSupabase.ts';
+import { errorResponse, fakeSupabase, request, setFunctionEnv } from '../_testing/fakeSupabase.ts';
 
 const USER = { id: 'user-1', email: 'sam@example.com', aud: 'authenticated' };
 // Almaden #470 and a far-away Legendary warehouse.
@@ -178,9 +172,22 @@ Deno.test('check-in: a failed insert is reported', async () => {
     'POST check_ins': errorResponse(500, { code: '500', message: 'disk full' }),
   });
   try {
-    const res = await quiet(() => handler(request(at(ALMADEN), { token: 'jwt' })));
+    const logged: unknown[] = [];
+    const error = console.error;
+    console.error = (...args: unknown[]) => logged.push(args.join(' '));
+    let res: Response;
+    try {
+      res = await handler(request(at(ALMADEN), { token: 'jwt' }));
+    } finally {
+      console.error = error;
+    }
     assertEquals(res.status, 500);
-    assertEquals((await res.json()).error, 'disk full');
+    // Generic message to the client; the database detail only in the log.
+    assertEquals((await res.json()).error, 'Could not record the check-in. Please try again.');
+    assertEquals(
+      logged.some((l) => String(l).includes('disk full')),
+      true,
+    );
   } finally {
     done();
   }

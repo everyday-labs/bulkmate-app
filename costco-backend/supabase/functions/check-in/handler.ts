@@ -213,12 +213,16 @@ export async function handler(req: Request): Promise<Response> {
         nearest.tier,
       );
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      console.error('check-in insert error:', message);
-      return new Response(JSON.stringify({ error: message }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      });
+      // Details stay in the function log; the client gets a generic message so
+      // database internals never reach the app.
+      console.error('check-in insert error:', e instanceof Error ? e.message : String(e));
+      return new Response(
+        JSON.stringify({ error: 'Could not record the check-in. Please try again.' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        },
+      );
     }
 
     const {
