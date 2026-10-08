@@ -19,17 +19,63 @@ env:
   # Git hooks are a local-dev gate; CI runs the same checks explicitly.
   HUSKY: 0
   NODE_VERSION: 22
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+  ACTIONLINT_VERSION: 1.7.12
+  ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+  ZIZMOR_VERSION: 1.30.1
 
-# Third-party actions are pinned to full commit SHAs (tag in the comment);
-# Dependabot (.github/dependabot.yml) keeps them current.
+# Third-party actions are pinned to full commit SHAs (tag in the comment) and
+# downloaded tools to a version + SHA-256; Dependabot keeps the actions current.
+# Every checkout drops its token (persist-credentials: false) so nothing later
+# in a job — artifacts included — can carry it out.
 
 jobs:
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # every commit on every branch, not just the tip
+          persist-credentials: false
+      - name: Install gitleaks (pinned, checksum-verified)
+        run: |
+          curl -sSfL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check
+          tar -xzf gitleaks.tar.gz gitleaks && sudo mv gitleaks /usr/local/bin/ && rm gitleaks.tar.gz
+      - name: Scan full history (.gitleaks.toml, known findings in .gitleaksignore)
+        run: ./scripts/secret-scan.sh
+
+  workflow-lint:
+    name: Workflow & shell lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install actionlint (pinned, checksum-verified)
+        run: |
+          curl -sSfL -o actionlint.tar.gz "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  actionlint.tar.gz" | sha256sum --check
+          tar -xzf actionlint.tar.gz actionlint && sudo mv actionlint /usr/local/bin/ && rm actionlint.tar.gz
+      - name: actionlint (workflow syntax, expressions, embedded shellcheck)
+        run: actionlint
+      - name: zizmor (GitHub Actions security audit)
+        run: pipx run "zizmor==${ZIZMOR_VERSION}" --format=github --min-severity=low .github/workflows
+      - name: shellcheck (scripts and git hooks)
+        run: shellcheck scripts/*.sh && shellcheck --shell=sh costco-mobile/.husky/pre-commit costco-mobile/.husky/pre-push
+
   lint:
     name: Lint & typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -58,12 +104,45 @@ jobs:
           deno check .
           deno lint
 
+  dependencies:
+    name: Dependency review & audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Block new vulnerable or copyleft dependencies (PRs only)
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0
+          comment-summary-in-pr: never
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: npm audit — existing vulnerabilities (reported, not blocking)
+        working-directory: costco-mobile
+        # Existing issues sit in Expo SDK 54's build tooling and need an SDK
+        # upgrade; dependency review above blocks anything new.
+        run: |
+          npm audit --omit=dev --json > audit.json || true
+          # shellcheck disable=SC2016 # ${...} is a JavaScript template literal
+          node -e '
+            const m = require("./audit.json").metadata.vulnerabilities;
+            console.log(["### npm audit (production deps)", "| critical | high | moderate | low |", "|---|---|---|---|",
+              `| ${m.critical} | ${m.high} | ${m.moderate} | ${m.low} |`].join("\n"));
+          ' >> "$GITHUB_STEP_SUMMARY"
+
   mobile-tests:
     name: Mobile tests (Jest + coverage)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -80,6 +159,7 @@ jobs:
         working-directory: costco-mobile
         run: |
           [ -f coverage/coverage-summary.json ] || exit 0
+          # shellcheck disable=SC2016 # ${...} is a JavaScript template literal
           node -e '
             const t = require("./coverage/coverage-summary.json").total;
             const row = (k) => `| ${k} | ${t[k].pct}% | ${t[k].covered}/${t[k].total} |`;
@@ -100,6 +180,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: v2.x
@@ -130,6 +212,8 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -168,11 +252,11 @@ jobs:
           path: costco-mobile/playwright-report/
           retention-days: 7
 
-  # Single status to require in branch protection.
+  # Single status required by branch protection on main.
   ci-passed:
     name: CI passed
     if: always()
-    needs: [lint, mobile-tests, backend-tests, visual]
+    needs: [secrets, workflow-lint, lint, dependencies, mobile-tests, backend-tests, visual]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
