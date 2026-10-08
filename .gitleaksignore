@@ -1,0 +1,16 @@
+# Known findings in old commits, already remediated. Matched by exact fingerprint
+# (commit:file:rule:line), so the same secret in any NEW commit still fails.
+#
+# Google Places API key + the settings file it lived in, committed by mistake
+# in .claude/settings.local.json (Aug 2026). Key deleted in Google Cloud on
+# 2026-10-07, file untracked in PR #20, GitHub secret-scanning alert #1
+# resolved as revoked. History is not rewritten: GitHub keeps old PR refs.
+3eb5bc0bf3b89e6f874cb51b26f277f976722204:.claude/settings.local.json:forbidden-file:0
+407f33db6d34a832f05ea5947bbd873788086100:.claude/settings.local.json:credential-assignment:122
+407f33db6d34a832f05ea5947bbd873788086100:.claude/settings.local.json:credential-assignment:124
+407f33db6d34a832f05ea5947bbd873788086100:.claude/settings.local.json:forbidden-file:0
+407f33db6d34a832f05ea5947bbd873788086100:.claude/settings.local.json:google-api-key-any-context:122
+407f33db6d34a832f05ea5947bbd873788086100:.claude/settings.local.json:google-api-key-any-context:124
+922e0bb3aad691ccc32cf529469ffba60d12ddeb:.claude/settings.local.json:forbidden-file:0
+c616e74fd94fed8a8f6d9f6c87cb31443bd867ce:.claude/settings.local.json:forbidden-file:0
+d08b47f97a83efd81dcdcfe3f7251416d025cff5:.claude/settings.local.json:forbidden-file:0
