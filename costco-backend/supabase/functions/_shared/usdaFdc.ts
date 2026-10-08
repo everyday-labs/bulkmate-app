@@ -14,6 +14,8 @@
 // returned `gtinUpc` against the input before trusting the result.
 
 const FDC_SEARCH_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search';
+// Fallback enrichment — give up quickly rather than slow the product screen.
+const TIMEOUT_MS = 8_000;
 
 function normalizeUpc(upc: string): string {
   // Strip leading zeros so "0123..." and "123..." compare equal — FDC and
@@ -47,7 +49,7 @@ export type FdcProduct = {
 export async function fetchProductByUpc(upc: string, apiKey: string): Promise<FdcProduct | null> {
   try {
     const url = `${FDC_SEARCH_URL}?query=${encodeURIComponent(upc)}&dataType=Branded&pageSize=1&api_key=${apiKey}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
 
     if (!res.ok) {
       console.warn(`FDC ${res.status} for UPC "${upc}"`);

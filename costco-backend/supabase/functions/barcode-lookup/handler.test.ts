@@ -213,13 +213,27 @@ Deno.test('barcode-lookup: nothing anywhere is a 404 and caches the miss', async
   }
 });
 
-Deno.test('barcode-lookup: works without API keys and without a signed-in user', async () => {
-  const { api, done } = setup({ 'GET auth/user': errorResponse(401) }, {});
+Deno.test('barcode-lookup: works without API keys', async () => {
+  const { api, done } = setup({}, {});
   try {
-    const body = await (await lookup(SKU, '')).json();
+    const body = await (await lookup()).json();
     assertEquals(body.source, 'partial'); // OFF needs no key; receipt history exists
     assertEquals(api.calls(RAPIDAPI).length, 0);
     assertEquals(api.calls(FDC).length, 0);
+  } finally {
+    await done();
+  }
+});
+
+Deno.test('barcode-lookup: refuses callers who are not signed in', async () => {
+  const { api, done } = setup({ 'GET auth/user': errorResponse(401) });
+  try {
+    // The public anon key resolves to no user; so does no token at all.
+    assertEquals((await lookup(SKU, 'anon-key')).status, 401);
+    assertEquals((await lookup(SKU, '')).status, 401);
+    // No paid (or free) lookups were spent, and nothing was recorded.
+    assertEquals(api.calls(RAPIDAPI).length, 0);
+    assertEquals(api.calls(OFF).length, 0);
     await settle();
     assertEquals(api.calls('POST product_lookups').length, 0);
   } finally {
@@ -233,7 +247,11 @@ Deno.test('barcode-lookup: validation and failures', async () => {
     assertEquals((await lookup('  ')).status, 400);
     // A malformed body is the one failure that escapes to the 500 handler —
     // database/API errors degrade to cache misses instead.
-    const bad = new Request('https://fn.local/', { method: 'POST', body: '{not json' });
+    const bad = new Request('https://fn.local/', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer jwt' },
+      body: '{not json',
+    });
     const res = await quiet(() => handler(bad));
     assertEquals(res.status, 500);
     await res.body?.cancel();
