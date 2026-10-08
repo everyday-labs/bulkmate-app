@@ -1,9 +1,139 @@
-# External APIs
+# External APIs & Services
 
-Every third-party API this app calls, where it's called from, and what happens
-when it fails. All seven clients live in `supabase/functions/_shared/` — one
-file per API — so there's a single canonical place to look for "how do we
-call X" regardless of which Edge Function needs it.
+Every third-party service Bulkmate depends on: what it's used for, which key
+it needs, what it costs, its limits/SLA, and what happens when it fails.
+The first half is the **register** (accounts, keys, costs, limits — keep it
+current whenever a key, plan or service changes); the second half is the
+per-API detail for the seven runtime clients in `supabase/functions/_shared/`
+(one file per API).
+
+**Never put secret values in this file** — the repo is public. Record the
+secret's *name* and where it lives; the values live in the provider
+dashboards, `supabase secrets`, EAS environment variables, and a password
+manager.
+
+*Prices and limits below were checked against the providers' public pages on
+2026-10-07. Re-check before relying on them — providers change plans.*
+
+## Which service is used for what
+
+| Service | Used for | Called from | Auth | Cost |
+|---|---|---|---|---|
+| Google Cloud Vision | Receipt OCR (photo → text) | `ingest-receipt` (`_shared/googleVision.ts`) | API key | **Paid** per image |
+| RapidAPI — Costco Live Data | Live Costco price, name, image, rating | `barcode-lookup`, `price-match-check` (`_shared/rapidApi.ts`) | API key (header) | **Paid** subscription |
+| Open Food Facts | Ingredients, NOVA, Nutri-Score, additives (primary) | `barcode-lookup` (`_shared/openFoodFacts.ts`) | None (User-Agent) | Free |
+| USDA FoodData Central | Ingredient text (fallback) | `barcode-lookup` (`_shared/usdaFdc.ts`) | API key (query param) | Free |
+| Expo Push API | Price-drop push notifications | `price-match-check` (`_shared/expoPush.ts`) | Device push token | Free |
+| Brevo API | Price-drop emails; SMS digest + phone codes (⏸ paused) | `price-match-check`, `weekly-price-texts`, `phone-verification` (`_shared/brevo.ts`) | API key (header) | Free ≤300 emails/day; SMS paid |
+| Brevo SMTP relay | Auth emails (sign-up / reset codes) | Supabase Auth (dashboard config) | SMTP login + key | Shares the 300/day |
+| PostHog | Analytics, session replay, error tracking | Mobile app + all 8 Edge Functions (`_shared/posthog.ts`) | Project token | Free tier |
+| Supabase | Postgres, Auth, Storage (receipt images), Edge Functions, pg_cron | Everything | Anon key (app), service-role key (functions) | Plan to confirm (see below) |
+| Google Sign-In | "Sign in with Google" | Mobile (`lib/googleSignIn.ts`) → Supabase Auth | OAuth client IDs + secret | Free |
+| Sign in with Apple | "Sign in with Apple" | Mobile → Supabase Auth | Services ID + client-secret JWT | Included in Apple Developer |
+| Google Places API | One-off seeding of the 723 warehouses + rarity | `costco-backend/scripts/seed-warehouses-from-google-places.mjs` (run locally) | API key | **Paid** above free cap |
+| Expo / EAS | Cloud builds, TestFlight submits, OTA updates, iOS push credentials | `eas` CLI | Expo account | Free plan |
+| GitHub Pages | everyday-labs.org website, AASA universal-link file, feedback form | Browser | — | Free |
+| Cloudflare | DNS for everyday-labs.org; `hello@` email forwarding | — | Cloudflare account | Free |
+| Domain `everyday-labs.org` | Website, email sender, universal links | — | Registrar account | **Paid** yearly |
+| Apple Developer Program | Signing, TestFlight/App Store, Sign in with Apple, push (APNs) | — | Apple ID, team `XX3T25NCVV` | **Paid** $99/yr |
+
+## Paid accounts — what's actually costing money
+
+| Account | What you pay for | Price (2026-10-07) | Started / renews | Evidence | To confirm |
+|---|---|---|---|---|---|
+| **Google Cloud** (project "Bulkmate") | Vision OCR; Places API when seeding | Vision `DOCUMENT_TEXT_DETECTION`: first 1,000 images/month free, then $1.50 per 1,000 (≈ $0.0015/receipt). Places Text Search Pro: 5,000 calls/month free, then $32 per 1,000 | Billing account upgraded from free trial to paid **2026-06-03** | "You have upgraded to a paid Google Cloud account" email, 2026-06-03 | Set a **budget alert** (Billing → Budgets) — none is recorded; restrict both API keys to their one API |
+| **RapidAPI** (Costco Live Data) | Pricing lookups | Depends on the plan subscribed to — not recorded anywhere in the repo | Unknown | No receipt found in the developer's Gmail | Plan name, monthly quota, overage price (RapidAPI → My Apps → Billing). Overage on RapidAPI plans is usually billed automatically |
+| **Apple Developer Program** | Distribution, Sign in with Apple, push | $99/year | Enrolled + PLA accepted **2026-08-11** → renews ~2026-08-11 each year | `CLAUDE.md` → Build Status | Auto-renew on; lapsing pulls the app from the App Store |
+| **Domain `everyday-labs.org`** | Website, `noreply@`/`hello@` email, universal links | Cloudflare Registrar at-cost yearly .org price | Bought **2026-10-06**, registry expiry **2027-10-06** | WHOIS (registrar Cloudflare, Inc.) | Confirm auto-renew is on (Cloudflare → Domain Registration → Manage). Losing the domain breaks email, privacy URL and universal links at once |
+| **Supabase** | Whole backend | Free $0, Pro $25/month | — | — | **Which plan?** On Free, a project with no activity for 7 days is paused (app goes dark until restored by hand), Edge Functions stop at 150s, and DB/Storage cap at 500 MB / 1 GB. Pro is the safe choice once real users exist |
+| **Brevo** | Email (free); SMS credits only if texts are re-enabled | Free: 300 emails/day, Brevo branding. SMS: prepaid credits per country | — | — | Stay on free until volume approaches 300/day |
+| **Google Play Console** | Android publishing | $25 one-time | Not paid yet | — | Only needed if Android ships |
+| Free: PostHog, Expo/EAS, Open Food Facts, USDA FDC, Expo Push, GitHub Pages, Cloudflare | — | $0 | — | — | Watch the free caps in the limits table below |
+
+## API keys & secrets register
+
+Where every credential lives. "Public" means it ships inside the app or website
+by design and is safe to expose; everything else is secret.
+
+| Name | Service / account | Lives in | Public? | Used by | Rotation / expiry notes |
+|---|---|---|---|---|---|
+| `EXPO_PUBLIC_SUPABASE_URL` | Supabase project | `costco-mobile/.env`, EAS env vars; also hard-coded in website `bulkmate/feedback.html` | Public | Mobile app, feedback form | — |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase project | Same as above | Public (RLS protects data) | Mobile app, feedback form | Rotating it needs an app release *and* a website edit |
+| `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_URL` | Supabase project | Edge Function secrets (auto-managed) | **Secret** — bypasses RLS | All Edge Functions | Never ship to the app or website |
+| `GOOGLE_CLOUD_VISION_API_KEY` | Google Cloud project "Bulkmate" (paid) | Edge Function secret | **Secret** | `ingest-receipt` | Restrict to Cloud Vision API only |
+| `RAPIDAPI_KEY` | RapidAPI account | Edge Function secret | **Secret** | `barcode-lookup`, `price-match-check` | A leaked key bills your RapidAPI plan |
+| `USDA_FDC_API_KEY` | api.data.gov | Edge Function secret | Secret (free) | `barcode-lookup` | Registered under the developer's details (`NAMING_TODO.md` §5) |
+| `BREVO_API_KEY` | Brevo account | Edge Function secret | **Secret** | Email/SMS functions | — |
+| `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`, `BREVO_SMS_SENDER` | Brevo | Edge Function secrets (optional) | Not secret | Brevo client | Defaults in `_shared/brevo.ts` |
+| `ALERT_EMAIL_DAILY_CAP` | — (tuning) | Edge Function secret (optional) | Not secret | `price-match-check` | Default 200 price-drop emails per UTC day; raise it if Brevo is upgraded |
+| `RAPIDAPI_MAX_CALLS_PER_RUN` | — (tuning) | Edge Function secret (optional) | Not secret | `price-match-check` | Default 300; set to about (monthly RapidAPI quota − expected barcode scans) ÷ 30 |
+| Brevo SMTP login + SMTP key | Brevo account | Supabase dashboard → Auth → SMTP | **Secret** | Auth emails | Separate from `BREVO_API_KEY` |
+| `NOTIFY_LINK_SECRET` | Self-generated | Edge Function secret | **Secret** | Signs email unsubscribe links (`_shared/notifyLinks.ts`) | Changing it breaks every unsubscribe link already sent |
+| `POSTHOG_PROJECT_TOKEN`, `POSTHOG_HOST` | PostHog project | `costco-mobile/.env`, EAS env vars, Edge Function secrets | Public (write-only) | App + functions | — |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | Google Cloud "Bulkmate" OAuth clients | `costco-mobile/.env`, EAS env vars | Public | Google sign-in | — |
+| Google OAuth Web client **secret** | Google Cloud "Bulkmate" | Supabase dashboard → Auth → Google | **Secret** | Supabase Auth | — |
+| Apple Sign-in client-secret JWT | Apple Developer (client ID `com.twonk0609.bulkmate`) | Supabase dashboard → Auth → Apple | **Secret** | Supabase Auth | **Expires 2027-02-10** (6-month max; calendar reminder set for 2027-01-27). Re-mint with `costco-backend/scripts/generate-apple-client-secret.mjs` |
+| Apple `.p8` signing key (+ Key ID `B4MB9C5436`) | Apple Developer | `~/.config/bulkmate/` on the developer's Mac (mode 600, not iCloud-synced) + a macOS Keychain backup item; never in the repo (`*.p8` gitignored) | **Secret** | Mints the JWT above | Downloadable only once — moved off the synced Desktop 2026-10-07 |
+| APNs push key / iOS certificates | Apple Developer | Managed by EAS credentials | **Secret** | iOS push via Expo | Created by `eas credentials` / first EAS build |
+| `GOOGLE_PLACES_API_KEY` | Google Cloud "Bulkmate" (paid) | Developer's shell env only, when seeding | **Secret** | Seed script | Restrict to Places API; disable between seeding runs |
+| Supabase CLI access token | Supabase account | `~/.supabase` on the dev machine | **Secret** | `supabase db push`, `functions deploy` | — |
+
+## Limits, SLAs, bottlenecks & drawbacks
+
+| Service | SLA | Limits that matter | Bottlenecks & drawbacks |
+|---|---|---|---|
+| **Google Cloud Vision** | ≥ 99.9% monthly uptime (published Google SLA) | 1,000 free images/month, then billed per image | **Hard dependency** — when it's down or the key is wrong, no receipt can be scanned (the only client allowed to throw). Cost grows 1:1 with scans; nothing to cache. 30s request timeout → a clean "retry" error. `ingest-receipt` only runs for the signed-in owner of the uploaded image, so the anon key can't spend Vision calls. |
+| **RapidAPI — Costco Live Data** | **None** — a third-party marketplace listing, not Costco | Plan quota unknown (see above) | Unofficial data source that can change, rate-limit or disappear without notice. Doesn't match raw UPC/EAN barcodes (most real scans). Main ongoing cost. **Mitigated:** 72h cache; 8s timeout; the sweep prices each SKU once, 4 at a time, stops starting new SKUs after 90s, and makes at most `RAPIDAPI_MAX_CALLS_PER_RUN` (default 300) API calls — SKUs past either limit fall back to the OCR ledger or wait for the next run. `barcode-lookup` requires a signed-in user and `price-match-check` the service role, so the anon key can't spend calls. **Still open:** set the per-run cap from the real plan quota. |
+| **Open Food Facts** | **None** — volunteer-run non-profit | 15 product reads/min per IP; search 10/min; IP bans for abuse | All calls come from Supabase's shared egress IPs, so the per-IP limit is shared with other tenants → expect occasional 429s (graceful: falls back to USDA). Crowd-sourced data can be wrong. 8s timeout. **ODbL licence requires attribution** — credited under the ingredients card on the product screen (linked to openfoodfacts.org). |
+| **USDA FoodData Central** | None (US government service) | 1,000 requests/hour per key; a block lasts 1 hour | Full-text search, not a barcode lookup — every hit is re-checked against the UPC. US-branded foods only; raw text only, so weaker classification. |
+| **Expo Push** | **None** — Expo publishes no SLA; APNs/FCM have occasional outages too | 100 messages per request (batched); no daily cap | Push is best-effort; the in-app Alerts screen is the source of truth. Push receipts aren't checked, so dead tokens are never cleaned up. Needs a dev/Release build — not Expo Go. |
+| **Brevo** | No SLA on the free plan | **300 emails/day total** (auth codes + price-drop emails share it); Brevo branding on free | The daily cap is the first hard ceiling. **Mitigated:** price-drop emails stop at `ALERT_EMAIL_DAILY_CAP` (default 200) per UTC day, leaving ~100 for sign-up/reset codes; anything past the cap — or any failed send — keeps `emailed_at` null and goes out on the next run. 10s timeout. A sign-up spike of 100+/day can still exhaust it — upgrade Brevo before then. US SMS needs a registered number + paid credits (why SMS is paused). |
+| **PostHog** | No SLA on the free tier | Free per month: 1M events, 5K session recordings, 100K exceptions | Session replay is the cap you'll hit first. Set billing limits if a card is ever added. Backend delivery has never been confirmed in the dashboard. |
+| **Supabase** | No SLA on Free/Pro | Free: 500 MB DB, 1 GB Storage, 500K function calls, 5 GB egress, 2s CPU per request, **150s wall clock** (400s on paid); paused after 7 days idle | Single point of failure for everything. Receipt images fill the 1 GB Storage cap first. A Free-plan pause also stops the daily price-match cron. |
+| **Google Places** | Google Maps Platform SLA | Text Search Pro: 5,000 free calls/month, then $32 per 1,000 | Only used when re-seeding. Ratings drift, so rarity tiers go stale until the script is re-run. Google's terms restrict long-term caching of Places content — worth reviewing for the stored `google_rating` columns. |
+| **Expo / EAS** | None on the free plan | 15 iOS + 15 Android builds/month; OTA updates to 1,000 MAU | Build queue waits on the free tier. |
+| **Apple** | — | — | Sign-in client secret expires every 6 months (next **2027-02-10**). Hide-My-Email users only receive mail from registered sender domains. |
+| **Domain / Cloudflare / GitHub Pages** | None (free tiers) | GitHub Pages: soft 100 GB/month bandwidth | One expired domain breaks website, email and universal links together. |
+
+## Who may call each Edge Function
+
+The gateway's default `verify_jwt` only proves a token was signed by this
+project — the public anon key passes it. Functions that spend money or act for
+a user check the caller themselves (`_shared/auth.ts`):
+
+| Function | Allowed caller | Why |
+|---|---|---|
+| `price-match-check` | Service role only (pg_cron sweep, `ingest-receipt`) | Spends RapidAPI calls and the Brevo email quota |
+| `weekly-price-texts` | Service role only (pg_cron) | Sends paid SMS |
+| `ingest-receipt` | Signed-in user; image must be under `<their id>/` | Spends Vision calls; writes into the caller's account |
+| `barcode-lookup` | Signed-in user | Spends RapidAPI calls |
+| `check-in`, `delete-account`, `phone-verification` | Signed-in user | Act on the caller's account |
+| `email-unsubscribe` | Anyone with a signed link (`verify_jwt = false`) | Opened from an email |
+
+Every outbound API call has a timeout (5-30s, set per client in `_shared/`), so
+one slow provider can't hold a function until the 150s gateway limit.
+
+## Services not called at runtime
+
+These don't appear in `_shared/` but are part of what keeps the app running.
+
+- **Supabase** — the backend itself. Auth emails go through the Brevo SMTP relay
+  set in the dashboard. `pg_cron` runs `daily-price-match-sweep` (08:00 UTC)
+  through `pg_net`; `weekly-price-texts` is unscheduled while SMS is paused.
+- **Google Sign-In / Sign in with Apple** — the native SDKs return an ID token
+  that `supabase.auth.signInWithIdToken` verifies; provider secrets live in the
+  Supabase dashboard (see the key register).
+- **Google Places API** — only `scripts/seed-warehouses-from-google-places.mjs`,
+  run by hand: `GOOGLE_PLACES_API_KEY=… node costco-backend/scripts/seed-warehouses-from-google-places.mjs`
+  (`REGION_FILTER` limits the run). Output is a SQL migration; the app never
+  calls Places.
+- **Expo / EAS** — builds and push credentials; project `costco-app`, owner
+  `twonk0609s-team` (never rename — see `NAMING_TODO.md`).
+- **Website** (`everyday-labs/everyday-labs.github.io`) — the feedback form
+  posts straight to Supabase REST with the anon key (`feature_requests` is
+  insert-only).
+
+## Runtime clients (`supabase/functions/_shared/`)
 
 | API | Client file | Called from | Auth | Cost |
 |---|---|---|---|---|
@@ -13,7 +143,7 @@ call X" regardless of which Edge Function needs it.
 | USDA FoodData Central | `_shared/usdaFdc.ts` | `barcode-lookup` (fallback only) | API key (query param) | Free |
 | Expo Push API | `_shared/expoPush.ts` | `price-match-check` | None (device push token) | Free |
 | Brevo (email + SMS) | `_shared/brevo.ts` | `price-match-check`, `weekly-price-texts`, `phone-verification` | API key (header) | Email free up to 300/day; SMS paid credits |
-| PostHog | `_shared/posthog.ts` | All 4 functions (top-level catch) | Project token | Free tier |
+| PostHog | `_shared/posthog.ts` | All 8 functions (top-level catch) | Project token | Free tier |
 
 No official Costco API exists — `api.costco.com` and other Costco-internal
 endpoints are session-cookie protected and must never be called directly (see
