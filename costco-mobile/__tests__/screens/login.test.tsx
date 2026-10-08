@@ -49,7 +49,7 @@ describe('LoginScreen', () => {
       email: 'sam@example.com',
       password: 'hunter22',
     });
-    expect(posthog!.identify).toHaveBeenCalledWith(TEST_USER.id, { email: TEST_USER.email });
+    expect(posthog!.identify).toHaveBeenCalledWith(TEST_USER.id);
     // Spinner gone, button back.
     await screen.findByText('Sign In');
   });
