@@ -74,6 +74,7 @@ export async function handler(req: Request): Promise<Response> {
     const message = e instanceof Error ? e.message : String(e);
     console.error('delete-account error:', message);
     await capturePostHogException(e, { functionName: 'delete-account' }, userId);
-    return json({ error: message }, 500);
+    // Details are logged above; never echo internal errors to the client.
+    return json({ error: 'Account deletion failed. Please try again.' }, 500);
   }
 }
