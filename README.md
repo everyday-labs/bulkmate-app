@@ -134,10 +134,14 @@ One command runs everything CI runs — formatting, lint, types, tests and cover
 | Edge Function tests | `deno test` with a fake Supabase (`_testing/fakeSupabase.ts`) | `./scripts/deno-coverage.sh` (repo root) |
 | Accessibility | WCAG contrast of the palette | `npm run check:contrast` |
 | Visual regression | Playwright screenshots of the Expo web build | `npm run build:web && npm run test:visual` |
+| Secrets | gitleaks (`.gitleaks.toml` extends the built-in rules) + GitHub push protection | `./scripts/secret-scan.sh` (repo root) |
+| Workflows & shell | actionlint, zizmor (Actions security), shellcheck | `brew install actionlint zizmor shellcheck` — run by the hooks/CI |
+| Security analysis | CodeQL (`security-extended`), OpenSSF Scorecard | CI only — results under **Security → Code scanning** |
+| Dependencies | Dependency review (blocks new high/critical or GPL deps on PRs), `npm audit` report, Dependabot | CI only |
 
 **Coverage gates** (CI fails below them): mobile ≥ 80% lines/statements, 75% functions, 65% branches (`jest.coverageThreshold` in `package.json`); Edge Functions ≥ 90% lines across *every* source file (`scripts/deno-coverage.sh`).
 
-**Git hooks** (Husky, installed by `npm install` in `costco-mobile/`): *pre-commit* formats and lints the staged files, typechecks, and runs the tests related to them; *pre-push* runs `./scripts/check-all.sh`. `git commit --no-verify` skips them in an emergency — CI still runs everything.
+**Git hooks** (Husky, installed by `npm install` in `costco-mobile/`): *pre-commit* first scans the staged changes for secrets (needs `brew install gitleaks`; it fails closed), then formats and lints the staged files, typechecks, and runs the tests related to them; *pre-push* runs `./scripts/check-all.sh`. `git commit --no-verify` skips them in an emergency — CI still runs everything.
 
 **CI** (`.github/workflows/ci.yml`) runs on every pull request and push to `main`: lint & types, mobile tests, Edge Function tests, and visual regression, then a single **CI passed** status. Visual baselines are Linux images rendered in a pinned Playwright container; when a UI change is intended, CI uploads the new screenshots as the `visual-baselines` artifact — review and commit them under `costco-mobile/e2e/__screenshots__/`.
 

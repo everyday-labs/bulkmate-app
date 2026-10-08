@@ -4,6 +4,15 @@
 set -e
 root="$(git rev-parse --show-toplevel)"
 
+echo "▶ Secrets (gitleaks, full history)"
+"$root/scripts/secret-scan.sh"
+
+echo "▶ Workflows & shell (actionlint, zizmor, shellcheck)"
+"$root/scripts/optional-tool.sh" actionlint
+"$root/scripts/optional-tool.sh" zizmor --no-progress --min-severity=low "$root/.github/workflows"
+"$root/scripts/optional-tool.sh" shellcheck "$root"/scripts/*.sh
+"$root/scripts/optional-tool.sh" shellcheck --shell=sh "$root/costco-mobile/.husky/pre-commit" "$root/costco-mobile/.husky/pre-push"
+
 echo "▶ Formatting (Prettier)"
 # Tracked files only: what is pushed is committed, and unrelated untracked
 # work-in-progress must not block a push.
