@@ -15,6 +15,8 @@
 // limited more aggressively, which we hit firsthand while spike-testing.
 
 const OFF_PRODUCT_URL = 'https://world.openfoodfacts.org/api/v2/product';
+// Enrichment only — give up quickly and let the caller fall back to USDA.
+const TIMEOUT_MS = 8_000;
 const USER_AGENT = 'Bulkmate/1.0 (Everyday Labs; hello@everyday-labs.org) - Supabase Edge Function';
 
 const FIELDS = [
@@ -73,7 +75,10 @@ function readPalmOil(analysisTags: unknown): 'yes' | 'no' | 'unknown' {
 export async function fetchOffProduct(upc: string): Promise<OffProduct | null> {
   try {
     const url = `${OFF_PRODUCT_URL}/${encodeURIComponent(upc)}.json?fields=${FIELDS}`;
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const res = await fetch(url, {
+      headers: { 'User-Agent': USER_AGENT },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
 
     if (!res.ok) {
       console.warn(`Open Food Facts ${res.status} for UPC "${upc}"`);

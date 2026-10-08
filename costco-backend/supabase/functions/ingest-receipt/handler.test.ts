@@ -61,13 +61,15 @@ function setup(routes: Record<string, unknown> = {}, ocr: string | null = OCR) {
     'GET badges': [],
     // Fire-and-forget price check
     'POST functions/price-match-check': { checked: 2 },
+    // The signed-in caller (the receipt's owner)
+    'GET auth/user': { id: USER_ID, aud: 'authenticated' },
     ...routes,
   });
   return { api, done: async () => (await settle(), api.restore(), cleanup()) };
 }
 
-const ingest = (body: unknown = { imagePath: IMAGE, userId: USER_ID }) =>
-  quiet(() => handler(request(body)));
+const ingest = (body: unknown = { imagePath: IMAGE, userId: USER_ID }, token = 'jwt') =>
+  quiet(() => handler(request(body, { token })));
 
 Deno.test('ingest-receipt: OCRs, parses and stores the receipt, items and visit', async () => {
   const { api, done } = setup();
@@ -207,7 +209,7 @@ Deno.test('ingest-receipt: unreadable receipts are rejected with a reason', asyn
 Deno.test('ingest-receipt: request, download and insert failures', async () => {
   const missing = setup();
   try {
-    assertEquals((await ingest({ imagePath: IMAGE })).status, 400);
+    assertEquals((await ingest({ userId: USER_ID })).status, 400);
   } finally {
     await missing.done();
   }
@@ -237,4 +239,37 @@ Deno.test('ingest-receipt: request, download and insert failures', async () => {
   const pre = await handler(request(null, { method: 'OPTIONS' }));
   assertEquals(pre.status, 200);
   await pre.body?.cancel();
+});
+
+Deno.test('ingest-receipt: only the signed-in owner of the image can ingest it', async () => {
+  const { api, done } = setup();
+  try {
+    // No token (the public anon key resolves to no user)
+    assertEquals((await ingest(undefined, '')).status, 401);
+    // userId in the body must be the caller's
+    assertEquals((await ingest({ imagePath: IMAGE, userId: 'someone-else' })).status, 403);
+    // and so must the image
+    assertEquals((await ingest({ imagePath: 'someone-else/1.jpg' })).status, 403);
+    // Nothing was read or OCR'd
+    assertEquals(api.calls('GET storage/receipts').length, 0);
+    assertEquals(api.calls(VISION).length, 0);
+  } finally {
+    await done();
+  }
+
+  const anon = setup({ 'GET auth/user': errorResponse(401) });
+  try {
+    assertEquals((await ingest(undefined, 'anon-key')).status, 401);
+    assertEquals(anon.api.calls(VISION).length, 0);
+  } finally {
+    await anon.done();
+  }
+
+  // Older app builds send userId too; without it the caller still owns the receipt.
+  const noUserId = setup();
+  try {
+    assertEquals((await ingest({ imagePath: IMAGE })).status, 200);
+  } finally {
+    await noUserId.done();
+  }
 });

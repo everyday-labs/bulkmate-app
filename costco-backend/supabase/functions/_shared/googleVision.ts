@@ -12,6 +12,10 @@
 
 const VISION_API_URL = 'https://vision.googleapis.com/v1/images:annotate';
 
+// Normal OCR takes 1-5s. Past this, fail with a retryable error instead of
+// holding ingest-receipt open until the gateway's 150s timeout.
+const TIMEOUT_MS = 30_000;
+
 export async function extractTextFromImage(base64Image: string): Promise<string> {
   const apiKey = Deno.env.get('GOOGLE_CLOUD_VISION_API_KEY');
   if (!apiKey) throw new Error('GOOGLE_CLOUD_VISION_API_KEY not set');
@@ -27,6 +31,7 @@ export async function extractTextFromImage(base64Image: string): Promise<string>
         },
       ],
     }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
 
   if (!response.ok) {

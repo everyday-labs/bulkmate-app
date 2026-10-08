@@ -69,7 +69,7 @@ Most reads (receipts, badges, profile) go straight from the app to Supabase via 
 
 ## External APIs
 
-No official Costco API exists, so pricing, ingredient, and OCR data are sourced from a mix of licensed, free/open, and crowdsourced sources. Every client lives in `costco-backend/supabase/functions/_shared/`, one file per API — see [`costco-backend/EXTERNAL_APIS.md`](./costco-backend/EXTERNAL_APIS.md) for the full detail on each (auth, caching, and exactly what happens when it fails).
+No official Costco API exists, so pricing, ingredient, and OCR data are sourced from a mix of licensed, free/open, and crowdsourced sources. Every client lives in `costco-backend/supabase/functions/_shared/`, one file per API — see [`costco-backend/EXTERNAL_APIS.md`](./costco-backend/EXTERNAL_APIS.md) for the full detail on each (auth, caching, and exactly what happens when it fails). That file is also the register of every paid account, API key/secret (names and locations, never values), and each service's limits, SLA and drawbacks.
 
 | API | Used for | Called from | Auth | Cost |
 |---|---|---|---|---|
